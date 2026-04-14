@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Backend API Test</h1>
+    
+    <div>
+        <h2>Test Employees Endpoint</h2>
+        <button onclick="testEmployees()">Test GET /api/employees</button>
+        <div id="employeesResult"></div>
+    </div>
+    
+    <div>
+        <h2>Test Attendance Endpoint</h2>
+        <button onclick="testAttendance()">Test POST /api/attendance</button>
+        <div id="attendanceResult"></div>
+    </div>
+    
+    <div>
+        <h2>Test Backend Health</h2>
+        <button onclick="testHealth()">Test Backend Health</button>
+        <div id="healthResult"></div>
+    </div>
+
+    <script>
+        async function testEmployees() {
+            const resultDiv = document.getElementById('employeesResult');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:5069/api/employees');
+                const data = await response.json();
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function testAttendance() {
+            const resultDiv = document.getElementById('attendanceResult');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const testData = {
+                    employeeId: 1,
+                    date: "2024-01-15",
+                    isPresent: true,
+                    notes: "Test attendance record"
+                };
+                
+                const response = await fetch('http://localhost:5069/api/attendance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<pre>Success: ${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    const errorText = await response.text();
+                    resultDiv.innerHTML = `<p style="color: red;">Error ${response.status}: ${errorText}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:5069/api/health');
+                if (response.ok) {
+                    resultDiv.innerHTML = '<p style="color: green;">Backend is healthy!</p>';
+                } else {
+                    resultDiv.innerHTML = `<p style="color: orange;">Backend responded with status: ${response.status}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Backend is not accessible: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 

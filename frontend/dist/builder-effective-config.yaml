@@ -1,0 +1,29 @@
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - filter:
+      - build/**/*
+      - build/**/*
+      - public/electron.js
+      - node_modules/**/*
+extraMetadata:
+  main: build/electron.js
+appId: com.proluxgroup.app
+productName: PROLUX Group
+extraResources:
+  - from: ../backend/publish
+    to: backend
+    filter:
+      - '**/*'
+win:
+  target: nsis
+  icon: public/rio-logo.png
+mac:
+  target: dmg
+  icon: public/rio-logo.png
+linux:
+  target: AppImage
+  icon: public/rio-logo.png
+extends: react-cra
+electronVersion: 37.1.0

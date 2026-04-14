@@ -1,0 +1,417 @@
+import React, { useRef, useMemo, useState } from "react";
+import {
+  Button,
+  Table,
+  Input,
+  Card,
+  Typography,
+  Space,
+  Row,
+  Col,
+  Switch,
+  message,
+} from "antd";
+import { PrinterOutlined } from "@ant-design/icons";
+import { computeInvoiceTotals, formatMkd } from "../utils/invoiceTotals";
+import apiClient, { API_ENDPOINTS } from "../config/api";
+import { useAuth } from "../contexts/AuthContext";
+
+const { Title, Text } = Typography;
+
+const columns = [
+  { title: "ITEM", dataIndex: "item", width: 60 },
+  { title: "Name", dataIndex: "name" },
+  { title: "Materials", dataIndex: "materials" },
+  { title: "m2/pcs", dataIndex: "m2pcs", width: 80 },
+  { title: "Price", dataIndex: "price", width: 80 },
+  { title: "Total", dataIndex: "total", width: 80 },
+];
+
+const initialRows = Array.from({ length: 8 }, (_, i) => ({
+  key: i,
+  item: i + 1,
+  name: "",
+  materials: "",
+  m2pcs: "",
+  price: "",
+  total: "",
+}));
+
+function TemplatePrint() {
+  const { isAdmin } = useAuth();
+  const [rows, setRows] = React.useState(initialRows);
+  const [header, setHeader] = React.useState({
+    customer: "",
+    date: "",
+    invoice: "",
+  });
+  const [discountPercent, setDiscountPercent] = React.useState("");
+  const [advancePayment, setAdvancePayment] = React.useState("");
+  const [description, setDescription] = React.useState([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
+  const [deductStockOnPrint, setDeductStockOnPrint] = useState(false);
+  const [printLoading, setPrintLoading] = useState(false);
+  const printRef = useRef();
+
+  const totals = useMemo(
+    () => computeInvoiceTotals(rows, discountPercent, advancePayment),
+    [rows, discountPercent, advancePayment]
+  );
+
+  const handleRowChange = (idx, field, value) => {
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[idx][field] = value;
+      return updated;
+    });
+  };
+
+  const handleHeaderChange = (field, value) => {
+    setHeader((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDescriptionChange = (idx, value) => {
+    setDescription((prev) => {
+      const updated = [...prev];
+      updated[idx] = value;
+      return updated;
+    });
+  };
+
+  const openPrintWindow = () => {
+    const printContents = printRef.current.innerHTML;
+    const win = window.open("", "", "height=900,width=1200");
+    win.document.write("<html><head><title>Print</title>");
+    win.document.write(
+      '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.16.13/antd.min.css" />'
+    );
+    win.document.write(`
+      <style>
+        @media print {
+          body { margin: 0; padding: 0; }
+          .print-container { 
+            max-width: 100% !important; 
+            padding: 15px !important; 
+            margin: 0 !important;
+            page-break-inside: avoid;
+          }
+          table { font-size: 12px; }
+          .ant-table { font-size: 12px; }
+          .ant-input { font-size: 12px; padding: 4px; }
+        }
+      </style>
+    `);
+    win.document.write("</head><body>");
+    win.document.write(printContents);
+    win.document.write("</body></html>");
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 500);
+  };
+
+  const handlePrint = async () => {
+    if (deductStockOnPrint && isAdmin()) {
+      setPrintLoading(true);
+      try {
+        const res = await apiClient.post(
+          API_ENDPOINTS.STOCK_APPLY_INVOICE_DEDUCTIONS,
+          {
+            lines: rows.map((r) => ({
+              name: r.name,
+              m2Pcs: r.m2pcs,
+            })),
+            invoiceNumber: header.invoice || null,
+            customerName: header.customer || null,
+          }
+        );
+        const data = res.data || {};
+        const applied = data.applied || data.Applied || [];
+        const skipped = data.skipped || data.Skipped || [];
+        if (applied.length > 0) {
+          message.success(
+            `Stoku u zbrit: ${applied
+              .map(
+                (a) =>
+                  `${a.stockItemName || a.StockItemName} (−${
+                    a.quantityDeducted ?? a.QuantityDeducted
+                  })`
+              )
+              .join(", ")}`
+          );
+        } else {
+          message.info("Nuk u gjet asnjë rresht që përputhet me stokun.");
+        }
+        if (skipped.length > 0) {
+          message.warning(skipped.slice(0, 5).join(" · "));
+        }
+      } catch (e) {
+        const msg =
+          e?.response?.data?.message ||
+          (typeof e?.response?.data === "string" ? e.response.data : null);
+        message.error(msg || "Zbritja nga stoku dështoi. Printimi u anulua.");
+        setPrintLoading(false);
+        return;
+      } finally {
+        setPrintLoading(false);
+      }
+    }
+
+    openPrintWindow();
+  };
+
+  return (
+    <div>
+      <Space direction="vertical" size="middle" style={{ marginBottom: 24, width: "100%" }}>
+        <Space wrap align="start">
+          <Button
+            icon={<PrinterOutlined />}
+            type="primary"
+            onClick={handlePrint}
+            loading={printLoading}
+          >
+            Print
+          </Button>
+          {isAdmin() && (
+            <Space align="center" wrap>
+              <Switch
+                checked={deductStockOnPrint}
+                onChange={setDeductStockOnPrint}
+              />
+              <Text type="secondary" style={{ maxWidth: 520 }}>
+                Zbrit nga stoku para printimit: emri në rresht duhet të përputhet saktë me{" "}
+                <Text strong>emrin</Text> ose <Text strong>SKU</Text> të artikullit në
+                stok; sasia merret nga <Text strong>m2/pcs</Text>. Nëse stoku nuk mjafton,
+                printimi anulohet. Printimi i dyfishtë zbrit dy herë.
+              </Text>
+            </Space>
+          )}
+        </Space>
+      </Space>
+      <div
+        ref={printRef}
+        className="print-container"
+        style={{
+          background: "#fff",
+          padding: "20px",
+          maxWidth: "800px",
+          margin: "0 auto",
+          border: "2px solid #000",
+          minHeight: "100vh",
+          boxSizing: "border-box",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <img
+            src={
+              process.env.NODE_ENV === "development"
+                ? "/rio-logo.png"
+                : "./rio-logo.png"
+            }
+            alt="ProLux Group Logo"
+            style={{ height: 50 }}
+          />
+          <div style={{ textAlign: "right", fontSize: 12 }}>
+            <div>PROLUX Group - Superior Natural Surfaces</div>
+            <div>Address: 11 Noemvri br.52</div>
+            <div>Email: proluxceramics01@gmail.com</div>
+            <div>Tel: 071/764/334</div>
+          </div>
+        </div>
+        <Title level={3} style={{ textAlign: "center", margin: "8px 0" }}>
+          PROLUX GROUP
+        </Title>
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: 500,
+            color: "#555",
+            marginBottom: 12,
+            fontSize: "14px",
+          }}
+        >
+          SUPERIOR NATURAL SURFACES
+        </div>
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: 700,
+            marginBottom: 8,
+            fontSize: "16px",
+          }}
+        >
+          INVOICE / FLETËFATURË
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: 12,
+          }}
+        >
+          <Input
+            placeholder="Customer Name"
+            value={header.customer}
+            onChange={(e) => handleHeaderChange("customer", e.target.value)}
+            style={{ width: 250 }}
+            bordered={false}
+          />
+          <Input
+            placeholder="Date"
+            value={header.date}
+            onChange={(e) => handleHeaderChange("date", e.target.value)}
+            style={{ width: 150 }}
+            bordered={false}
+          />
+          <Input
+            placeholder="Invoice No."
+            value={header.invoice}
+            onChange={(e) => handleHeaderChange("invoice", e.target.value)}
+            style={{ width: 150 }}
+            bordered={false}
+          />
+        </div>
+        <Table
+          columns={columns.map((col) => ({
+            ...col,
+            render: (text, record, idx) => (
+              <Input
+                value={rows[idx][col.dataIndex]}
+                onChange={(e) =>
+                  handleRowChange(idx, col.dataIndex, e.target.value)
+                }
+                bordered={false}
+                style={{
+                  background: "transparent",
+                  borderBottom: "2px solid #000",
+                  minWidth: 40,
+                }}
+              />
+            ),
+          }))}
+          dataSource={rows}
+          pagination={false}
+          bordered
+          style={{ marginBottom: 12 }}
+        />
+        <div style={{ marginBottom: 12 }}>
+          <Card size="small" title={<b>Description</b>} bordered={false}>
+            {description.map((desc, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  marginBottom: 2,
+                }}
+              >
+                <span style={{ width: 20, color: "#888" }}>{idx + 1}</span>
+                <Input
+                  value={desc}
+                  onChange={(e) => handleDescriptionChange(idx, e.target.value)}
+                  bordered={false}
+                  style={{ borderBottom: "2px solid #000", flex: 1 }}
+                />
+              </div>
+            ))}
+          </Card>
+        </div>
+
+        <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
+          <Col xs={24} sm={12}>
+            <Text strong>Zbritja (%)</Text>
+            <Input
+              placeholder="0"
+              value={discountPercent}
+              onChange={(e) => setDiscountPercent(e.target.value)}
+              suffix="%"
+              style={{ marginTop: 4 }}
+            />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Text strong>Avans / Parapagim (MKD)</Text>
+            <Input
+              placeholder="0"
+              value={advancePayment}
+              onChange={(e) => setAdvancePayment(e.target.value)}
+              style={{ marginTop: 4 }}
+            />
+          </Col>
+        </Row>
+
+        <div
+          style={{
+            maxWidth: 420,
+            marginLeft: "auto",
+            fontSize: 14,
+            borderTop: "1px solid #ccc",
+            paddingTop: 12,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text>Nëntotali (shuma e rreshtave)</Text>
+            <Text strong>{formatMkd(totals.lineSubtotal)}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text>Zbritja ({totals.discountPercent}%)</Text>
+            <Text strong>- {formatMkd(totals.discountAmount)}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text>Total pas zbritjes</Text>
+            <Text strong>{formatMkd(totals.totalAfterDiscount)}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text>Avans i klientit</Text>
+            <Text strong>- {formatMkd(totals.advance)}</Text>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              marginTop: 8,
+              fontWeight: 700,
+              fontSize: 16,
+            }}
+          >
+            <Text strong>Për të paguar</Text>
+            <Text strong>{formatMkd(totals.balanceDue)}</Text>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: 16,
+            fontSize: 11,
+            color: "#888",
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
+          <div>
+            For any further information you can contact us:
+            <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
+              <span>🌐 www.proluxgroup.com</span>
+              <span>🔵 facebook.com/proluxgroup</span>
+              <span>🟣 instagram.com/proluxgroup</span>
+            </div>
+          </div>
+          <div>Mob: 071/764/334</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default TemplatePrint;
