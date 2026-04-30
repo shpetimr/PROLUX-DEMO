@@ -34,16 +34,15 @@ namespace backend.Services
             {
                 row.RelativeItem().Column(col =>
                 {
-                    col.Item().Text("RIO KOMPANI").Bold().FontSize(22);
-                    col.Item().Text("DESIGNED BY NATURE").FontSize(12);
+                    col.Item().Text("PROLUX GROUP").Bold().FontSize(22);
+                    col.Item().Text("SUPERIOR NATURAL SURFACES").FontSize(12);
                 });
-                row.ConstantItem(120).Height(60).Placeholder(); // Logo placeholder
                 row.RelativeItem().AlignRight().Column(col =>
                 {
-                    col.Item().Text("Rio Kompani Dooel S.Gradec, Gostivar Macedonia").FontSize(9);
-                    col.Item().Text("Tel: +389 42 521 422").FontSize(9);
-                    col.Item().Text("Procredit Bank: 380 501 653 600 126").FontSize(9);
-                    col.Item().Text("Halk Bank: 270 047 589 980 164").FontSize(9);
+                    col.Item().Text("PROLUX Group - Superior Natural Surfaces").FontSize(9);
+                    col.Item().Text("Address: 11 Noemvri br.52").FontSize(9);
+                    col.Item().Text("Email: proluxceramics01@gmail.com").FontSize(9);
+                    col.Item().Text("Tel: 071/764/334").FontSize(9);
                 });
             });
             container.PaddingVertical(10).LineHorizontal(1);
@@ -131,8 +130,8 @@ namespace backend.Services
             });
             container.Row(row =>
             {
-                row.RelativeItem().Text("www.riokomapni.com    www.facebook.com/riokomapni").FontSize(9);
-                row.RelativeItem().AlignRight().Text("Mob: +389 70 699 977    www.instagram.com/riokomapni").FontSize(9);
+                row.RelativeItem().Text("Email: proluxceramics01@gmail.com").FontSize(9);
+                row.RelativeItem().AlignRight().Text("Tel: 071/764/334").FontSize(9);
             });
         }
     }

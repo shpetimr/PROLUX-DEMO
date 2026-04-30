@@ -1,14 +1,30 @@
-# Business Management System - Startup Guide
+# PROLUX Group Management - Startup Guide
 
 ## Quick Start
 
-This guide will help you get the complete Business Management System running with both backend and frontend.
+This guide will help you get the complete PROLUX Group management application running with both backend and frontend.
 
 ## Prerequisites
 
 - **.NET 7.0 SDK** - [Download here](https://dotnet.microsoft.com/download/dotnet/7.0)
 - **Node.js 16+** - [Download here](https://nodejs.org/)
 - **SQLite** (included with .NET)
+
+## Build and Test Checks
+
+Run these from the `frontend` directory:
+
+```bash
+npm run check
+```
+
+This builds the backend, builds the frontend, and runs the frontend test command in CI mode. For the desktop package flow, use:
+
+```bash
+npm run build-electron
+```
+
+The Electron backend bundle is published to `artifacts/backend-publish` so generated files stay outside the backend project tree.
 
 ## Step 1: Start the Backend
 
@@ -26,8 +42,8 @@ This guide will help you get the complete Business Management System running wit
    ```
 
 4. **Verify the backend is running:**
-   - You should see output indicating the server is running on `http://localhost:5069`
-   - The API will be available at `http://localhost:5069/api`
+   - You should see output indicating the server is running on the `ASPNETCORE_URLS` value from `backend/.env`
+   - The API will be available at that URL plus `/api`
 
 ## Step 2: Start the Frontend
 
@@ -45,7 +61,7 @@ This guide will help you get the complete Business Management System running wit
    ```
 
 4. **Verify the frontend is running:**
-   - React app should open in your browser at `http://localhost:3000`
+   - React app should open in your browser at the `PORT` value from `frontend/.env`
    - You should see the login page
 
 ## Step 3: Run as Desktop Application
@@ -62,10 +78,9 @@ This guide will help you get the complete Business Management System running wit
 
 ## Step 4: Login and Explore
 
-1. **Login with default credentials:**
+1. **Login with a provisioned account:**
 
-   - Username: `admin`
-   - Password: `admin123`
+   - Use credentials created by your administrator or deployment process
 
 2. **Navigate through the system:**
    - **Dashboard**: Overview of business metrics
@@ -119,19 +134,19 @@ This guide will help you get the complete Business Management System running wit
 ### Backend Issues
 
 - **Port already in use**: Change the port in `appsettings.json`
-- **Database errors**: Delete `backend.db` and restart (will recreate with sample data)
+- **Database errors**: Delete `backend.db` and restart (the schema will be recreated)
 - **Build errors**: Run `dotnet restore` then `dotnet build`
 
 ### Frontend Issues
 
-- **Port 3000 in use**: React will automatically suggest an alternative port
+- **Frontend port in use**: Update `PORT` and `PROLUX_FRONTEND_DEV_URL` in `frontend/.env`
 - **Dependencies missing**: Run `npm install`
 - **Electron not working**: Ensure Node.js is properly installed
 
 ### Connection Issues
 
-- **Frontend can't connect to backend**: Ensure backend is running on port 5069
-- **CORS errors**: Backend is configured to allow requests from localhost:3000
+- **Frontend can't connect to backend**: Ensure `REACT_APP_API_URL` or the `PROLUX_BACKEND_*` variables point to the running API
+- **CORS errors**: Ensure `CORS_ALLOWED_ORIGINS` or `PROLUX_FRONTEND_*` matches the frontend origin
 
 ## Development Mode
 
@@ -172,10 +187,6 @@ If you encounter any issues:
 
 ## Default Data
 
-The system comes with sample data:
-
-- Admin user (admin/admin123)
-- Sample employees (warehouse and field)
-- Sample financial records
+The system does not create sample business records or default login credentials automatically.
 
 You can start using the system immediately or clear the data and start fresh.

@@ -1,6 +1,6 @@
-# Business Management System - Frontend
+# PROLUX Group Management - Frontend
 
-A modern desktop application built with Electron, React, Ant Design, and Tailwind CSS for comprehensive business management.
+A modern web application built with React, Ant Design, and Tailwind CSS for comprehensive business management. Electron tooling is still available for local/desktop workflows, but production deployment is prepared for Netlify.
 
 ## Features
 
@@ -51,8 +51,8 @@ A modern desktop application built with Electron, React, Ant Design, and Tailwin
 
 ## Technology Stack
 
-- **Frontend Framework**: React 18
-- **Desktop App**: Electron
+- **Frontend Framework**: React 19
+- **Desktop App**: Optional Electron tooling
 - **UI Library**: Ant Design
 - **Styling**: Tailwind CSS
 - **HTTP Client**: Axios
@@ -103,7 +103,7 @@ frontend/
 
 ## API Integration
 
-The frontend connects to the .NET Core backend API running on `http://localhost:5069`:
+The frontend connects to the .NET Core backend API configured by `REACT_APP_API_URL`:
 
 - **Authentication**: `/api/auth/login`
 - **Employees**: `/api/employees`
@@ -145,7 +145,7 @@ The frontend connects to the .NET Core backend API running on `http://localhost:
 
 ## Usage
 
-1. **Login**: Use default credentials `admin / admin123`
+1. **Login**: Use a provisioned account from the backend environment
 2. **Navigate**: Use the sidebar to access different modules
 3. **Manage Data**: Add, edit, or delete records using the interface
 4. **Generate Reports**: Select date ranges and export financial reports
@@ -162,11 +162,21 @@ The frontend connects to the .NET Core backend API running on `http://localhost:
 
 ### Environment Variables
 
-Create a `.env` file in the root directory:
+Copy `frontend/.env.example` to `frontend/.env` and point the frontend at the backend API:
 
 ```env
-REACT_APP_API_URL=http://localhost:5069
+REACT_APP_API_URL=https://api.example.com/api
 ```
+
+For local desktop development, the example env file also supports composing that URL from `PROLUX_BACKEND_SCHEME`, `PROLUX_BACKEND_HOST`, `PROLUX_BACKEND_PORT`, and `PROLUX_API_PATH`.
+
+For Netlify production, set only the public Railway API URL:
+
+```env
+REACT_APP_API_URL=https://your-railway-backend.up.railway.app/api
+```
+
+Do not put `DATABASE_URL`, PostgreSQL credentials, or Supabase keys in frontend environment files.
 
 ## Contributing
 

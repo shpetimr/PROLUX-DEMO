@@ -3,7 +3,6 @@ import {
   HashRouter as Router,
   Route,
   Routes,
-  Navigate,
 } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
@@ -24,7 +23,7 @@ import { DataChangeProvider } from "./contexts/DataChangeContext";
 import TemplatePrint from "./pages/TemplatePrint";
 import OfferPrint from "./pages/OfferPrint";
 import Stock from "./pages/Stock";
-import ApiTest from "./components/ApiTest";
+import { PERMISSIONS } from "./config/permissions";
 
 function App() {
   return (
@@ -44,7 +43,9 @@ function App() {
               <Route
                 index
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.DASHBOARD_VIEW}
+                  >
                     <Dashboard />
                   </ProtectedRoute>
                 }
@@ -52,7 +53,9 @@ function App() {
               <Route
                 path="employees"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.EMPLOYEES_MANAGE}
+                  >
                     <Employees />
                   </ProtectedRoute>
                 }
@@ -60,7 +63,9 @@ function App() {
               <Route
                 path="expenses"
                 element={
-                  <ProtectedRoute requiredPermission="expenses">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.EXPENSES_MANAGE}
+                  >
                     <Expenses />
                   </ProtectedRoute>
                 }
@@ -68,7 +73,9 @@ function App() {
               <Route
                 path="purchases"
                 element={
-                  <ProtectedRoute requiredPermission="purchases">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.PURCHASES_MANAGE}
+                  >
                     <Purchases />
                   </ProtectedRoute>
                 }
@@ -76,7 +83,9 @@ function App() {
               <Route
                 path="rents"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.RENTS_MANAGE}
+                  >
                     <Rents />
                   </ProtectedRoute>
                 }
@@ -84,7 +93,9 @@ function App() {
               <Route
                 path="incomes"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.INCOMES_MANAGE}
+                  >
                     <Incomes />
                   </ProtectedRoute>
                 }
@@ -92,7 +103,9 @@ function App() {
               <Route
                 path="debts"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.DEBTS_MANAGE}
+                  >
                     <Debts />
                   </ProtectedRoute>
                 }
@@ -101,7 +114,9 @@ function App() {
               <Route
                 path="reports"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.REPORTS_VIEW}
+                  >
                     <Reports />
                   </ProtectedRoute>
                 }
@@ -109,7 +124,9 @@ function App() {
               <Route
                 path="projects"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.PROJECTS_MANAGE}
+                  >
                     <Projects />
                   </ProtectedRoute>
                 }
@@ -117,7 +134,9 @@ function App() {
               <Route
                 path="projects/:id"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.PROJECTS_MANAGE}
+                  >
                     <ProjectDetails />
                   </ProtectedRoute>
                 }
@@ -125,7 +144,9 @@ function App() {
               <Route
                 path="template-print"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.TEMPLATES_PRINT}
+                  >
                     <TemplatePrint />
                   </ProtectedRoute>
                 }
@@ -133,7 +154,9 @@ function App() {
               <Route
                 path="offer-print"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.OFFERS_PRINT}
+                  >
                     <OfferPrint />
                   </ProtectedRoute>
                 }
@@ -141,16 +164,10 @@ function App() {
               <Route
                 path="stock"
                 element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.STOCK_MANAGE}
+                  >
                     <Stock />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="api-test"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <ApiTest />
                   </ProtectedRoute>
                 }
               />

@@ -2,6 +2,7 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Spin, Result, Button } from "antd";
+import { ROLES } from "../config/permissions";
 
 const ProtectedRoute = ({
   children,
@@ -13,7 +14,6 @@ const ProtectedRoute = ({
     isAdmin,
     isUser,
     hasPermission,
-    canAccessPage,
     loading,
   } = useAuth();
   const location = useLocation();
@@ -33,7 +33,12 @@ const ProtectedRoute = ({
 
   // Check role-based access
   if (requiredRole) {
-    if (requiredRole === "admin" && !isAdmin()) {
+    const normalizedRequiredRole = requiredRole.toLowerCase();
+
+    if (
+      normalizedRequiredRole === ROLES.ADMIN.toLowerCase() &&
+      !isAdmin()
+    ) {
       return (
         <Result
           status="403"
@@ -47,7 +52,10 @@ const ProtectedRoute = ({
         />
       );
     }
-    if (requiredRole === "user" && !isUser()) {
+    if (
+      normalizedRequiredRole === ROLES.USER.toLowerCase() &&
+      !isUser()
+    ) {
       return (
         <Result
           status="403"
@@ -70,23 +78,6 @@ const ProtectedRoute = ({
         status="403"
         title="403"
         subTitle="Sorry, you don't have permission to access this resource."
-        extra={
-          <Button type="primary" onClick={() => window.history.back()}>
-            Go Back
-          </Button>
-        }
-      />
-    );
-  }
-
-  // Check page access
-  const currentPage = location.pathname.split("/")[1] || "dashboard";
-  if (!canAccessPage(currentPage)) {
-    return (
-      <Result
-        status="403"
-        title="403"
-        subTitle="Sorry, you are not authorized to access this page."
         extra={
           <Button type="primary" onClick={() => window.history.back()}>
             Go Back

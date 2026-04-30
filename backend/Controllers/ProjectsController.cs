@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
@@ -11,6 +12,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = AppPermissions.ProjectsManage)]
     public class ProjectsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -27,8 +29,16 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<IEnumerable<ProjectDto>>> GetProjects()
         {
-            var projects = await _context.Projects
-                .Include(p => p.CreatedBy)
+            IQueryable<Project> projectsQuery = _context.Projects
+                .Include(p => p.CreatedBy);
+
+            if (!_currentUserService.IsAdmin())
+            {
+                var currentUserId = _currentUserService.GetCurrentUserId();
+                projectsQuery = projectsQuery.Where(p => p.CreatedById == currentUserId);
+            }
+
+            var projects = await projectsQuery
                 .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new ProjectDto
                 {
@@ -63,6 +73,11 @@ namespace backend.Controllers
             if (project == null)
             {
                 return NotFound();
+            }
+
+            if (!_currentUserService.IsAdmin() && project.CreatedById != _currentUserService.GetCurrentUserId())
+            {
+                return Forbid();
             }
 
             var projectDto = new ProjectDto
@@ -217,9 +232,17 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<IEnumerable<ProjectDto>>> GetProjectsByStatus(ProjectStatus status)
         {
-            var projects = await _context.Projects
+            IQueryable<Project> projectsQuery = _context.Projects
                 .Include(p => p.CreatedBy)
-                .Where(p => p.Status == status)
+                .Where(p => p.Status == status);
+
+            if (!_currentUserService.IsAdmin())
+            {
+                var currentUserId = _currentUserService.GetCurrentUserId();
+                projectsQuery = projectsQuery.Where(p => p.CreatedById == currentUserId);
+            }
+
+            var projects = await projectsQuery
                 .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new ProjectDto
                 {

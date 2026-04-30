@@ -13,7 +13,6 @@ import {
   message,
   Popconfirm,
   Tag,
-  Select,
   Row,
   Col,
   Statistic,
@@ -24,7 +23,6 @@ import {
   DeleteOutlined,
   DollarOutlined,
   BarChartOutlined,
-  RiseOutlined,
   FallOutlined,
   SendOutlined,
 } from "@ant-design/icons";
@@ -32,12 +30,13 @@ import apiClient, { API_ENDPOINTS } from "../config/api";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { useDataChange } from "../contexts/DataChangeContext";
+import { useAuth } from "../contexts/AuthContext";
+import { PERMISSIONS } from "../config/permissions";
 import { useNavigate } from "react-router-dom";
 
 dayjs.extend(utc);
 
-const { Title, Text } = Typography;
-const { Option } = Select;
+const { Title } = Typography;
 const { TextArea } = Input;
 
 function Expenses() {
@@ -47,7 +46,9 @@ function Expenses() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [form] = Form.useForm();
   const { notifyDataChanged } = useDataChange();
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
+  const canViewReports = hasPermission(PERMISSIONS.REPORTS_VIEW);
 
   useEffect(() => {
     fetchExpenses();
@@ -59,7 +60,7 @@ function Expenses() {
       const response = await apiClient.get(API_ENDPOINTS.EXPENSES);
       setExpenses(response.data);
     } catch (error) {
-      message.error("Dështoi të merren shpenzimet");
+      message.error("DÃ«shtoi tÃ« merren shpenzimet");
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,7 @@ function Expenses() {
       fetchExpenses();
       notifyDataChanged();
     } catch (error) {
-      message.error("Dështoi të fshihet shpenzimi");
+      message.error("DÃ«shtoi tÃ« fshihet shpenzimi");
     }
   };
 
@@ -108,7 +109,7 @@ function Expenses() {
           `${API_ENDPOINTS.EXPENSES}/${editingExpense.id}`,
           data
         );
-        message.success("Shpenzimi u përditësua me sukses");
+        message.success("Shpenzimi u pÃ«rditÃ«sua me sukses");
       } else {
         const response = await apiClient.post(API_ENDPOINTS.EXPENSES, data);
         console.log("Create response:", response); // Debug log
@@ -125,29 +126,34 @@ function Expenses() {
       if (error.response?.data?.message) {
         message.error(`Gabim: ${error.response.data.message}`);
       } else if (error.response?.status === 400) {
-        message.error("Të dhënat nuk janë të vlefshme. Kontrolloni fushat.");
+        message.error("TÃ« dhÃ«nat nuk janÃ« tÃ« vlefshme. Kontrolloni fushat.");
       } else if (error.response?.status === 401) {
-        message.error("Ju nuk jeni të autorizuar. Ju lutemi identifikohuni.");
+        message.error("Ju nuk jeni tÃ« autorizuar. Ju lutemi identifikohuni.");
       } else if (error.response?.status === 403) {
-        message.error("Ju nuk keni të drejta për këtë veprim.");
+        message.error("Ju nuk keni tÃ« drejta pÃ«r kÃ«tÃ« veprim.");
       } else if (error.response?.status >= 500) {
-        message.error("Gabim në server. Provoni përsëri më vonë.");
+        message.error("Gabim nÃ« server. Provoni pÃ«rsÃ«ri mÃ« vonÃ«.");
       } else {
-        message.error("Dështoi të ruhet shpenzimi. Kontrolloni lidhjen.");
+        message.error("DÃ«shtoi tÃ« ruhet shpenzimi. Kontrolloni lidhjen.");
       }
     }
   };
 
-  // Funksioni për të dërguar të dhënat në raportin financiar
+  // Funksioni pÃ«r tÃ« dÃ«rguar tÃ« dhÃ«nat nÃ« raportin financiar
   const sendToFinancialReport = async () => {
+    if (!canViewReports) {
+      message.error("Ju nuk keni tÃ« drejta pÃ«r raportet financiare.");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      // Mbledh të gjitha shpenzimet
+      // Mbledh tÃ« gjitha shpenzimet
       const response = await apiClient.get(API_ENDPOINTS.EXPENSES);
       const allExpenses = response.data;
 
-      // Dërgon të dhënat në raportin financiar
+      // DÃ«rgon tÃ« dhÃ«nat nÃ« raportin financiar
       const reportData = {
         expenses: allExpenses,
         totalAmount: allExpenses.reduce(
@@ -159,19 +165,19 @@ function Expenses() {
         generatedAt: new Date().toISOString(),
       };
 
-      // Dërgon në endpoint-in e raportit financiar
+      // DÃ«rgon nÃ« endpoint-in e raportit financiar
       await apiClient.post(
         `${API_ENDPOINTS.REPORTS}/financial/expenses`,
         reportData
       );
 
-      message.success("Të dhënat u dërguan me sukses në raportin financiar!");
+      message.success("TÃ« dhÃ«nat u dÃ«rguan me sukses nÃ« raportin financiar!");
 
       // Hap faqen e raporteve
       navigate("/reports");
     } catch (error) {
-      console.error("Gabim në dërgimin e të dhënave:", error);
-      message.error("Dështoi të dërgohen të dhënat në raportin financiar");
+      console.error("Gabim nÃ« dÃ«rgimin e tÃ« dhÃ«nave:", error);
+      message.error("DÃ«shtoi tÃ« dÃ«rgohen tÃ« dhÃ«nat nÃ« raportin financiar");
     } finally {
       setLoading(false);
     }
@@ -182,9 +188,6 @@ function Expenses() {
     (sum, expense) => sum + expense.amount,
     0
   );
-  const todayExpenses = expenses
-    .filter((expense) => dayjs.utc(expense.date).isSame(dayjs.utc(), "day"))
-    .reduce((sum, expense) => sum + expense.amount, 0);
   const thisMonthExpenses = expenses
     .filter((expense) => dayjs.utc(expense.date).isSame(dayjs.utc(), "month"))
     .reduce((sum, expense) => sum + expense.amount, 0);
@@ -213,11 +216,11 @@ function Expenses() {
       title: "Shuma",
       dataIndex: "amount",
       key: "amount",
-      render: (amount) => `${(amount || 0).toFixed(2)} ден`,
+      render: (amount) => `${(amount || 0).toFixed(2)} Ð´ÐµÐ½`,
       sorter: (a, b) => a.amount - b.amount,
     },
     {
-      title: "Përshkrimi",
+      title: "PÃ«rshkrimi",
       dataIndex: "description",
       key: "description",
       ellipsis: true,
@@ -235,7 +238,7 @@ function Expenses() {
             Redakto
           </Button>
           <Popconfirm
-            title="A jeni të sigurt që dëshironi ta fshini këtë shpenzim?"
+            title="A jeni tÃ« sigurt qÃ« dÃ«shironi ta fshini kÃ«tÃ« shpenzim?"
             onConfirm={() => handleDelete(record.id)}
             okText="Po"
             cancelText="Jo"
@@ -254,21 +257,25 @@ function Expenses() {
       <div className="flex justify-between items-center mb-6">
         <Title level={2}>Menaxhimi i Shpenzimeve</Title>
         <Space>
-          <Button
-            type="default"
-            icon={<BarChartOutlined />}
-            onClick={() => navigate("/reports")}
-          >
-            Shiko Raportet
-          </Button>
-          <Button
-            type="default"
-            icon={<SendOutlined />}
-            onClick={sendToFinancialReport}
-            loading={loading}
-          >
-            Dërgo në Raportin Financiar
-          </Button>
+          {canViewReports && (
+            <Button
+              type="default"
+              icon={<BarChartOutlined />}
+              onClick={() => navigate("/reports")}
+            >
+              Shiko Raportet
+            </Button>
+          )}
+          {canViewReports && (
+            <Button
+              type="default"
+              icon={<SendOutlined />}
+              onClick={sendToFinancialReport}
+              loading={loading}
+            >
+              DÃ«rgo nÃ« Raportin Financiar
+            </Button>
+          )}
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             Shto Shpenzim
           </Button>
@@ -285,19 +292,19 @@ function Expenses() {
               precision={2}
               valueStyle={{ color: "#ff4d4f" }}
               prefix={<DollarOutlined />}
-              suffix="ден"
+              suffix="Ð´ÐµÐ½"
             />
           </Card>
         </Col>
         <Col xs={24} sm={12} md={8} lg={6}>
           <Card className="bg-white border-0 shadow-lg">
             <Statistic
-              title="Shpenzimet e Këtij Muaji"
+              title="Shpenzimet e KÃ«tij Muaji"
               value={thisMonthExpenses}
               precision={2}
               valueStyle={{ color: "#1890ff" }}
               prefix={<FallOutlined />}
-              suffix="ден"
+              suffix="Ð´ÐµÐ½"
             />
           </Card>
         </Col>
@@ -354,7 +361,7 @@ function Expenses() {
           <Form.Item
             name="date"
             label="Data"
-            rules={[{ required: true, message: "Ju lutemi zgjidhni datën" }]}
+            rules={[{ required: true, message: "Ju lutemi zgjidhni datÃ«n" }]}
           >
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
@@ -362,26 +369,26 @@ function Expenses() {
           <Form.Item
             name="amount"
             label="Shuma"
-            rules={[{ required: true, message: "Ju lutemi shkruani shumën" }]}
+            rules={[{ required: true, message: "Ju lutemi shkruani shumÃ«n" }]}
           >
             <InputNumber
               style={{ width: "100%" }}
               formatter={(value) =>
-                `${value} ден`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+                `${value} Ð´ÐµÐ½`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
               }
-              parser={(value) => value.replace(/ден\s?|,*/g, "")}
+              parser={(value) => value.replace(/Ð´ÐµÐ½\s?|,*/g, "")}
               min={0}
             />
           </Form.Item>
 
-          <Form.Item name="description" label="Përshkrimi">
+          <Form.Item name="description" label="PÃ«rshkrimi">
             <TextArea rows={3} />
           </Form.Item>
 
           <Form.Item className="mb-0">
             <Space>
               <Button type="primary" htmlType="submit">
-                {editingExpense ? "Përditëso" : "Krijo"}
+                {editingExpense ? "PÃ«rditÃ«so" : "Krijo"}
               </Button>
               <Button onClick={() => setModalVisible(false)}>Anulo</Button>
             </Space>

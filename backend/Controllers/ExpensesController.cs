@@ -1,15 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
 using backend.Services;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = AppPermissions.ExpensesManage)]
     public class ExpensesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -197,7 +200,7 @@ namespace backend.Controllers
         [HttpGet("types")]
         public async Task<ActionResult<IEnumerable<string>>> GetExpenseTypes()
         {
-            var types = await _context.Expenses
+            var types = await GetAccessibleExpenses()
                 .Select(e => e.ExpenseType)
                 .Distinct()
                 .OrderBy(t => t)
@@ -209,11 +212,12 @@ namespace backend.Controllers
         [HttpGet("summary")]
         public async Task<ActionResult<object>> GetExpenseSummary()
         {
-            var totalExpenses = await _context.Expenses.SumAsync(e => e.Amount);
-            var expenseCount = await _context.Expenses.CountAsync();
+            var expensesQuery = GetAccessibleExpenses();
+            var totalExpenses = await expensesQuery.SumAsync(e => e.Amount);
+            var expenseCount = await expensesQuery.CountAsync();
             var averageExpense = expenseCount > 0 ? totalExpenses / expenseCount : 0;
 
-            var summaryByType = await _context.Expenses
+            var summaryByType = await expensesQuery
                 .GroupBy(e => e.ExpenseType)
                 .Select(g => new
                 {
@@ -239,12 +243,12 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<object>> GetDailyExpenseCalculations([FromQuery] DateTime? date = null)
         {
-            var targetDate = date ?? DateTime.UtcNow.Date;
-            var startOfDay = targetDate.Date;
-            var endOfDay = startOfDay.AddDays(1).AddTicks(-1);
+            var targetDate = DateTimeUtc.Date(date ?? DateTime.UtcNow);
+            var startOfDay = targetDate;
+            var endOfDay = startOfDay.AddDays(1);
 
-            var dailyExpenses = await _context.Expenses
-                .Where(e => e.Date >= startOfDay && e.Date <= endOfDay)
+            var dailyExpenses = await GetAccessibleExpenses()
+                .Where(e => e.Date >= startOfDay && e.Date < endOfDay)
                 .ToListAsync();
 
             var totalAmount = dailyExpenses.Sum(e => e.Amount);
@@ -295,12 +299,12 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<object>> GetWeeklyExpenseCalculations([FromQuery] DateTime? startDate = null)
         {
-            var targetDate = startDate ?? DateTime.UtcNow.Date;
-            var startOfWeek = targetDate.Date.AddDays(-(int)targetDate.DayOfWeek);
-            var endOfWeek = startOfWeek.AddDays(7).AddTicks(-1);
+            var targetDate = DateTimeUtc.Date(startDate ?? DateTime.UtcNow);
+            var startOfWeek = targetDate.AddDays(-(int)targetDate.DayOfWeek);
+            var endOfWeek = startOfWeek.AddDays(7);
 
-            var weeklyExpenses = await _context.Expenses
-                .Where(e => e.Date >= startOfWeek && e.Date <= endOfWeek)
+            var weeklyExpenses = await GetAccessibleExpenses()
+                .Where(e => e.Date >= startOfWeek && e.Date < endOfWeek)
                 .ToListAsync();
 
             var totalAmount = weeklyExpenses.Sum(e => e.Amount);
@@ -331,7 +335,7 @@ namespace backend.Controllers
             return Ok(new
             {
                 WeekStart = startOfWeek,
-                WeekEnd = endOfWeek,
+                WeekEnd = endOfWeek.AddDays(-1),
                 TotalAmount = totalAmount,
                 ExpenseCount = expenseCount,
                 AverageAmount = expenseCount > 0 ? totalAmount / expenseCount : 0,
@@ -356,11 +360,11 @@ namespace backend.Controllers
             var targetYear = year ?? DateTime.UtcNow.Year;
             var targetMonth = month ?? DateTime.UtcNow.Month;
             
-            var startOfMonth = new DateTime(targetYear, targetMonth, 1);
-            var endOfMonth = startOfMonth.AddMonths(1).AddTicks(-1);
+            var startOfMonth = DateTimeUtc.MonthStart(targetYear, targetMonth);
+            var endOfMonth = startOfMonth.AddMonths(1);
 
-            var monthlyExpenses = await _context.Expenses
-                .Where(e => e.Date >= startOfMonth && e.Date <= endOfMonth)
+            var monthlyExpenses = await GetAccessibleExpenses()
+                .Where(e => e.Date >= startOfMonth && e.Date < endOfMonth)
                 .ToListAsync();
 
             var totalAmount = monthlyExpenses.Sum(e => e.Amount);
@@ -435,8 +439,12 @@ namespace backend.Controllers
             [FromQuery] DateTime startDate, 
             [FromQuery] DateTime endDate)
         {
-            var periodExpenses = await _context.Expenses
-                .Where(e => e.Date >= startDate && e.Date <= endDate)
+            startDate = DateTimeUtc.Date(startDate);
+            endDate = DateTimeUtc.Date(endDate);
+            var endExclusive = endDate.AddDays(1);
+
+            var periodExpenses = await GetAccessibleExpenses()
+                .Where(e => e.Date >= startDate && e.Date < endExclusive)
                 .ToListAsync();
 
             var totalAmount = periodExpenses.Sum(e => e.Amount);
@@ -492,11 +500,17 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<object>> GetExpenseTrends([FromQuery] int months = 6)
         {
-            var endDate = DateTime.UtcNow.Date;
+            var endDate = DateTimeUtc.Today();
             var startDate = endDate.AddMonths(-months);
+            var endExclusive = endDate.AddDays(1);
 
-            var monthlyTrends = await _context.Expenses
-                .Where(e => e.Date >= startDate && e.Date <= endDate)
+            var expensesQuery = GetAccessibleExpenses();
+
+            var expenses = await expensesQuery
+                .Where(e => e.Date >= startDate && e.Date < endExclusive)
+                .ToListAsync();
+
+            var monthlyTrends = expenses
                 .GroupBy(e => new { e.Date.Year, e.Date.Month })
                 .Select(g => new
                 {
@@ -509,10 +523,9 @@ namespace backend.Controllers
                 })
                 .OrderBy(x => x.Year)
                 .ThenBy(x => x.Month)
-                .ToListAsync();
+                .ToList();
 
-            var typeTrends = await _context.Expenses
-                .Where(e => e.Date >= startDate && e.Date <= endDate)
+            var typeTrends = expenses
                 .GroupBy(e => new { e.ExpenseType, e.Date.Year, e.Date.Month })
                 .Select(g => new
                 {
@@ -525,7 +538,7 @@ namespace backend.Controllers
                 .OrderBy(x => x.Type)
                 .ThenBy(x => x.Year)
                 .ThenBy(x => x.Month)
-                .ToListAsync();
+                .ToList();
 
             return Ok(new
             {
@@ -535,6 +548,19 @@ namespace backend.Controllers
                 MonthlyTrends = monthlyTrends,
                 TypeTrends = typeTrends
             });
+        }
+
+        private IQueryable<Expense> GetAccessibleExpenses()
+        {
+            IQueryable<Expense> expensesQuery = _context.Expenses;
+
+            if (!_currentUserService.IsAdmin())
+            {
+                var currentUserId = _currentUserService.GetCurrentUserId();
+                expensesQuery = expensesQuery.Where(e => e.CreatedById == currentUserId);
+            }
+
+            return expensesQuery;
         }
     }
 } 

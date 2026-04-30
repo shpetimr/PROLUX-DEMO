@@ -2,12 +2,8 @@
   "name": "prolux-group",
   "version": "0.1.0",
   "private": true,
-  "author": "FYS-DEV",
+  "author": "PROLUX Group",
   "dependencies": {
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0",
     "antd": "^5.26.2",
     "axios": "^1.10.0",
     "dayjs": "^1.11.13",
@@ -15,16 +11,21 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.2",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "react-scripts": "5.0.1"
   },
   "scripts": {
-    "start": "set PORT=3000 && react-scripts start",
+    "start": "node scripts/react-scripts-runner.js start",
     "electron": "electron .",
-    "electron-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "react-scripts build",
-    "build-electron": "npm run build && electron-builder",
-    "test": "react-scripts test",
+    "electron-dev": "concurrently \"npm start\" \"node scripts/wait-for-frontend.js && electron .\"",
+    "prebuild": "node scripts/validate-production-env.js",
+    "build": "node scripts/react-scripts-runner.js build",
+    "backend:build": "dotnet build ../backend/backend.csproj",
+    "publish-backend": "dotnet publish ../backend/backend.csproj -c Release -r win-x64 --self-contained true -o ../artifacts/backend-publish",
+    "build-electron": "npm run clean:artifacts && npm run build && npm run publish-backend && electron-builder",
+    "test": "node scripts/react-scripts-runner.js test --watchAll=false --runInBand --passWithNoTests",
+    "test:watch": "node scripts/react-scripts-runner.js test --watchAll",
+    "check": "npm run backend:build && npm run build && npm test",
+    "clean:artifacts": "node scripts/clean-artifacts.js",
     "eject": "react-scripts eject",
     "desktop": "npm run electron-dev"
   },
@@ -49,8 +50,7 @@
   "devDependencies": {
     "concurrently": "^9.2.0",
     "electron": "^37.1.0",
-    "electron-builder": "^25.1.0",
-    "wait-on": "^8.0.3"
+    "electron-builder": "^25.1.0"
   },
   "main": "public/electron.js",
   "homepage": ".",
@@ -67,7 +67,7 @@
     ],
     "extraResources": [
       {
-        "from": "../backend/publish",
+        "from": "../artifacts/backend-publish",
         "to": "backend",
         "filter": [
           "**/*"
@@ -76,15 +76,15 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/rio-logo.png"
+      "icon": "public/prolux-logo.png"
     },
     "mac": {
       "target": "dmg",
-      "icon": "public/rio-logo.png"
+      "icon": "public/prolux-logo.png"
     },
     "linux": {
       "target": "AppImage",
-      "icon": "public/rio-logo.png"
+      "icon": "public/prolux-logo.png"
     }
   }
 }

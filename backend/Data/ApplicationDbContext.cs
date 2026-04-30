@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using backend.Models;
+using backend.Utilities;
 
 namespace backend.Data
 {
@@ -200,6 +201,53 @@ namespace backend.Data
                 entity.Property(e => e.Note).HasMaxLength(500);
                 entity.HasIndex(e => e.StockItemId);
             });
+        }
+
+        public override int SaveChanges()
+        {
+            NormalizeTrackedDateTimes();
+            return base.SaveChanges();
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            NormalizeTrackedDateTimes();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            NormalizeTrackedDateTimes();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            NormalizeTrackedDateTimes();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void NormalizeTrackedDateTimes()
+        {
+            foreach (var entry in ChangeTracker.Entries()
+                .Where(entry => entry.State == EntityState.Added || entry.State == EntityState.Modified))
+            {
+                foreach (var property in entry.Properties)
+                {
+                    var propertyType = property.Metadata.ClrType;
+                    if (propertyType != typeof(DateTime) && propertyType != typeof(DateTime?))
+                    {
+                        continue;
+                    }
+
+                    if (property.CurrentValue is DateTime value)
+                    {
+                        property.CurrentValue = DateTimeUtc.Normalize(value);
+                    }
+                }
+            }
         }
     }
 } 

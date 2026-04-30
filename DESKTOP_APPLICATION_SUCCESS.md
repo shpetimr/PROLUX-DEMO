@@ -2,7 +2,7 @@
 
 ## ✅ **Status: COMPLETE AND WORKING**
 
-Your PROLUX Group Business Management System has been successfully converted from a web application to a fully functional desktop application!
+Your PROLUX Group Management application has been successfully converted from a web application to a fully functional desktop application!
 
 ## 📁 **What Was Created**
 
@@ -25,7 +25,7 @@ Your PROLUX Group Business Management System has been successfully converted fro
 - ✅ React.js application with Ant Design UI
 - ✅ Electron framework for desktop functionality
 - ✅ Automatic backend startup and health monitoring
-- ✅ Dynamic port detection (5069-5080)
+- ✅ Dynamic backend port detection from environment configuration
 - ✅ Professional Windows application menu
 
 ### **Backend (.NET 7.0)**
@@ -41,7 +41,7 @@ Your PROLUX Group Business Management System has been successfully converted fro
 
 - ✅ SQLite database with all tables and relationships
 - ✅ Updated schema with all required columns
-- ✅ Sample data and default users (admin/admin123, user/user123)
+- ✅ Sample business data available for testing
 
 ## 🚀 **Features Working**
 
@@ -82,10 +82,10 @@ Your PROLUX Group Business Management System has been successfully converted fro
 2. Run `PROLUX Group.exe` from anywhere
 3. No installation required
 
-## 🔐 **Default Login Credentials**
+## 🔐 **Login Access**
 
-- **Admin User**: `admin` / `admin123`
-- **Regular User**: `user` / `user123`
+- Default login credentials are no longer included
+- Access should be provisioned with real administrator-managed accounts
 
 ## 🛠️ **What Was Fixed**
 
@@ -133,10 +133,10 @@ To update the desktop application:
 If you encounter any issues:
 
 1. Check the application logs in the backend directory
-2. Ensure no other applications are using port 5069
+2. Ensure no other applications are using the configured backend URL/port
 3. Try running as administrator if needed
 4. Verify Windows Defender isn't blocking the application
 
 ---
 
-**🎉 Congratulations! Your PROLUX Group Business Management System is now a fully functional desktop application!**
+**🎉 Congratulations! Your PROLUX Group Management application is now a fully functional desktop application!**

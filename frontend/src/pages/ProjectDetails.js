@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Card,
   Descriptions,
   Tag,
   Button,
-  Space,
   Timeline,
   Statistic,
   Row,
@@ -21,14 +20,12 @@ import {
 import {
   ArrowLeftOutlined,
   EditOutlined,
-  DollarOutlined,
   CalendarOutlined,
   UserOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   StopOutlined,
   ExclamationCircleOutlined,
-  PlusOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -45,11 +42,7 @@ const ProjectDetails = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [form] = Form.useForm();
 
-  useEffect(() => {
-    fetchProjectDetails();
-  }, [id]);
-
-  const fetchProjectDetails = async () => {
+  const fetchProjectDetails = useCallback(async () => {
     setLoading(true);
     try {
       const response = await apiClient.get(API_ENDPOINTS.PROJECT_BY_ID(id));
@@ -60,7 +53,11 @@ const ProjectDetails = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchProjectDetails();
+  }, [fetchProjectDetails]);
 
   const handleEdit = () => {
     form.setFieldsValue({

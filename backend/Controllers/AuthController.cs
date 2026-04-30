@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using backend.Authorization;
 using backend.Services;
 using backend.DTOs;
 
@@ -9,13 +11,16 @@ namespace backend.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly ICurrentUserService _currentUserService;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, ICurrentUserService currentUserService)
         {
             _authService = authService;
+            _currentUserService = currentUserService;
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
         public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto loginDto)
         {
             try
@@ -34,6 +39,7 @@ namespace backend.Controllers
         }
 
         [HttpPost("register")]
+        [Authorize(Policy = AppPermissions.UsersManage)]
         public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterDto registerDto)
         {
             try
@@ -51,12 +57,32 @@ namespace backend.Controllers
             }
         }
 
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult<UserResponseDto>> GetCurrentUser()
+        {
+            var userId = _currentUserService.GetCurrentUserId();
+            if (userId == 0)
+            {
+                return Unauthorized();
+            }
+
+            var user = await _authService.GetCurrentUserAsync(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            return Ok(user);
+        }
+
         [HttpPost("validate")]
-        public async Task<ActionResult<bool>> ValidateToken([FromBody] string token)
+        [AllowAnonymous]
+        public async Task<ActionResult<bool>> ValidateToken([FromBody] ValidateTokenDto request)
         {
             try
             {
-                var isValid = await _authService.ValidateTokenAsync(token);
+                var isValid = await _authService.ValidateTokenAsync(request.Token);
                 return Ok(isValid);
             }
             catch (Exception ex)

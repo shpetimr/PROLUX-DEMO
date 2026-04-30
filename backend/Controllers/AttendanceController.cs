@@ -1,14 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
-using System.Security.Claims;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = AppPermissions.AttendanceManage)]
     public class AttendanceController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -26,11 +29,11 @@ namespace backend.Controllers
             if (employee == null)
                 return NotFound("Punëtori nuk u gjet");
 
-            var startDate = new DateTime(year, month, 1);
-            var endDate = startDate.AddMonths(1).AddDays(-1);
+            var startDate = DateTimeUtc.MonthStart(year, month);
+            var endDate = startDate.AddMonths(1);
 
             var attendanceRecords = await _context.AttendanceRecords
-                .Where(a => a.EmployeeId == employeeId && a.Date >= startDate && a.Date <= endDate)
+                .Where(a => a.EmployeeId == employeeId && a.Date >= startDate && a.Date < endDate)
                 .OrderBy(a => a.Date)
                 .ToListAsync();
 
@@ -80,8 +83,8 @@ namespace backend.Controllers
         [HttpGet("month/{year}/{month}")]
         public async Task<ActionResult<List<MonthlyAttendanceDto>>> GetMonthlyAttendanceForAllEmployees(int year, int month)
         {
-            var startDate = new DateTime(year, month, 1);
-            var endDate = startDate.AddMonths(1).AddDays(-1);
+            var startDate = DateTimeUtc.MonthStart(year, month);
+            var endDate = startDate.AddMonths(1);
 
             var employees = await _context.Employees.ToListAsync();
             var result = new List<MonthlyAttendanceDto>();
@@ -89,7 +92,7 @@ namespace backend.Controllers
             foreach (var employee in employees)
             {
                 var attendanceRecords = await _context.AttendanceRecords
-                    .Where(a => a.EmployeeId == employee.Id && a.Date >= startDate && a.Date <= endDate)
+                    .Where(a => a.EmployeeId == employee.Id && a.Date >= startDate && a.Date < endDate)
                     .OrderBy(a => a.Date)
                     .ToListAsync();
 
@@ -131,9 +134,15 @@ namespace backend.Controllers
             if (employee == null)
                 return NotFound("Punëtori nuk u gjet");
 
+            var attendanceDate = DateTimeUtc.Date(createDto.Date);
+            var nextDate = attendanceDate.AddDays(1);
+
             // Check if attendance record already exists for this date and employee
             var existingRecord = await _context.AttendanceRecords
-                .FirstOrDefaultAsync(a => a.EmployeeId == createDto.EmployeeId && a.Date.Date == createDto.Date.Date);
+                .FirstOrDefaultAsync(a =>
+                    a.EmployeeId == createDto.EmployeeId &&
+                    a.Date >= attendanceDate &&
+                    a.Date < nextDate);
 
             if (existingRecord != null)
                 return BadRequest("Regjistrimi i pranisë për këtë datë ekziston tashmë");
@@ -141,7 +150,7 @@ namespace backend.Controllers
             var attendanceRecord = new AttendanceRecord
             {
                 EmployeeId = createDto.EmployeeId,
-                Date = createDto.Date.Date,
+                Date = attendanceDate,
                 IsPresent = createDto.IsPresent,
                 Notes = createDto.Notes,
                 DailyBonus = createDto.DailyBonus ?? 0,
@@ -155,7 +164,7 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             // Update employee's comprehensive data for the current month
-            await UpdateEmployeeComprehensiveData(createDto.EmployeeId, createDto.Date.Year, createDto.Date.Month);
+            await UpdateEmployeeComprehensiveData(createDto.EmployeeId, attendanceDate.Year, attendanceDate.Month);
 
             return new AttendanceDto
             {
@@ -244,9 +253,15 @@ namespace backend.Controllers
                 if (employee == null)
                     continue;
 
+                var attendanceDate = DateTimeUtc.Date(createDto.Date);
+                var nextDate = attendanceDate.AddDays(1);
+
                 // Check if attendance record already exists for this date and employee
                 var existingRecord = await _context.AttendanceRecords
-                    .FirstOrDefaultAsync(a => a.EmployeeId == createDto.EmployeeId && a.Date.Date == createDto.Date.Date);
+                    .FirstOrDefaultAsync(a =>
+                        a.EmployeeId == createDto.EmployeeId &&
+                        a.Date >= attendanceDate &&
+                        a.Date < nextDate);
 
                 if (existingRecord != null)
                     continue;
@@ -254,7 +269,7 @@ namespace backend.Controllers
                 var attendanceRecord = new AttendanceRecord
                 {
                     EmployeeId = createDto.EmployeeId,
-                    Date = createDto.Date.Date,
+                    Date = attendanceDate,
                     IsPresent = createDto.IsPresent,
                     Notes = createDto.Notes
                 };
@@ -268,8 +283,8 @@ namespace backend.Controllers
             var employeeIds = createDtos.Select(d => d.EmployeeId).Distinct();
             foreach (var employeeId in employeeIds)
             {
-                var firstRecord = createDtos.First(d => d.EmployeeId == employeeId);
-                await UpdateEmployeeComprehensiveData(employeeId, firstRecord.Date.Year, firstRecord.Date.Month);
+                var firstRecordDate = DateTimeUtc.Date(createDtos.First(d => d.EmployeeId == employeeId).Date);
+                await UpdateEmployeeComprehensiveData(employeeId, firstRecordDate.Year, firstRecordDate.Month);
             }
 
             return Ok("Regjistrimet e pranisë u krijuan me sukses");
@@ -277,11 +292,11 @@ namespace backend.Controllers
 
         private async Task UpdateEmployeeComprehensiveData(int employeeId, int year, int month)
         {
-            var startDate = new DateTime(year, month, 1);
-            var endDate = startDate.AddMonths(1).AddDays(-1);
+            var startDate = DateTimeUtc.MonthStart(year, month);
+            var endDate = startDate.AddMonths(1);
 
             var attendanceRecords = await _context.AttendanceRecords
-                .Where(a => a.EmployeeId == employeeId && a.Date >= startDate && a.Date <= endDate)
+                .Where(a => a.EmployeeId == employeeId && a.Date >= startDate && a.Date < endDate)
                 .ToListAsync();
 
             var daysWorked = attendanceRecords.Count(a => a.IsPresent && !a.IsHalfDay);

@@ -140,8 +140,8 @@ function OfferPrint() {
           <img
             src={
               process.env.NODE_ENV === "development"
-                ? "/rio-logo.png"
-                : "./rio-logo.png"
+                ? "/prolux-logo.png"
+                : "./prolux-logo.png"
             }
             alt="ProLux Group Logo"
             style={{ height: 50 }}

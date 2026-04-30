@@ -10,7 +10,7 @@ namespace backend.DTOs
         public string Username { get; set; } = string.Empty;
         
         [Required]
-        [StringLength(100)]
+        [StringLength(512)]
         public string Password { get; set; } = string.Empty;
     }
     
@@ -21,7 +21,7 @@ namespace backend.DTOs
         public string Username { get; set; } = string.Empty;
         
         [Required]
-        [StringLength(100, MinimumLength = 6)]
+        [StringLength(512, MinimumLength = 12)]
         public string Password { get; set; } = string.Empty;
         
         [Required]
@@ -34,11 +34,19 @@ namespace backend.DTOs
     
     public class AuthResponseDto
     {
+        public int Id { get; set; }
         public string Token { get; set; } = string.Empty;
         public string Username { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public UserRole Role { get; set; }
+        public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
         public DateTime ExpiresAt { get; set; }
+    }
+
+    public class ValidateTokenDto
+    {
+        [Required]
+        public string Token { get; set; } = string.Empty;
     }
     
     public class UserResponseDto
@@ -47,6 +55,7 @@ namespace backend.DTOs
         public string Username { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public UserRole Role { get; set; }
+        public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
         public DateTime CreatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
     }

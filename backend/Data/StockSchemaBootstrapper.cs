@@ -9,6 +9,11 @@ namespace backend.Data
     {
         public static async Task EnsureAsync(ApplicationDbContext db)
         {
+            if (!db.Database.IsSqlite())
+            {
+                return;
+            }
+
             await db.Database.ExecuteSqlRawAsync(@"
 CREATE TABLE IF NOT EXISTS ""StockItems"" (
     ""Id"" INTEGER NOT NULL CONSTRAINT ""PK_StockItems"" PRIMARY KEY AUTOINCREMENT,

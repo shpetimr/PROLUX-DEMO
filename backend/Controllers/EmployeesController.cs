@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
@@ -10,6 +11,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = AppPermissions.EmployeesManage)]
     public class EmployeesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -145,7 +147,12 @@ namespace backend.Controllers
                 Console.WriteLine("=== MODEL STATE ERRORS ===");
                 foreach (var key in ModelState.Keys)
                 {
-                    var errors = ModelState[key].Errors;
+                    var errors = ModelState[key]?.Errors;
+                    if (errors == null)
+                    {
+                        continue;
+                    }
+
                     foreach (var error in errors)
                     {
                         Console.WriteLine($"ModelState error for {key}: {error.ErrorMessage}");
@@ -343,16 +350,6 @@ namespace backend.Controllers
                 .Select(p => p.ToString());
 
             return Ok(positions);
-        }
-        
-        [HttpPost("test-position")]
-        public ActionResult<object> TestPosition([FromBody] CreateEmployeeDto dto)
-        {
-            return Ok(new { 
-                receivedPosition = dto.position,
-                isValid = !string.IsNullOrEmpty(dto.position) && 
-                         (dto.position.ToLower() == "magazine" || dto.position.ToLower() == "terren")
-            });
         }
     }
 } 

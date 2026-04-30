@@ -26,6 +26,7 @@ import {
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { PERMISSIONS } from "../config/permissions";
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
@@ -34,102 +35,93 @@ function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, isAdmin, isUser } = useAuth();
+  const { user, logout, isAdmin, hasPermission } = useAuth();
 
   const handleLogout = () => {
     logout();
   };
 
-  // Create menu items based on user role
+  // Build the sidebar from the same permission names used by the API.
   const getMenuItems = () => {
-    const baseItems = [
+    const items = [
       {
         key: "/",
         icon: <DashboardOutlined />,
         label: "Dashboard",
+        requiredPermission: PERMISSIONS.DASHBOARD_VIEW,
       },
       {
         key: "/template-print",
         icon: <PrinterOutlined />,
         label: "Fletpages",
+        requiredPermission: PERMISSIONS.TEMPLATES_PRINT,
       },
       {
         key: "/offer-print",
         icon: <FileTextOutlined />,
-        label: "Ofertë",
+        label: "OfertÃ«",
+        requiredPermission: PERMISSIONS.OFFERS_PRINT,
+      },
+      {
+        key: "/employees",
+        icon: <TeamOutlined />,
+        label: "PunÃ«torÃ«t",
+        requiredPermission: PERMISSIONS.EMPLOYEES_MANAGE,
+      },
+      {
+        key: "/expenses",
+        icon: <DollarOutlined />,
+        label: "Shpenzimet",
+        requiredPermission: PERMISSIONS.EXPENSES_MANAGE,
+      },
+      {
+        key: "/purchases",
+        icon: <ShoppingOutlined />,
+        label: "Blerjet",
+        requiredPermission: PERMISSIONS.PURCHASES_MANAGE,
+      },
+      {
+        key: "/rents",
+        icon: <HomeOutlined />,
+        label: "Qirat",
+        requiredPermission: PERMISSIONS.RENTS_MANAGE,
+      },
+      {
+        key: "/incomes",
+        icon: <RiseOutlined />,
+        label: "TÃ« Ardhurat",
+        requiredPermission: PERMISSIONS.INCOMES_MANAGE,
+      },
+      {
+        key: "/debts",
+        icon: <ExclamationCircleOutlined />,
+        label: "Borxhet",
+        requiredPermission: PERMISSIONS.DEBTS_MANAGE,
+      },
+      {
+        key: "/projects",
+        icon: <ProjectOutlined />,
+        label: "Projektet",
+        requiredPermission: PERMISSIONS.PROJECTS_MANAGE,
+      },
+      {
+        key: "/reports",
+        icon: <BarChartOutlined />,
+        label: "Raportet",
+        requiredPermission: PERMISSIONS.REPORTS_VIEW,
+      },
+      {
+        key: "/stock",
+        icon: <InboxOutlined />,
+        label: "Stoku",
+        requiredPermission: PERMISSIONS.STOCK_MANAGE,
       },
     ];
 
-    // Admin can see all menu items
-    if (isAdmin()) {
-      return [
-        ...baseItems,
-        {
-          key: "/employees",
-          icon: <TeamOutlined />,
-          label: "Punëtorët",
-        },
-        {
-          key: "/expenses",
-          icon: <DollarOutlined />,
-          label: "Shpenzimet",
-        },
-        {
-          key: "/purchases",
-          icon: <ShoppingOutlined />,
-          label: "Blerjet",
-        },
-        {
-          key: "/rents",
-          icon: <HomeOutlined />,
-          label: "Qirat",
-        },
-        {
-          key: "/incomes",
-          icon: <RiseOutlined />,
-          label: "Të Ardhurat",
-        },
-        {
-          key: "/debts",
-          icon: <ExclamationCircleOutlined />,
-          label: "Borxhet",
-        },
-        {
-          key: "/projects",
-          icon: <ProjectOutlined />,
-          label: "Projektet",
-        },
-        {
-          key: "/reports",
-          icon: <BarChartOutlined />,
-          label: "Raportet",
-        },
-        {
-          key: "/stock",
-          icon: <InboxOutlined />,
-          label: "Stoku",
-        },
-      ];
-    }
-
-    // User can only see expenses and purchases
-    if (isUser()) {
-      return [
-        ...baseItems,
-        {
-          key: "/expenses",
-          icon: <DollarOutlined />,
-          label: "Shpenzimet",
-        },
-        {
-          key: "/purchases",
-          icon: <ShoppingOutlined />,
-          label: "Blerjet",
-        },
-      ];
-    }
-
-    return baseItems;
+    return items.filter(
+      (item) =>
+        !item.requiredPermission || hasPermission(item.requiredPermission)
+    );
   };
 
   const menuItems = getMenuItems();
@@ -146,7 +138,11 @@ function Layout() {
         <div className="p-4 text-center bg-gradient-to-br from-gray-800 to-gray-900">
           <div className="flex justify-center">
             <img
-              src={process.env.NODE_ENV === 'development' ? '/rio-logo.png' : './rio-logo.png'}
+              src={
+                process.env.NODE_ENV === "development"
+                  ? "/prolux-logo.png"
+                  : "./prolux-logo.png"
+              }
               alt="ProLux Logo"
               className={collapsed ? "w-8 h-8" : "w-12 h-12"}
               style={{ objectFit: "contain" }}
@@ -166,7 +162,7 @@ function Layout() {
         <Header className="bg-white px-6 flex items-center justify-between border-b border-gray-200/50 shadow-sm">
           <div className="flex items-center">
             <Title level={4} className="m-0 text-gray-800 font-semibold">
-              PROLUX Group - Business Management System
+              PROLUX Group Management
             </Title>
           </div>
           <div className="flex items-center gap-4">

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Services;
 using backend.DTOs;
 using backend.Data;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
@@ -13,27 +15,20 @@ namespace backend.Controllers
     {
         private readonly IReportService _reportService;
         private readonly ApplicationDbContext _context;
-        private readonly ICurrentUserService _currentUserService;
 
-        public ReportsController(IReportService reportService, ApplicationDbContext context, ICurrentUserService currentUserService)
+        public ReportsController(IReportService reportService, ApplicationDbContext context)
         {
             _reportService = reportService;
             _context = context;
-            _currentUserService = currentUserService;
         }
 
         [HttpGet("financial")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<FinancialReportDto>> GetFinancialReport(
             [FromQuery] DateTime? startDate,
             [FromQuery] DateTime? endDate,
             [FromQuery] string? reportType = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-            
             try
             {
                 var report = await _reportService.GetFinancialReportAsync(startDate, endDate, reportType);
@@ -46,14 +41,9 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly/{year}/{month}")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<MonthlyReportDto>> GetMonthlyReport(int year, int month)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-            
             try
             {
                 var report = await _reportService.GetMonthlyReportAsync(year, month);
@@ -66,14 +56,9 @@ namespace backend.Controllers
         }
 
         [HttpGet("yearly/{year}")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<YearlyReportDto>> GetYearlyReport(int year)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-            
             try
             {
                 var report = await _reportService.GetYearlyReportAsync(year);
@@ -86,7 +71,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("dashboard")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.DashboardView)]
         public async Task<ActionResult<DashboardStatsDto>> GetDashboardStats()
         {
             try
@@ -101,7 +86,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("dashboard/project-debt-stats")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetProjectAndDebtStats()
         {
             try
@@ -116,7 +101,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("dashboard/comprehensive")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetComprehensiveDashboardData()
         {
             
@@ -210,6 +195,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly-breakdown/{year}")]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<List<MonthlyReportDto>>> GetMonthlyBreakdown(int year)
         {
             try
@@ -224,6 +210,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("current-month")]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<MonthlyReportDto>> GetCurrentMonthReport()
         {
             try
@@ -239,6 +226,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("current-year")]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<YearlyReportDto>> GetCurrentYearReport()
         {
             try
@@ -256,23 +244,19 @@ namespace backend.Controllers
         // New endpoints for comprehensive expense reporting
 
         [HttpGet("expenses/comprehensive")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetComprehensiveExpenseReport(
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
-                var start = startDate ?? DateTime.UtcNow.Date.AddMonths(-1);
-                var end = endDate ?? DateTime.UtcNow.Date;
+                var start = DateTimeUtc.Date(startDate ?? DateTime.UtcNow.Date.AddMonths(-1));
+                var end = DateTimeUtc.Date(endDate ?? DateTime.UtcNow.Date);
+                var endExclusive = end.AddDays(1);
 
                 var expenses = await _context.Expenses
-                    .Where(e => e.Date >= start && e.Date <= end)
+                    .Where(e => e.Date >= start && e.Date < endExclusive)
                     .ToListAsync();
 
                 var totalExpenses = expenses.Sum(e => e.Amount);
@@ -360,7 +344,7 @@ namespace backend.Controllers
                         TotalExpenses = totalExpenses,
                         ExpenseCount = expenseCount,
                         AverageExpense = expenseCount > 0 ? totalExpenses / expenseCount : 0,
-                        DailyAverage = totalExpenses / (end - start).Days
+                        DailyAverage = totalExpenses / Math.Max(1, (end - start).Days + 1)
                     },
                     ExpensesByType = expensesByType,
                     DailyBreakdown = dailyBreakdown,
@@ -376,36 +360,32 @@ namespace backend.Controllers
         }
 
         [HttpGet("expenses/financial-impact")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetExpenseFinancialImpact(
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
-                var start = startDate ?? DateTime.UtcNow.Date.AddMonths(-1);
-                var end = endDate ?? DateTime.UtcNow.Date;
+                var start = DateTimeUtc.Date(startDate ?? DateTime.UtcNow.Date.AddMonths(-1));
+                var end = DateTimeUtc.Date(endDate ?? DateTime.UtcNow.Date);
+                var endExclusive = end.AddDays(1);
 
                 // Get all financial data for the period
                 var expenses = await _context.Expenses
-                    .Where(e => e.Date >= start && e.Date <= end)
+                    .Where(e => e.Date >= start && e.Date < endExclusive)
                     .SumAsync(e => e.Amount);
 
                 var incomes = await _context.Incomes
-                    .Where(i => i.Date >= start && i.Date <= end)
+                    .Where(i => i.Date >= start && i.Date < endExclusive)
                     .SumAsync(i => i.Amount);
 
                 var purchases = await _context.Purchases
-                    .Where(p => p.PurchaseDate >= start && p.PurchaseDate <= end)
+                    .Where(p => p.PurchaseDate >= start && p.PurchaseDate < endExclusive)
                     .SumAsync(p => p.TotalPrice);
 
                 var rents = await _context.Rents
-                    .Where(r => r.PaymentDate >= start && r.PaymentDate <= end)
+                    .Where(r => r.PaymentDate >= start && r.PaymentDate < endExclusive)
                     .SumAsync(r => r.MonthlyAmount);
 
                 var totalOutflow = expenses + purchases + rents;
@@ -414,7 +394,7 @@ namespace backend.Controllers
 
                 // Expense breakdown by type
                 var expenseBreakdown = await _context.Expenses
-                    .Where(e => e.Date >= start && e.Date <= end)
+                    .Where(e => e.Date >= start && e.Date < endExclusive)
                     .GroupBy(e => e.ExpenseType)
                     .Select(g => new
                     {
@@ -455,38 +435,45 @@ namespace backend.Controllers
         }
 
         [HttpGet("expenses/trends")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetExpenseTrends([FromQuery] int months = 12)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
-                var endDate = DateTime.UtcNow.Date;
+                var endDate = DateTimeUtc.Today();
                 var startDate = endDate.AddMonths(-months);
+                var endExclusive = endDate.AddDays(1);
 
-                var monthlyTrends = await _context.Expenses
-                    .Where(e => e.Date >= startDate && e.Date <= endDate)
+                var monthlyTrendRows = await _context.Expenses
+                    .Where(e => e.Date >= startDate && e.Date < endExclusive)
                     .GroupBy(e => new { e.Date.Year, e.Date.Month })
                     .Select(g => new
                     {
                         Year = g.Key.Year,
                         Month = g.Key.Month,
-                        MonthName = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMMM yyyy"),
                         TotalAmount = g.Sum(e => e.Amount),
                         ExpenseCount = g.Count(),
-                        AverageAmount = g.Average(e => e.Amount),
-                        DailyAverage = g.Sum(e => e.Amount) / DateTime.DaysInMonth(g.Key.Year, g.Key.Month)
+                        AverageAmount = g.Average(e => e.Amount)
                     })
                     .OrderBy(x => x.Year)
                     .ThenBy(x => x.Month)
                     .ToListAsync();
 
+                var monthlyTrends = monthlyTrendRows
+                    .Select(x => new
+                    {
+                        x.Year,
+                        x.Month,
+                        MonthName = new DateTime(x.Year, x.Month, 1).ToString("MMMM yyyy"),
+                        x.TotalAmount,
+                        x.ExpenseCount,
+                        x.AverageAmount,
+                        DailyAverage = x.TotalAmount / DateTime.DaysInMonth(x.Year, x.Month)
+                    })
+                    .ToList();
+
                 var typeTrends = await _context.Expenses
-                    .Where(e => e.Date >= startDate && e.Date <= endDate)
+                    .Where(e => e.Date >= startDate && e.Date < endExclusive)
                     .GroupBy(e => new { e.ExpenseType, e.Date.Year, e.Date.Month })
                     .Select(g => new
                     {
@@ -538,21 +525,17 @@ namespace backend.Controllers
         }
 
         [HttpGet("expenses/forecast")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetExpenseForecast([FromQuery] int months = 3)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
-                var endDate = DateTime.UtcNow.Date;
+                var endDate = DateTimeUtc.Today();
                 var startDate = endDate.AddMonths(-6); // Use last 6 months for forecasting
+                var endExclusive = endDate.AddDays(1);
 
                 var historicalData = await _context.Expenses
-                    .Where(e => e.Date >= startDate && e.Date <= endDate)
+                    .Where(e => e.Date >= startDate && e.Date < endExclusive)
                     .GroupBy(e => new { e.Date.Year, e.Date.Month })
                     .Select(g => new
                     {
@@ -608,14 +591,9 @@ namespace backend.Controllers
         // New comprehensive financial calculation endpoints
 
         [HttpGet("financial/daily")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetDailyFinancialCalculations([FromQuery] DateTime? date = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var result = await _reportService.GetDailyFinancialCalculationsAsync(date);
@@ -628,14 +606,9 @@ namespace backend.Controllers
         }
 
         [HttpGet("financial/weekly")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetWeeklyFinancialCalculations([FromQuery] DateTime? startDate = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var result = await _reportService.GetWeeklyFinancialCalculationsAsync(startDate);
@@ -648,14 +621,9 @@ namespace backend.Controllers
         }
 
         [HttpGet("financial/monthly")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetMonthlyFinancialCalculations([FromQuery] int? year = null, [FromQuery] int? month = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var result = await _reportService.GetMonthlyFinancialCalculationsAsync(year, month);
@@ -668,14 +636,9 @@ namespace backend.Controllers
         }
 
         [HttpGet("financial/annual")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetAnnualFinancialCalculations([FromQuery] int? year = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var result = await _reportService.GetAnnualFinancialCalculationsAsync(year);
@@ -688,18 +651,13 @@ namespace backend.Controllers
         }
 
         [HttpGet("financial/comprehensive")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetComprehensiveFinancialReport([FromQuery] string period = "current")
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
-                var currentDate = DateTime.UtcNow.Date;
-                object dailyReport = null, weeklyReport = null, monthlyReport = null, annualReport = null;
+                var currentDate = DateTimeUtc.Today();
+                object? dailyReport = null, weeklyReport = null, monthlyReport = null, annualReport = null;
 
                 switch (period.ToLower())
                 {
@@ -741,34 +699,30 @@ namespace backend.Controllers
         }
 
         [HttpGet("financial/summary")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetFinancialSummary([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
-                var start = startDate ?? DateTime.UtcNow.Date.AddMonths(-1);
-                var end = endDate ?? DateTime.UtcNow.Date;
+                var start = DateTimeUtc.Date(startDate ?? DateTime.UtcNow.Date.AddMonths(-1));
+                var end = DateTimeUtc.Date(endDate ?? DateTime.UtcNow.Date);
+                var endExclusive = end.AddDays(1);
 
                 // Get all financial data for the period
                 var expenses = await _context.Expenses
-                    .Where(e => e.Date >= start && e.Date <= end)
+                    .Where(e => e.Date >= start && e.Date < endExclusive)
                     .SumAsync(e => e.Amount);
 
                 var incomes = await _context.Incomes
-                    .Where(i => i.Date >= start && i.Date <= end)
+                    .Where(i => i.Date >= start && i.Date < endExclusive)
                     .SumAsync(i => i.Amount);
 
                 var purchases = await _context.Purchases
-                    .Where(p => p.PurchaseDate >= start && p.PurchaseDate <= end)
+                    .Where(p => p.PurchaseDate >= start && p.PurchaseDate < endExclusive)
                     .SumAsync(p => p.TotalPrice);
 
                 var rents = await _context.Rents
-                    .Where(r => r.PaymentDate >= start && r.PaymentDate <= end)
+                    .Where(r => r.PaymentDate >= start && r.PaymentDate < endExclusive)
                     .SumAsync(r => r.MonthlyAmount);
 
                 var totalOutflow = expenses + purchases + rents;
@@ -783,7 +737,7 @@ namespace backend.Controllers
 
                 // Get top expense types
                 var topExpenseTypes = await _context.Expenses
-                    .Where(e => e.Date >= start && e.Date <= end)
+                    .Where(e => e.Date >= start && e.Date < endExclusive)
                     .GroupBy(e => e.ExpenseType)
                     .Select(g => new
                     {
@@ -798,7 +752,7 @@ namespace backend.Controllers
 
                 // Get top income sources
                 var topIncomeSources = await _context.Incomes
-                    .Where(i => i.Date >= start && i.Date <= end)
+                    .Where(i => i.Date >= start && i.Date < endExclusive)
                     .GroupBy(i => i.Source)
                     .Select(g => new
                     {
@@ -847,18 +801,11 @@ namespace backend.Controllers
         }
 
         [HttpGet("financial/period-totals")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetAllPeriodTotals()
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
-            var today = DateTime.UtcNow.Date;
+            var today = DateTimeUtc.Today();
             var weekStart = today.AddDays(-(int)today.DayOfWeek + 1); // Monday as start
-            var monthStart = new DateTime(today.Year, today.Month, 1);
-            var yearStart = new DateTime(today.Year, 1, 1);
 
             dynamic daily = await _reportService.GetDailyFinancialCalculationsAsync(today);
             dynamic weekly = await _reportService.GetWeeklyFinancialCalculationsAsync(weekStart);
@@ -886,7 +833,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("purchases/daily-breakdown")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetDailyPurchasesBreakdown([FromQuery] DateTime? date = null)
         {
             var result = await _reportService.GetDailyPurchasesBreakdownAsync(date);
@@ -894,7 +841,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("purchases/weekly-breakdown")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetWeeklyPurchasesBreakdown([FromQuery] DateTime? startDate = null)
         {
             var result = await _reportService.GetWeeklyPurchasesBreakdownAsync(startDate);
@@ -902,7 +849,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("purchases/monthly-breakdown")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetMonthlyPurchasesBreakdown([FromQuery] int? year = null, [FromQuery] int? month = null)
         {
             var result = await _reportService.GetMonthlyPurchasesBreakdownAsync(year, month);
@@ -910,7 +857,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("purchases/annual-breakdown")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetAnnualPurchasesBreakdown([FromQuery] int? year = null)
         {
             var result = await _reportService.GetAnnualPurchasesBreakdownAsync(year);
@@ -918,13 +865,14 @@ namespace backend.Controllers
         }
 
         [HttpGet("purchases/financial")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetFinancialPurchasesReport([FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
-            var start = startDate ?? DateTime.UtcNow.Date.AddMonths(-1);
-            var end = endDate ?? DateTime.UtcNow.Date;
+            var start = DateTimeUtc.Date(startDate ?? DateTime.UtcNow.Date.AddMonths(-1));
+            var end = DateTimeUtc.Date(endDate ?? DateTime.UtcNow.Date);
+            var endExclusive = end.AddDays(1);
             var purchases = await _context.Purchases
-                .Where(p => p.PurchaseDate >= start && p.PurchaseDate <= end)
+                .Where(p => p.PurchaseDate >= start && p.PurchaseDate < endExclusive)
                 .OrderByDescending(p => p.PurchaseDate)
                 .ToListAsync();
             var total = purchases.Sum(p => p.TotalPrice);
@@ -950,18 +898,13 @@ namespace backend.Controllers
 
         // New Monthly Tracking Endpoints
         [HttpGet("monthly-tracking")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<MonthlyTrackingDto>> GetMonthlyTracking(
             [FromQuery] DateTime startDate,
             [FromQuery] DateTime endDate,
             [FromQuery] bool includeDetails = true,
             [FromQuery] bool includeBreakdowns = true)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var tracking = await _reportService.GetMonthlyTrackingAsync(startDate, endDate, includeDetails, includeBreakdowns);
@@ -974,18 +917,13 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly-tracking/{year}/{month}")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<MonthlyTrackingDto>> GetMonthlyTrackingByMonth(
             int year, 
             int month,
             [FromQuery] bool includeDetails = true,
             [FromQuery] bool includeBreakdowns = true)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var tracking = await _reportService.GetMonthlyTrackingByMonthAsync(year, month, includeDetails, includeBreakdowns);
@@ -998,17 +936,12 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly-tracking/year/{year}")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<List<MonthlyTrackingDto>>> GetMonthlyTrackingForYear(
             int year,
             [FromQuery] bool includeDetails = true,
             [FromQuery] bool includeBreakdowns = true)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var tracking = await _reportService.GetMonthlyTrackingForYearAsync(year, includeDetails, includeBreakdowns);
@@ -1021,16 +954,11 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly-tracking/summary")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<object>> GetMonthlyTrackingSummary(
             [FromQuery] DateTime startDate,
             [FromQuery] DateTime endDate)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var summary = await _reportService.GetMonthlyTrackingSummaryAsync(startDate, endDate);
@@ -1043,16 +971,11 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly-tracking/current-month")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<MonthlyTrackingDto>> GetCurrentMonthTracking(
             [FromQuery] bool includeDetails = true,
             [FromQuery] bool includeBreakdowns = true)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var currentDate = DateTime.UtcNow;
@@ -1066,16 +989,11 @@ namespace backend.Controllers
         }
 
         [HttpGet("monthly-tracking/current-year")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<List<MonthlyTrackingDto>>> GetCurrentYearTracking(
             [FromQuery] bool includeDetails = true,
             [FromQuery] bool includeBreakdowns = true)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var currentDate = DateTime.UtcNow;
@@ -1089,14 +1007,9 @@ namespace backend.Controllers
         }
 
         [HttpPost("monthly-tracking/custom")]
-        [Authorize]
+        [Authorize(Policy = AppPermissions.ReportsView)]
         public async Task<ActionResult<MonthlyTrackingDto>> GetCustomMonthlyTracking([FromBody] MonthlyTrackingRequestDto request)
         {
-            if (!_currentUserService.IsAdmin())
-            {
-                return Forbid();
-            }
-
             try
             {
                 var tracking = await _reportService.GetMonthlyTrackingAsync(request.StartDate, request.EndDate, request.IncludeDetails, request.IncludeBreakdowns);

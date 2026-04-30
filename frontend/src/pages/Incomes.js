@@ -13,7 +13,6 @@ import {
   message,
   Popconfirm,
   Tag,
-  Select,
 } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import apiClient, { API_ENDPOINTS } from "../config/api";
@@ -24,7 +23,6 @@ import { useDataChange } from "../contexts/DataChangeContext";
 dayjs.extend(utc);
 
 const { Title } = Typography;
-const { Option } = Select;
 const { TextArea } = Input;
 
 function Incomes() {

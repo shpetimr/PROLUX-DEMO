@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Button,
@@ -6,7 +6,6 @@ import {
   Modal,
   Form,
   Input,
-  Select,
   DatePicker,
   InputNumber,
   message,
@@ -33,7 +32,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 const { Title } = Typography;
-const { Option } = Select;
 const { TextArea } = Input;
 
 function Debts() {
@@ -62,6 +60,7 @@ function Debts() {
 
     fetchDebts();
     fetchSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isAuthenticated, user]);
 
   // Fetch debts

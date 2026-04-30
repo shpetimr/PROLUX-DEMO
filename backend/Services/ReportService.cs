@@ -3,6 +3,7 @@ using backend.Data;
 using backend.DTOs;
 using backend.Services;
 using backend.Models;
+using backend.Utilities;
 
 namespace backend.Services
 {
@@ -22,7 +23,7 @@ namespace backend.Services
             // Determine the date range based on reportType
             if (!string.IsNullOrEmpty(reportType))
             {
-                var now = DateTime.UtcNow.Date;
+                var now = DateTimeUtc.Today();
                 if (reportType == "daily")
                 {
                     startDate = now;
@@ -35,18 +36,21 @@ namespace backend.Services
                 }
                 else if (reportType == "monthly")
                 {
-                    startDate = new DateTime(now.Year, now.Month, 1);
+                    startDate = DateTimeUtc.MonthStart(now.Year, now.Month);
                     endDate = startDate.Value.AddMonths(1).AddDays(-1);
                 }
                 else if (reportType == "yearly")
                 {
-                    startDate = new DateTime(now.Year, 1, 1);
-                    endDate = new DateTime(now.Year, 12, 31);
+                    startDate = DateTimeUtc.YearStart(now.Year);
+                    endDate = startDate.Value.AddYears(1).AddDays(-1);
                 }
             }
 
             // If no date range is provided, use the full range of data
             bool allTime = (!startDate.HasValue && !endDate.HasValue);
+            var normalizedStartDate = startDate.HasValue ? DateTimeUtc.Normalize(startDate.Value) : (DateTime?)null;
+            var normalizedEndDate = endDate.HasValue ? DateTimeUtc.Date(endDate.Value) : (DateTime?)null;
+            var endExclusive = normalizedEndDate?.AddDays(1);
 
             var expenses = _context.Expenses.AsQueryable();
             var rents = _context.Rents.AsQueryable();
@@ -55,19 +59,19 @@ namespace backend.Services
 
             if (!allTime)
             {
-                if (startDate.HasValue)
+                if (normalizedStartDate.HasValue)
                 {
-                    expenses = expenses.Where(e => e.Date >= startDate.Value);
-                    rents = rents.Where(r => r.PaymentDate >= startDate.Value);
-                    purchases = purchases.Where(p => p.PurchaseDate >= startDate.Value);
-                    incomes = incomes.Where(i => i.Date >= startDate.Value);
+                    expenses = expenses.Where(e => e.Date >= normalizedStartDate.Value);
+                    rents = rents.Where(r => r.PaymentDate >= normalizedStartDate.Value);
+                    purchases = purchases.Where(p => p.PurchaseDate >= normalizedStartDate.Value);
+                    incomes = incomes.Where(i => i.Date >= normalizedStartDate.Value);
                 }
-                if (endDate.HasValue)
+                if (endExclusive.HasValue)
                 {
-                    expenses = expenses.Where(e => e.Date <= endDate.Value);
-                    rents = rents.Where(r => r.PaymentDate <= endDate.Value);
-                    purchases = purchases.Where(p => p.PurchaseDate <= endDate.Value);
-                    incomes = incomes.Where(i => i.Date <= endDate.Value);
+                    expenses = expenses.Where(e => e.Date < endExclusive.Value);
+                    rents = rents.Where(r => r.PaymentDate < endExclusive.Value);
+                    purchases = purchases.Where(p => p.PurchaseDate < endExclusive.Value);
+                    incomes = incomes.Where(i => i.Date < endExclusive.Value);
                 }
             }
 
@@ -85,14 +89,14 @@ namespace backend.Services
                 TotalRents = totalRent,
                 TotalIncome = totalIncome,
                 NetBalance = netBalance,
-                StartDate = startDate ?? DateTime.MinValue,
-                EndDate = endDate ?? DateTime.MaxValue
+                StartDate = normalizedStartDate ?? DateTime.MinValue,
+                EndDate = normalizedEndDate ?? DateTime.MaxValue
             };
         }
 
         public async Task<MonthlyReportDto> GetMonthlyReportAsync(int year, int month)
         {
-            var startDate = new DateTime(year, month, 1);
+            var startDate = DateTimeUtc.MonthStart(year, month);
             var endDate = startDate.AddMonths(1).AddDays(-1);
             
             var report = await GetFinancialReportAsync(startDate, endDate);
@@ -113,8 +117,8 @@ namespace backend.Services
 
         public async Task<YearlyReportDto> GetYearlyReportAsync(int year)
         {
-            var startDate = new DateTime(year, 1, 1);
-            var endDate = new DateTime(year, 12, 31);
+            var startDate = DateTimeUtc.YearStart(year);
+            var endDate = startDate.AddYears(1).AddDays(-1);
             
             var report = await GetFinancialReportAsync(startDate, endDate);
             var monthlyBreakdown = await GetMonthlyReportsForYearAsync(year);
@@ -138,13 +142,21 @@ namespace backend.Services
             try
             {
                 var currentDate = DateTime.UtcNow;
-                var currentMonthStart = new DateTime(currentDate.Year, currentDate.Month, 1);
-                var currentMonthEnd = currentMonthStart.AddMonths(1).AddDays(-1);
-                var yearStart = new DateTime(currentDate.Year, 1, 1);
+                var currentMonthStart = DateTimeUtc.MonthStart(currentDate.Year, currentDate.Month);
+                var currentMonthEnd = currentMonthStart.AddMonths(1);
+                var yearStart = DateTimeUtc.YearStart(currentDate.Year);
                 
                 // Filter data based on user role
                 var currentUserId = _currentUserService.GetCurrentUserId();
                 var isAdmin = _currentUserService.IsAdmin();
+                var expensesQuery = _context.Expenses.AsQueryable();
+                var purchasesQuery = _context.Purchases.AsQueryable();
+
+                if (!isAdmin)
+                {
+                    expensesQuery = expensesQuery.Where(e => e.CreatedById == currentUserId);
+                    purchasesQuery = purchasesQuery.Where(p => p.CreatedById == currentUserId);
+                }
                 
                 // Employee statistics with new position system (only for admins)
                 var totalEmployees = isAdmin ? await _context.Employees.CountAsync() : 0;
@@ -157,40 +169,46 @@ namespace backend.Services
                 var averageSalary = employees.Any() ? currentMonthSalaries / employees.Count : 0;
                 
                 // Calculate current month financial data
-                var currentMonthExpenses = await _context.Expenses
-                    .Where(e => e.Date >= currentMonthStart && e.Date <= currentMonthEnd)
+                var currentMonthExpenses = await expensesQuery
+                    .Where(e => e.Date >= currentMonthStart && e.Date < currentMonthEnd)
                     .SumAsync(e => e.Amount);
                     
-                var currentMonthIncome = await _context.Incomes
-                    .Where(i => i.Date >= currentMonthStart && i.Date <= currentMonthEnd)
-                    .SumAsync(i => i.Amount);
+                var currentMonthIncome = isAdmin
+                    ? await _context.Incomes
+                        .Where(i => i.Date >= currentMonthStart && i.Date < currentMonthEnd)
+                        .SumAsync(i => i.Amount)
+                    : 0m;
                     
-                var currentMonthPurchases = await _context.Purchases
-                    .Where(p => p.PurchaseDate >= currentMonthStart && p.PurchaseDate <= currentMonthEnd)
+                var currentMonthPurchases = await purchasesQuery
+                    .Where(p => p.PurchaseDate >= currentMonthStart && p.PurchaseDate < currentMonthEnd)
                     .SumAsync(p => p.TotalPrice);
                     
-                var currentMonthRents = await _context.Rents
-                    .Where(r => r.PaymentDate >= currentMonthStart && r.PaymentDate <= currentMonthEnd)
-                    .SumAsync(r => r.MonthlyAmount);
+                var currentMonthRents = isAdmin
+                    ? await _context.Rents
+                        .Where(r => r.PaymentDate >= currentMonthStart && r.PaymentDate < currentMonthEnd)
+                        .SumAsync(r => r.MonthlyAmount)
+                    : 0m;
                     
                 var currentMonthProfit = currentMonthIncome - (currentMonthExpenses + currentMonthPurchases + currentMonthRents + currentMonthSalaries);
                 
                 // Calculate year to date data
-                var yearToDateIncome = await _context.Incomes
-                    .Where(i => i.Date >= yearStart && i.Date <= currentDate)
-                    .SumAsync(i => i.Amount);
+                var yearToDateIncome = isAdmin
+                    ? await _context.Incomes
+                        .Where(i => i.Date >= yearStart && i.Date <= currentDate)
+                        .SumAsync(i => i.Amount)
+                    : 0m;
                     
-                var yearToDateExpenses = await _context.Expenses
+                var yearToDateExpenses = await expensesQuery
                     .Where(e => e.Date >= yearStart && e.Date <= currentDate)
                     .SumAsync(e => e.Amount);
                     
                 var yearToDateProfit = yearToDateIncome - yearToDateExpenses;
                 
                 // Calculate total data
-                var totalExpenses = await _context.Expenses.SumAsync(e => e.Amount);
-                var totalIncomes = await _context.Incomes.SumAsync(i => i.Amount);
-                var totalPurchases = await _context.Purchases.SumAsync(p => p.TotalPrice);
-                var totalRents = await _context.Rents.SumAsync(r => r.MonthlyAmount);
+                var totalExpenses = await expensesQuery.SumAsync(e => e.Amount);
+                var totalIncomes = isAdmin ? await _context.Incomes.SumAsync(i => i.Amount) : 0m;
+                var totalPurchases = await purchasesQuery.SumAsync(p => p.TotalPrice);
+                var totalRents = isAdmin ? await _context.Rents.SumAsync(r => r.MonthlyAmount) : 0m;
                 
                 return new DashboardStatsDto
                 {
@@ -211,7 +229,7 @@ namespace backend.Services
                     AverageSalary = averageSalary
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
@@ -221,21 +239,22 @@ namespace backend.Services
 
         public async Task<object> GetDailyFinancialCalculationsAsync(DateTime? date = null)
         {
-            var targetDate = (date ?? DateTime.UtcNow.Date).Date;
+            var targetDate = DateTimeUtc.Date(date ?? DateTime.UtcNow);
+            var nextDate = targetDate.AddDays(1);
             var dailyExpenses = await _context.Expenses
-                .Where(e => e.Date.Date == targetDate)
+                .Where(e => e.Date >= targetDate && e.Date < nextDate)
                 .ToListAsync();
 
             var dailyIncomes = await _context.Incomes
-                .Where(i => i.Date.Date == targetDate)
+                .Where(i => i.Date >= targetDate && i.Date < nextDate)
                 .ToListAsync();
 
             var dailyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate.Date == targetDate)
+                .Where(p => p.PurchaseDate >= targetDate && p.PurchaseDate < nextDate)
                 .ToListAsync();
 
             var dailyRents = await _context.Rents
-                .Where(r => r.PaymentDate.Date == targetDate)
+                .Where(r => r.PaymentDate >= targetDate && r.PaymentDate < nextDate)
                 .ToListAsync();
 
             var totalExpenses = dailyExpenses.Sum(e => e.Amount);
@@ -294,24 +313,24 @@ namespace backend.Services
 
         public async Task<object> GetWeeklyFinancialCalculationsAsync(DateTime? startDate = null)
         {
-            var targetDate = (startDate ?? DateTime.UtcNow.Date).Date;
+            var targetDate = DateTimeUtc.Date(startDate ?? DateTime.UtcNow);
             var startOfWeek = targetDate.AddDays(-(int)targetDate.DayOfWeek);
             var endOfWeek = startOfWeek.AddDays(7);
 
             var weeklyExpenses = await _context.Expenses
-                .Where(e => e.Date.Date >= startOfWeek && e.Date.Date < endOfWeek)
+                .Where(e => e.Date >= startOfWeek && e.Date < endOfWeek)
                 .ToListAsync();
 
             var weeklyIncomes = await _context.Incomes
-                .Where(i => i.Date.Date >= startOfWeek && i.Date.Date < endOfWeek)
+                .Where(i => i.Date >= startOfWeek && i.Date < endOfWeek)
                 .ToListAsync();
 
             var weeklyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate.Date >= startOfWeek && p.PurchaseDate.Date < endOfWeek)
+                .Where(p => p.PurchaseDate >= startOfWeek && p.PurchaseDate < endOfWeek)
                 .ToListAsync();
 
             var weeklyRents = await _context.Rents
-                .Where(r => r.PaymentDate.Date >= startOfWeek && r.PaymentDate.Date < endOfWeek)
+                .Where(r => r.PaymentDate >= startOfWeek && r.PaymentDate < endOfWeek)
                 .ToListAsync();
 
             var totalExpenses = weeklyExpenses.Sum(e => e.Amount);
@@ -353,6 +372,13 @@ namespace backend.Services
                     DailyAverage = netIncome / 7
                 },
                 DailyBreakdown = dailyBreakdown,
+                TransactionCounts = new
+                {
+                    Expenses = weeklyExpenses.Count,
+                    Incomes = weeklyIncomes.Count,
+                    Purchases = weeklyPurchases.Count,
+                    Rents = weeklyRents.Count
+                },
                 ExpenseBreakdown = weeklyExpenses
                     .GroupBy(e => e.ExpenseType)
                     .Select(g => new
@@ -372,23 +398,23 @@ namespace backend.Services
             var targetYear = year ?? DateTime.UtcNow.Year;
             var targetMonth = month ?? DateTime.UtcNow.Month;
             
-            var startOfMonth = new DateTime(targetYear, targetMonth, 1);
-            var endOfMonth = startOfMonth.AddMonths(1).AddTicks(-1);
+            var startOfMonth = DateTimeUtc.MonthStart(targetYear, targetMonth);
+            var endOfMonth = startOfMonth.AddMonths(1);
 
             var monthlyExpenses = await _context.Expenses
-                .Where(e => e.Date >= startOfMonth && e.Date <= endOfMonth)
+                .Where(e => e.Date >= startOfMonth && e.Date < endOfMonth)
                 .ToListAsync();
 
             var monthlyIncomes = await _context.Incomes
-                .Where(i => i.Date >= startOfMonth && i.Date <= endOfMonth)
+                .Where(i => i.Date >= startOfMonth && i.Date < endOfMonth)
                 .ToListAsync();
 
             var monthlyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate >= startOfMonth && p.PurchaseDate <= endOfMonth)
+                .Where(p => p.PurchaseDate >= startOfMonth && p.PurchaseDate < endOfMonth)
                 .ToListAsync();
 
             var monthlyRents = await _context.Rents
-                .Where(r => r.PaymentDate >= startOfMonth && r.PaymentDate <= endOfMonth)
+                .Where(r => r.PaymentDate >= startOfMonth && r.PaymentDate < endOfMonth)
                 .ToListAsync();
 
             // Calculate employee salaries for the month
@@ -475,6 +501,13 @@ namespace backend.Services
                 },
                 DailyBreakdown = dailyBreakdown,
                 WeeklyBreakdown = weeklyBreakdown,
+                TransactionCounts = new
+                {
+                    Expenses = monthlyExpenses.Count,
+                    Incomes = monthlyIncomes.Count,
+                    Purchases = monthlyPurchases.Count,
+                    Rents = monthlyRents.Count
+                },
                 ExpenseBreakdown = monthlyExpenses
                     .GroupBy(e => e.ExpenseType)
                     .Select(g => new
@@ -492,23 +525,23 @@ namespace backend.Services
         public async Task<object> GetAnnualFinancialCalculationsAsync(int? year = null)
         {
             var targetYear = year ?? DateTime.UtcNow.Year;
-            var startOfYear = new DateTime(targetYear, 1, 1);
-            var endOfYear = new DateTime(targetYear, 12, 31);
+            var startOfYear = DateTimeUtc.YearStart(targetYear);
+            var endOfYear = startOfYear.AddYears(1);
 
             var annualExpenses = await _context.Expenses
-                .Where(e => e.Date >= startOfYear && e.Date <= endOfYear)
+                .Where(e => e.Date >= startOfYear && e.Date < endOfYear)
                 .ToListAsync();
 
             var annualIncomes = await _context.Incomes
-                .Where(i => i.Date >= startOfYear && i.Date <= endOfYear)
+                .Where(i => i.Date >= startOfYear && i.Date < endOfYear)
                 .ToListAsync();
 
             var annualPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate >= startOfYear && p.PurchaseDate <= endOfYear)
+                .Where(p => p.PurchaseDate >= startOfYear && p.PurchaseDate < endOfYear)
                 .ToListAsync();
 
             var annualRents = await _context.Rents
-                .Where(r => r.PaymentDate >= startOfYear && r.PaymentDate <= endOfYear)
+                .Where(r => r.PaymentDate >= startOfYear && r.PaymentDate < endOfYear)
                 .ToListAsync();
 
             var totalExpenses = annualExpenses.Sum(e => e.Amount);
@@ -570,6 +603,13 @@ namespace backend.Services
                 },
                 MonthlyBreakdown = monthlyBreakdown,
                 QuarterlyBreakdown = quarterlyBreakdown,
+                TransactionCounts = new
+                {
+                    Expenses = annualExpenses.Count,
+                    Incomes = annualIncomes.Count,
+                    Purchases = annualPurchases.Count,
+                    Rents = annualRents.Count
+                },
                 ExpenseBreakdown = annualExpenses
                     .GroupBy(e => e.ExpenseType)
                     .Select(g => new
@@ -632,7 +672,7 @@ namespace backend.Services
                     CurrencySymbol = "MKD"
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }
@@ -654,9 +694,10 @@ namespace backend.Services
         // Breakdown për blerjet (purchases) - Ditore
         public async Task<object> GetDailyPurchasesBreakdownAsync(DateTime? date = null)
         {
-            var targetDate = (date ?? DateTime.UtcNow.Date).Date;
+            var targetDate = DateTimeUtc.Date(date ?? DateTime.UtcNow);
+            var nextDate = targetDate.AddDays(1);
             var dailyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate.Date == targetDate)
+                .Where(p => p.PurchaseDate >= targetDate && p.PurchaseDate < nextDate)
                 .ToListAsync();
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var purchasesByItem = dailyPurchases
@@ -680,10 +721,11 @@ namespace backend.Services
         // Breakdown për blerjet (purchases) - Javore
         public async Task<object> GetWeeklyPurchasesBreakdownAsync(DateTime? startDate = null)
         {
-            var targetDate = startDate ?? DateTime.UtcNow.Date;
-            var startOfWeek = targetDate.Date.AddDays(-(int)targetDate.DayOfWeek);
+            var targetDate = DateTimeUtc.Date(startDate ?? DateTime.UtcNow);
+            var startOfWeek = targetDate.AddDays(-(int)targetDate.DayOfWeek);
+            var endOfWeek = startOfWeek.AddDays(7);
             var dailyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate.Date >= startOfWeek && p.PurchaseDate.Date < startOfWeek.AddDays(7))
+                .Where(p => p.PurchaseDate >= startOfWeek && p.PurchaseDate < endOfWeek)
                 .ToListAsync();
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var dailyBreakdown = Enumerable.Range(0, 7)
@@ -707,10 +749,11 @@ namespace backend.Services
         {
             var targetYear = year ?? DateTime.UtcNow.Year;
             var targetMonth = month ?? DateTime.UtcNow.Month;
-            var startOfMonth = new DateTime(targetYear, targetMonth, 1);
+            var startOfMonth = DateTimeUtc.MonthStart(targetYear, targetMonth);
             var daysInMonth = DateTime.DaysInMonth(targetYear, targetMonth);
+            var startOfNextMonth = startOfMonth.AddMonths(1);
             var dailyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate.Date >= startOfMonth && p.PurchaseDate.Date < startOfMonth.AddDays(daysInMonth))
+                .Where(p => p.PurchaseDate >= startOfMonth && p.PurchaseDate < startOfNextMonth)
                 .ToListAsync();
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var dailyBreakdown = Enumerable.Range(0, daysInMonth)
@@ -733,10 +776,10 @@ namespace backend.Services
         public async Task<object> GetAnnualPurchasesBreakdownAsync(int? year = null)
         {
             var targetYear = year ?? DateTime.UtcNow.Year;
-            var startOfYear = new DateTime(targetYear, 1, 1);
-            var endOfYear = new DateTime(targetYear, 12, 31);
+            var startOfYear = DateTimeUtc.YearStart(targetYear);
+            var endOfYear = startOfYear.AddYears(1);
             var monthlyPurchases = await _context.Purchases
-                .Where(p => p.PurchaseDate.Year == targetYear)
+                .Where(p => p.PurchaseDate >= startOfYear && p.PurchaseDate < endOfYear)
                 .ToListAsync();
             var totalPurchases = monthlyPurchases.Sum(p => p.TotalPrice);
             var monthlyBreakdown = Enumerable.Range(1, 12)
@@ -759,29 +802,32 @@ namespace backend.Services
         {
             try
             {
+                startDate = DateTimeUtc.Date(startDate);
+                endDate = DateTimeUtc.Date(endDate);
+                var endExclusive = endDate.AddDays(1);
                 var periodName = GetPeriodName(startDate, endDate);
                 
                 // Get expenses for the period
                 var expenses = await _context.Expenses
-                    .Where(e => e.Date >= startDate && e.Date <= endDate)
+                    .Where(e => e.Date >= startDate && e.Date < endExclusive)
                     .Include(e => e.CreatedBy)
                     .ToListAsync();
 
                 // Get purchases for the period
                 var purchases = await _context.Purchases
-                    .Where(p => p.PurchaseDate >= startDate && p.PurchaseDate <= endDate)
+                    .Where(p => p.PurchaseDate >= startDate && p.PurchaseDate < endExclusive)
                     .Include(p => p.CreatedBy)
                     .ToListAsync();
 
                 // Get rents for the period
                 var rents = await _context.Rents
-                    .Where(r => r.PaymentDate >= startDate && r.PaymentDate <= endDate)
+                    .Where(r => r.PaymentDate >= startDate && r.PaymentDate < endExclusive)
                     .Include(r => r.CreatedBy)
                     .ToListAsync();
 
                 // Get incomes for the period
                 var incomes = await _context.Incomes
-                    .Where(i => i.Date >= startDate && i.Date <= endDate)
+                    .Where(i => i.Date >= startDate && i.Date < endExclusive)
                     .Include(i => i.CreatedBy)
                     .ToListAsync();
 
@@ -835,7 +881,7 @@ namespace backend.Services
                         {
                             Id = p.Id,
                             ItemName = p.ItemName,
-                            Description = p.Description,
+                            Description = p.Description ?? string.Empty,
                             TotalPrice = p.TotalPrice,
                             Quantity = p.Quantity,
                             UnitPrice = p.UnitPrice,
@@ -853,7 +899,7 @@ namespace backend.Services
                         {
                             Id = r.Id,
                             Location = r.Location,
-                            Description = r.Description,
+                            Description = r.Description ?? string.Empty,
                             MonthlyAmount = r.MonthlyAmount,
                             PaymentDate = r.PaymentDate,
                             CreatedBy = r.CreatedBy?.FullName ?? "Unknown"
@@ -869,7 +915,7 @@ namespace backend.Services
                         {
                             Id = i.Id,
                             Source = i.Source,
-                            Description = i.Description,
+                            Description = i.Description ?? string.Empty,
                             Amount = i.Amount,
                             Date = i.Date,
                             CreatedBy = i.CreatedBy?.FullName ?? "Unknown"
@@ -918,7 +964,7 @@ namespace backend.Services
 
         public async Task<MonthlyTrackingDto> GetMonthlyTrackingByMonthAsync(int year, int month, bool includeDetails = true, bool includeBreakdowns = true)
         {
-            var startDate = new DateTime(year, month, 1);
+            var startDate = DateTimeUtc.MonthStart(year, month);
             var endDate = startDate.AddMonths(1).AddDays(-1);
             return await GetMonthlyTrackingAsync(startDate, endDate, includeDetails, includeBreakdowns);
         }

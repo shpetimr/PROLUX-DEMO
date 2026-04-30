@@ -14,7 +14,6 @@ import {
   Row,
   Col,
   Statistic,
-  Progress,
   message,
   Popconfirm,
   Tooltip,
@@ -76,6 +75,7 @@ const Projects = () => {
     console.log("Is authenticated:", isAuthenticated()); // Debug log
 
     fetchProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user, navigate]);
 
   const fetchProjects = async () => {

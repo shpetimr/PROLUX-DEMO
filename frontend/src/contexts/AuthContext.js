@@ -1,4 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import apiClient, { API_ENDPOINTS } from "../config/api";
+import {
+  ROLES,
+  getDefaultPermissionsForRole,
+  normalizePermissions,
+  normalizeRole,
+} from "../config/permissions";
 
 const AuthContext = createContext();
 
@@ -14,33 +21,73 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check if user is logged in on app start
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-
-    if (storedUser && token) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-      } catch (error) {
-        console.error("Error parsing stored user data:", error);
-        logout();
-      }
+  const normalizeUser = (rawUser) => {
+    if (!rawUser || typeof rawUser !== "object") {
+      return null;
     }
-    setLoading(false);
-  }, []);
 
-  const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+    const role = normalizeRole(rawUser.role);
+    const explicitPermissions = normalizePermissions(rawUser.permissions);
+
+    return {
+      ...rawUser,
+      role,
+      permissions:
+        explicitPermissions.length > 0
+          ? explicitPermissions
+          : getDefaultPermissionsForRole(role),
+    };
   };
 
-  const logout = () => {
+  const clearSession = () => {
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    // Do not navigate here. Navigation should be handled in the component after logout.
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const resetStoredSession = () => {
+      setUser(null);
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+    };
+
+    const loadCurrentUser = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await apiClient.get(API_ENDPOINTS.AUTH_ME);
+        const currentUser = normalizeUser(response.data);
+
+        if (!currentUser) {
+          resetStoredSession();
+          return;
+        }
+
+        setUser(currentUser);
+        localStorage.setItem("user", JSON.stringify(currentUser));
+      } catch (error) {
+        resetStoredSession();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCurrentUser();
+  }, []);
+
+  const login = (userData) => {
+    const normalizedUser = normalizeUser(userData);
+    setUser(normalizedUser);
+    localStorage.setItem("user", JSON.stringify(normalizedUser));
+  };
+
+  const logout = () => {
+    clearSession();
   };
 
   const isAuthenticated = () => {
@@ -48,48 +95,26 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAdmin = () => {
-    return user?.role === "Admin" || user?.role === "admin";
+    return user?.role === ROLES.ADMIN;
   };
 
   const isUser = () => {
-    return user?.role === "User" || user?.role === "user";
+    return user?.role === ROLES.USER;
   };
 
   const hasPermission = (permission) => {
-    if (!user) return false;
-
-    // Admin has all permissions
-    if (isAdmin()) return true;
-
-    // User permissions
-    if (isUser()) {
-      const userPermissions = ["expenses", "purchases"];
-      return userPermissions.includes(permission);
+    if (!user || !permission) {
+      return false;
     }
 
-    return false;
-  };
-
-  const canAccessPage = (page) => {
-    if (!user) return false;
-
-    // Admin can access all pages
-    if (isAdmin()) return true;
-
-    // User can only access specific pages
-    if (isUser()) {
-      const allowedPages = [
-        "expenses",
-        "purchases",
-        "dashboard",
-        "template-print",
-        "offer-print",
-        "",
-      ];
-      return allowedPages.includes(page);
-    }
-
-    return false;
+    const requestedPermission = permission.trim().toLowerCase();
+    return (
+      user.permissions?.some(
+        (userPermission) =>
+          typeof userPermission === "string" &&
+          userPermission.trim().toLowerCase() === requestedPermission
+      ) ?? false
+    );
   };
 
   const value = {
@@ -100,7 +125,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isUser,
     hasPermission,
-    canAccessPage,
+    permissions: user?.permissions ?? [],
     loading,
   };
 

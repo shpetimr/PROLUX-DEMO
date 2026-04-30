@@ -1,12 +1,116 @@
 import axios from "axios";
 
-// API Configuration - Update this to match your backend
-const API_BASE_URL = "http://localhost:5069/api";
+const isProductionBuild = process.env.NODE_ENV === "production";
 
-// Common backend URL patterns - uncomment the one that matches your backend
-// const API_BASE_URL = "http://localhost:5069/api";
-// const API_BASE_URL = "http://localhost:5069";
-// const API_BASE_URL = "http://localhost:5069/api/v1";
+const isLoopbackHostname = (hostname) => {
+  const normalizedHostname = hostname?.replace(/^\[|\]$/g, "").toLowerCase();
+  return (
+    normalizedHostname === "localhost" ||
+    normalizedHostname === "127.0.0.1" ||
+    normalizedHostname?.startsWith("127.") ||
+    normalizedHostname === "::1" ||
+    normalizedHostname === "0.0.0.0"
+  );
+};
+
+const pointsToLocalhost = (value) => {
+  if (!value || typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.origin !== window.location.origin && isLoopbackHostname(url.hostname);
+  } catch {
+    return false;
+  }
+};
+
+const normalizeBaseUrl = (value) => {
+  const configuredValue = value?.trim();
+
+  if (!configuredValue) {
+    return "/api";
+  }
+
+  if (isProductionBuild && pointsToLocalhost(configuredValue)) {
+    console.error(
+      "Ignoring localhost API URL in a production build. Set REACT_APP_API_URL to the public Railway API URL."
+    );
+    return "/api";
+  }
+
+  return configuredValue.replace(/\/+$/, "");
+};
+
+const getRuntimeApiUrl = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  if (
+    isProductionBuild &&
+    process.env.REACT_APP_ALLOW_RUNTIME_API_OVERRIDE !== "true"
+  ) {
+    return "";
+  }
+
+  return new URLSearchParams(window.location.search).get("apiBaseUrl") ?? "";
+};
+
+const normalizeApiPath = (value) => {
+  const apiPath = value?.trim() || "/api";
+  return `/${apiPath.replace(/^\/+/, "").replace(/\/+$/, "")}`;
+};
+
+const buildOriginFromParts = () => {
+  const scheme = process.env.REACT_APP_BACKEND_SCHEME?.trim();
+  const host = process.env.REACT_APP_BACKEND_HOST?.trim();
+  const port = process.env.REACT_APP_BACKEND_PORT?.trim();
+
+  if (!scheme || !host) {
+    return "";
+  }
+
+  const normalizedScheme = scheme.replace(/[:/\\]+$/, "");
+  const normalizedPort = port ? `:${port.replace(/^:/, "")}` : "";
+  return `${normalizedScheme}://${host}${normalizedPort}`;
+};
+
+const buildConfiguredApiUrl = () => {
+  const explicitApiUrl = process.env.REACT_APP_API_URL?.trim();
+  if (explicitApiUrl) {
+    return explicitApiUrl;
+  }
+
+  const backendOrigin =
+    process.env.REACT_APP_BACKEND_ORIGIN?.trim() || buildOriginFromParts();
+  if (!backendOrigin) {
+    return "";
+  }
+
+  return `${backendOrigin.replace(/\/+$/, "")}${normalizeApiPath(
+    process.env.REACT_APP_API_PATH
+  )}`;
+};
+
+const joinUrl = (baseUrl, endpoint = "") => {
+  const cleanEndpoint = endpoint ? `/${endpoint.replace(/^\/+/, "")}` : "";
+  return `${baseUrl}${cleanEndpoint}`;
+};
+
+export const API_BASE_URL = normalizeBaseUrl(
+  getRuntimeApiUrl() || buildConfiguredApiUrl()
+);
+export const getApiUrl = (endpoint = "") => joinUrl(API_BASE_URL, endpoint);
+export const getSwaggerUrl = () => {
+  if (typeof window === "undefined") {
+    return "/swagger";
+  }
+
+  const apiUrl = new URL(API_BASE_URL, window.location.origin);
+  return new URL("/swagger", apiUrl.origin).toString();
+};
 
 // Create axios instance with default configuration
 const apiClient = axios.create({
@@ -25,86 +129,44 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log API requests for debugging
-    console.log("API Request:", {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      hasToken: !!token,
-      tokenLength: token ? token.length : 0,
-      data: config.data,
-      headers: config.headers,
-    });
-
     return config;
   },
-  (error) => {
-    console.error("Request interceptor error:", error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor to handle common errors
 apiClient.interceptors.response.use(
-  (response) => {
-    console.log("API Response:", {
-      status: response.status,
-      url: response.config?.url,
-      data: response.data,
-    });
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error("API Error Response:", {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      message: error.message,
-      url: error.config?.url,
-      method: error.config?.method,
-      data: error.response?.data,
-      headers: error.response?.headers,
-    });
-
     if (error.response?.status === 401) {
-      // Unauthorized - redirect to login
-      console.log("Unauthorized access detected, redirecting to login");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      // TODO: Replace with React Router navigation (useNavigate) from a component context.
-      // window.location.href = "/login";
     }
 
     return Promise.reject(error);
   }
 );
 
-// API endpoints - Update these to match your backend endpoints
 export const API_ENDPOINTS = {
-  // Authentication - try different possible endpoints
   LOGIN: "/auth/login",
-  LOGIN_ALT: "/login",
-  LOGIN_AUTH: "/api/auth/login",
-  LOGIN_USER: "/user/login",
-  LOGIN_AUTHENTICATE: "/authenticate",
+  AUTH_ME: "/auth/me",
+  VALIDATE_TOKEN: "/auth/validate",
 
-  // Employees - update these to match your backend
   EMPLOYEES: "/employees",
   EMPLOYEE_BY_ID: (id) => `/employees/${id}`,
   CALCULATE_SALARY: (id) => `/employees/${id}/calculate-salary`,
 
-  // Attendance - new endpoints for daily attendance tracking
   ATTENDANCE: "/attendance",
   ATTENDANCE_BY_ID: (id) => `/attendance/${id}`,
   ATTENDANCE_EMPLOYEE_MONTH: (employeeId, year, month) => `/attendance/employee/${employeeId}/month/${year}/${month}`,
   ATTENDANCE_MONTH: (year, month) => `/attendance/month/${year}/${month}`,
   ATTENDANCE_BULK: "/attendance/bulk",
 
-  // Dashboard - update these to match your backend
   DASHBOARD_STATS: "/reports/dashboard",
   DASHBOARD_COMPREHENSIVE: "/reports/dashboard/comprehensive",
   DASHBOARD_ALT: "/dashboard",
   DASHBOARD_V1: "/v1/dashboard",
 
-  // Use only the standard endpoints for these resources:
   EXPENSES: "/expenses",
   INCOMES: "/incomes",
   PURCHASES: "/purchases",
@@ -142,17 +204,6 @@ export const API_ENDPOINTS = {
     MONTHLY: "/reports/financial/monthly",
     ANNUAL: "/reports/financial/annual",
     BY_DATE_RANGE: "/reports/financial/by-date-range",
-  },
-
-  // Monthly tracking endpoints
-  MONTHLY_TRACKING: {
-    CUSTOM_RANGE: "/reports/monthly-tracking",
-    BY_MONTH: (year, month) => `/reports/monthly-tracking/${year}/${month}`,
-    BY_YEAR: (year) => `/reports/monthly-tracking/year/${year}`,
-    CURRENT_MONTH: "/reports/monthly-tracking/current-month",
-    CURRENT_YEAR: "/reports/monthly-tracking/current-year",
-    SUMMARY: "/reports/monthly-tracking/summary",
-    CUSTOM_REQUEST: "/reports/monthly-tracking/custom",
   },
 
   STOCK_ITEMS: "/stock/items",

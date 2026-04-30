@@ -1,54 +1,17 @@
-using backend.Models;
-using backend.Services;
-using System.Security.Cryptography;
-using System.Text;
-using System.Collections.Generic;
-
 namespace backend.Data
 {
     public static class DatabaseSeeder
     {
-        public static async Task SeedAsync(ApplicationDbContext context, IAuthService authService)
+        public static async Task SeedAsync(ApplicationDbContext context)
         {
-            // Check if we're clearing the database (skip seeding sample data)
+            // Do not run startup maintenance while an explicit data clear is requested.
             var commandLineArgs = Environment.GetCommandLineArgs();
             bool shouldClearDatabase = commandLineArgs.Contains("--clear-database");
             
             if (shouldClearDatabase)
             {
-                Console.WriteLine("Skipping sample data seeding due to database clearing.");
+                Console.WriteLine("Skipping startup data maintenance due to database clearing.");
                 return;
-            }
-            
-            // Seed admin user if no users exist
-            if (!context.Users.Any())
-            {
-                var adminUser = new User
-                {
-                    Username = "admin",
-                    PasswordHash = HashPassword("admin123"),
-                    FullName = "Administrator",
-                    Role = UserRole.Admin,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                context.Users.Add(adminUser);
-                await context.SaveChangesAsync();
-            }
-
-            // Always ensure a default regular user exists
-            if (!context.Users.Any(u => u.Username == "user"))
-            {
-                var regularUser = new User
-                {
-                    Username = "user",
-                    PasswordHash = HashPassword("user123"),
-                    FullName = "Regular User",
-                    Role = UserRole.User,
-                    CreatedAt = DateTime.UtcNow
-                };
-                context.Users.Add(regularUser);
-                await context.SaveChangesAsync();
             }
 
             // Update existing employees with DailyRate if not set
@@ -83,14 +46,7 @@ namespace backend.Data
             await context.SaveChangesAsync();
             
             Console.WriteLine("All data cleared successfully!");
-            Console.WriteLine("Admin user (admin/admin123) and regular user (user/user123) are preserved.");
-        }
-
-        private static string HashPassword(string password)
-        {
-            using var sha256 = SHA256.Create();
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(hashedBytes);
+            Console.WriteLine("User accounts were preserved during cleanup.");
         }
     }
 } 

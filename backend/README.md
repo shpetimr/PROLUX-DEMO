@@ -1,4 +1,4 @@
-# Business Management System - Backend
+# PROLUX Group Management - Backend
 
 A comprehensive .NET Core Web API for managing employee salaries, business expenses, purchases, rent, and income tracking with detailed financial reporting.
 
@@ -48,8 +48,8 @@ A comprehensive .NET Core Web API for managing employee salaries, business expen
 
 ## Technology Stack
 
-- **Backend**: .NET Core 7.0 Web API
-- **Database**: SQLite (lightweight, local)
+- **Backend**: .NET 8 LTS Web API
+- **Database**: SQLite by default, PostgreSQL-compatible cloud databases by configuration
 - **ORM**: Entity Framework Core
 - **Authentication**: JWT Bearer Tokens
 - **Documentation**: Swagger/OpenAPI
@@ -58,7 +58,7 @@ A comprehensive .NET Core Web API for managing employee salaries, business expen
 
 ### Prerequisites
 
-- .NET 7.0 SDK or later
+- .NET 8.0 SDK or later
 - Visual Studio 2022 or VS Code
 
 ### Installation
@@ -76,20 +76,37 @@ A comprehensive .NET Core Web API for managing employee salaries, business expen
    dotnet restore
    ```
 
-3. **Run the application**
+3. **Create your local environment file**
+
+   ```bash
+   copy .env.example .env
+   ```
+
+   Set a strong `JWT_KEY` and real admin bootstrap credentials in `backend/.env`.
+
+4. **Provision the admin account**
+
+   ```bash
+   dotnet run -- --provision-admin --sanitize-sample-users
+   ```
+
+5. **Run the application**
 
    ```bash
    dotnet run
    ```
 
-4. **Access the API**
-   - API Base URL: `https://localhost:7001` or `http://localhost:5000`
-   - Swagger Documentation: `https://localhost:7001/swagger`
+6. **Access the API**
+   - API Base URL: configured by `ASPNETCORE_URLS`
+   - Swagger Documentation: `${ASPNETCORE_URLS}/swagger` in development
 
-### Default Admin Account
+### Initial Access
 
-- **Username**: `admin`
-- **Password**: `admin123`
+- The application does not create default login credentials.
+- The backend refuses to start without a strong JWT signing key and at least one administrator account.
+- Provision a real administrator account through your deployment or setup process before first use.
+- Use `dotnet run -- --audit-users` to review existing accounts before cleanup.
+- Use `dotnet run -- --provision-admin --sanitize-sample-users` to create the admin and rotate/remove placeholder users safely.
 
 ## API Endpoints
 
@@ -191,36 +208,46 @@ GET    /api/reports/current-year         - Get current year report
 
 ## Configuration
 
-### appsettings.json
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=BusinessManagement.db"
-  },
-  "Jwt": {
-    "Key": "your-super-secret-jwt-key-here-change-this-in-production"
-  }
-}
-```
-
 ### Environment Variables
 
+Copy `backend/.env.example` to `backend/.env` for local development. Runtime values now come from environment variables; `appsettings.json` only keeps non-secret logging defaults.
+
 - `ASPNETCORE_ENVIRONMENT`: Set to "Development" or "Production"
-- `JWT_KEY`: Override JWT secret key for production
+- `PROLUX_BACKEND_SCHEME`, `PROLUX_BACKEND_HOST`, `PROLUX_BACKEND_PORT`: Backend bind URL parts used when `ASPNETCORE_URLS` is not set
+- `ASPNETCORE_URLS`: Optional full backend bind URL; can be composed from the `PROLUX_BACKEND_*` variables in `.env`
+- `CORS_ALLOWED_ORIGINS`: Comma-separated browser origins allowed to call the API
+- `DATABASE_PROVIDER`: Database provider. Use `sqlite` locally or `postgres` for PostgreSQL/Supabase.
+- `SQLITE_CONNECTION_STRING`: SQLite connection string for the local database. Used when `DATABASE_PROVIDER=sqlite`.
+- `DATABASE_URL`: PostgreSQL URL for cloud databases when `DATABASE_PROVIDER=postgres`.
+- `DATABASE_CONNECTION_STRING`, `POSTGRES_CONNECTION_STRING`, `POSTGRESQL_CONNECTION_STRING`, `POSTGRES_URL`: Alternative backend-only connection string names.
+- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DATABASE`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Optional split PostgreSQL credentials if you do not want to store one full URL.
+- `POSTGRES_SSL_MODE`, `POSTGRES_TRUST_SERVER_CERTIFICATE`: Optional PostgreSQL TLS settings. External hosts default to `SSL Mode=Require`.
+- `JWT_KEY`: Required. Use a long random secret, preferably 32 random bytes encoded as Base64Url or 64 hex characters
+- `JWT_ISSUER`: Required token issuer
+- `JWT_AUDIENCE`: Required token audience
+- `ADMIN_USERNAME`: Required for `--provision-admin`
+- `ADMIN_FULL_NAME`: Required for `--provision-admin`
+- `ADMIN_PASSWORD`: Required for `--provision-admin`
 
-## Sample Data
+### Security Maintenance Commands
 
-The application includes sample data for testing:
+```bash
+dotnet run -- --audit-users
+dotnet run -- --provision-admin
+dotnet run -- --provision-admin --sanitize-sample-users
+```
 
-- Admin user (admin/admin123)
-- 3 sample employees (Warehouse and Field positions)
-- Sample expenses, purchases, rents, and incomes
-- Realistic financial data for testing reports
+- `--audit-users`: Lists current users, flags placeholder/sample accounts, and reports legacy password hashes
+- `--provision-admin`: Creates or updates the admin account from `backend/.env`
+- `--sanitize-sample-users`: Deletes unreferenced placeholder users and rotates referenced ones to non-loginable retired accounts
+
+## Data
+
+The application no longer creates demo business records automatically. Use the maintenance commands above to audit or sanitize legacy placeholder user accounts when needed.
 
 ## Security Features
 
-- **Password Hashing**: SHA256 with salt
+- **Password Hashing**: PBKDF2-HMAC-SHA256 with per-password salt
 - **JWT Authentication**: Secure token-based authentication
 - **CORS Configuration**: Configurable cross-origin requests
 - **Input Validation**: Comprehensive data validation
@@ -247,14 +274,64 @@ dotnet ef migrations add MigrationName
 dotnet ef database update
 ```
 
+### Cloud Database Setup
+
+The backend database provider is selected in `backend/.env` or in host-managed environment variables. Keep database credentials out of `frontend/.env`; the frontend should only know the API URL.
+
+Local SQLite:
+
+```env
+DATABASE_PROVIDER=sqlite
+SQLITE_CONNECTION_STRING=Data Source=BusinessManagement.db
+```
+
+Cloud PostgreSQL/Supabase:
+
+```env
+DATABASE_PROVIDER=postgres
+DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require
+```
+
+If a Supabase direct `db.*.supabase.co` host only has IPv6 DNS records from your runtime network, use the Supabase Session Pooler or Transaction Pooler connection string instead.
+
+Split PostgreSQL variables are also supported:
+
+```env
+DATABASE_PROVIDER=postgres
+POSTGRES_HOST=host
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=database
+POSTGRES_USER=user
+POSTGRES_PASSWORD=password
+POSTGRES_SSL_MODE=Require
+```
+
+The current application uses Entity Framework Core through `ApplicationDbContext`, so controllers and services do not need provider-specific code. PostgreSQL connections are normalized with SSL for external hosts, connection pooling, timeouts, keepalive, and EF retry-on-failure. The SQLite-only legacy stock-table bootstrap is skipped for PostgreSQL. For an empty cloud database, the startup schema creation path can create the current model; for long-term production migrations, generate provider-specific EF migrations with `DATABASE_PROVIDER=postgres` before switching startup to a migrations-only release flow.
+
 ## Production Deployment
+
+For the selected production stack, deploy this backend as a Railway service with
+service root `/backend`. Railway uses the included `Dockerfile` and
+`railway.toml`; generate a public Railway domain, then set Netlify's
+`REACT_APP_API_URL` to `https://<railway-domain>/api`.
+
+Railway provides `PORT` automatically. If no explicit `ASPNETCORE_URLS` or
+`PROLUX_BACKEND_*` bind URL is configured, the backend listens on
+`http://0.0.0.0:$PORT`.
+
+Use `backend/.env.production.example` and the root `DEPLOYMENT.md` for the exact
+Railway, Supabase, and Netlify variables.
+
+The backend targets `net8.0`, a supported LTS release.
 
 ### Security Checklist
 
 - [ ] Change JWT secret key
+- [ ] Store the JWT key only in environment variables or `.env`
 - [ ] Configure HTTPS
 - [ ] Set up proper CORS policies
 - [ ] Use environment-specific connection strings
+- [ ] Provision the admin account before first start
 - [ ] Enable logging and monitoring
 - [ ] Configure backup strategies
 
@@ -297,7 +374,8 @@ This backend is designed to work with:
 
 ### CORS Configuration
 
-The API is configured to allow all origins for development. For production, configure specific origins in `Program.cs`.
+The API reads allowed origins from `CORS_ALLOWED_ORIGINS` or `PROLUX_FRONTEND_*`.
+For production, set `CORS_ALLOWED_ORIGINS` to the exact Netlify origin.
 
 ## Support
 
@@ -305,7 +383,7 @@ For questions or issues:
 
 1. Check the Swagger documentation at `/swagger`
 2. Review the API endpoints and request/response formats
-3. Check the sample data for reference
+3. Check the API logs and database records for reference
 4. Ensure proper authentication headers are included
 
 ## License

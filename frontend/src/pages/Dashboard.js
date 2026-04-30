@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Card,
   Row,
   Col,
-  Statistic,
   Typography,
   Spin,
-  Progress,
   Table,
   Tag,
   Button,
@@ -18,9 +16,7 @@ import {
   ShoppingOutlined,
   HomeOutlined,
   BarChartOutlined,
-  UserOutlined,
   CalendarOutlined,
-  TrophyOutlined,
   CrownOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
@@ -28,8 +24,126 @@ import apiClient, { API_ENDPOINTS } from "../config/api";
 import dayjs from "dayjs";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { PERMISSIONS } from "../config/permissions";
 
 const { Title, Text } = Typography;
+
+const calculateComprehensiveStats = (
+  employees,
+  expenses,
+  incomes,
+  purchases,
+  rents,
+  dashboardStats
+) => {
+  const currentMonth = dayjs().format("YYYY-MM");
+  const currentYear = dayjs().format("YYYY");
+
+  const totalEmployees = employees.length;
+  const magazineEmployees = employees.filter(
+    (emp) =>
+      emp.position === "magazine" ||
+      emp.position === "Magazine" ||
+      emp.position === 0
+  ).length;
+  const terrenEmployees = employees.filter(
+    (emp) =>
+      emp.position === "terren" ||
+      emp.position === "Terren" ||
+      emp.position === 1
+  ).length;
+
+  const totalSalaries = employees.reduce(
+    (sum, emp) => sum + (emp.monthlySalary || 0),
+    0
+  );
+
+  const currentMonthExpenses = expenses
+    .filter((exp) => dayjs(exp.date).format("YYYY-MM") === currentMonth)
+    .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+  const currentMonthIncomes = incomes
+    .filter((inc) => dayjs(inc.date).format("YYYY-MM") === currentMonth)
+    .reduce((sum, inc) => sum + (inc.amount || 0), 0);
+
+  const currentMonthPurchases = purchases
+    .filter((pur) => dayjs(pur.purchaseDate).format("YYYY-MM") === currentMonth)
+    .reduce((sum, pur) => sum + (pur.totalPrice || 0), 0);
+
+  const currentMonthRents = rents
+    .filter((rent) => dayjs(rent.paymentDate).format("YYYY-MM") === currentMonth)
+    .reduce((sum, rent) => sum + (rent.monthlyAmount || 0), 0);
+
+  const yearToDateExpenses = expenses
+    .filter((exp) => dayjs(exp.date).format("YYYY") === currentYear)
+    .reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+  const yearToDateIncomes = incomes
+    .filter((inc) => dayjs(inc.date).format("YYYY") === currentYear)
+    .reduce((sum, inc) => sum + (inc.amount || 0), 0);
+
+  const yearToDatePurchases = purchases
+    .filter((pur) => dayjs(pur.purchaseDate).format("YYYY") === currentYear)
+    .reduce((sum, pur) => sum + (pur.totalPrice || 0), 0);
+
+  const yearToDateRents = rents
+    .filter((rent) => dayjs(rent.paymentDate).format("YYYY") === currentYear)
+    .reduce((sum, rent) => sum + (rent.monthlyAmount || 0), 0);
+
+  const currentMonthProfit =
+    currentMonthIncomes -
+    currentMonthExpenses -
+    currentMonthPurchases -
+    currentMonthRents -
+    totalSalaries;
+  const yearToDateProfit =
+    yearToDateIncomes -
+    yearToDateExpenses -
+    yearToDatePurchases -
+    yearToDateRents -
+    totalSalaries * 12;
+
+  const totalExpenses = expenses.reduce(
+    (sum, exp) => sum + (exp.amount || 0),
+    0
+  );
+  const totalIncomes = incomes.reduce((sum, inc) => sum + (inc.amount || 0), 0);
+  const totalPurchases = purchases.reduce(
+    (sum, pur) => sum + (pur.totalPrice || 0),
+    0
+  );
+  const totalRents = rents.reduce(
+    (sum, rent) => sum + (rent.monthlyAmount || 0),
+    0
+  );
+
+  return {
+    totalEmployees,
+    warehouseEmployees: magazineEmployees,
+    fieldEmployees: terrenEmployees,
+    currentMonthSalaries: totalSalaries,
+    currentMonthIncome: currentMonthIncomes,
+    currentMonthExpenses:
+      currentMonthExpenses + currentMonthPurchases + currentMonthRents,
+    currentMonthProfit,
+    yearToDateIncome: yearToDateIncomes,
+    yearToDateExpenses:
+      yearToDateExpenses + yearToDatePurchases + yearToDateRents,
+    yearToDateProfit,
+    totalExpenses,
+    totalIncomes,
+    totalPurchases,
+    totalRents,
+    profitMargin:
+      totalIncomes > 0
+        ? ((totalIncomes - totalExpenses - totalPurchases - totalRents) /
+            totalIncomes) *
+          100
+        : 0,
+    averageSalary: totalEmployees > 0 ? totalSalaries / totalEmployees : 0,
+    ...dashboardStats,
+  };
+};
 
 function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -42,79 +156,60 @@ function Dashboard() {
     rents: [],
     projects: [],
   });
-  const { isAdmin, isUser } = useAuth();
+  const { isAdmin, isUser, hasPermission } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchAllDashboardData();
-  }, []);
+  const canViewDashboard = hasPermission(PERMISSIONS.DASHBOARD_VIEW);
+  const canManageEmployees = hasPermission(PERMISSIONS.EMPLOYEES_MANAGE);
+  const canManageExpenses = hasPermission(PERMISSIONS.EXPENSES_MANAGE);
+  const canManagePurchases = hasPermission(PERMISSIONS.PURCHASES_MANAGE);
+  const canManageRents = hasPermission(PERMISSIONS.RENTS_MANAGE);
+  const canManageIncomes = hasPermission(PERMISSIONS.INCOMES_MANAGE);
+  const canManageDebts = hasPermission(PERMISSIONS.DEBTS_MANAGE);
+  const canViewReports = hasPermission(PERMISSIONS.REPORTS_VIEW);
 
-  const fetchAllDashboardData = async () => {
+  const fetchAllDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      // Prepare API calls based on user role
-      const apiCalls = [];
-      const callNames = [];
-
-      // Admin can see all data
-      if (isAdmin()) {
-        apiCalls.push(
-          apiClient.get(API_ENDPOINTS.EMPLOYEES),
-          apiClient.get(API_ENDPOINTS.EXPENSES),
-          apiClient.get(API_ENDPOINTS.INCOMES),
-          apiClient.get(API_ENDPOINTS.PURCHASES),
-          apiClient.get(API_ENDPOINTS.RENTS),
-          apiClient.get(API_ENDPOINTS.DASHBOARD_STATS)
-        );
-        callNames.push(
+      const apiCalls = [
+        canManageEmployees && [
           "employees",
+          apiClient.get(API_ENDPOINTS.EMPLOYEES),
+        ],
+        canManageExpenses && [
           "expenses",
-          "incomes",
-          "purchases",
-          "rents",
-          "dashboardStats"
-        );
-      } else if (isUser()) {
-        // User can only see expenses and purchases
-        apiCalls.push(
           apiClient.get(API_ENDPOINTS.EXPENSES),
+        ],
+        canManageIncomes && [
+          "incomes",
+          apiClient.get(API_ENDPOINTS.INCOMES),
+        ],
+        canManagePurchases && [
+          "purchases",
           apiClient.get(API_ENDPOINTS.PURCHASES),
-          apiClient.get(API_ENDPOINTS.DASHBOARD_STATS)
-        );
-        callNames.push("expenses", "purchases", "dashboardStats");
-      }
+        ],
+        canManageRents && ["rents", apiClient.get(API_ENDPOINTS.RENTS)],
+        canViewDashboard && [
+          "dashboardStats",
+          apiClient.get(API_ENDPOINTS.DASHBOARD_STATS),
+        ],
+      ].filter(Boolean);
 
-      const responses = await Promise.allSettled(apiCalls);
+      const responses = await Promise.allSettled(
+        apiCalls.map(([, request]) => request)
+      );
+      const responseData = responses.reduce((acc, response, index) => {
+        const [name] = apiCalls[index];
+        acc[name] = response.status === "fulfilled" ? response.value.data : [];
+        return acc;
+      }, {});
 
-      // Process responses based on user role
-      let employees = [],
-        expenses = [],
-        incomes = [],
-        purchases = [],
-        rents = [];
-      let dashboardStats = {};
-
-      if (isAdmin()) {
-        employees =
-          responses[0].status === "fulfilled" ? responses[0].value.data : [];
-        expenses =
-          responses[1].status === "fulfilled" ? responses[1].value.data : [];
-        incomes =
-          responses[2].status === "fulfilled" ? responses[2].value.data : [];
-        purchases =
-          responses[3].status === "fulfilled" ? responses[3].value.data : [];
-        rents =
-          responses[4].status === "fulfilled" ? responses[4].value.data : [];
-        dashboardStats =
-          responses[5].status === "fulfilled" ? responses[5].value.data : {};
-      } else if (isUser()) {
-        expenses =
-          responses[0].status === "fulfilled" ? responses[0].value.data : [];
-        purchases =
-          responses[1].status === "fulfilled" ? responses[1].value.data : [];
-        dashboardStats =
-          responses[2].status === "fulfilled" ? responses[2].value.data : {};
-      }
+      const employees = responseData.employees ?? [];
+      const expenses = responseData.expenses ?? [];
+      const incomes = responseData.incomes ?? [];
+      const purchases = responseData.purchases ?? [];
+      const rents = responseData.rents ?? [];
+      const dashboardStats = responseData.dashboardStats ?? {};
 
       // Calculate comprehensive statistics
       const calculatedStats = calculateComprehensiveStats(
@@ -139,148 +234,18 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    canManageEmployees,
+    canManageExpenses,
+    canManageIncomes,
+    canManagePurchases,
+    canManageRents,
+    canViewDashboard,
+  ]);
 
-  const calculateComprehensiveStats = (
-    employees,
-    expenses,
-    incomes,
-    purchases,
-    rents,
-    dashboardStats
-  ) => {
-    const currentMonth = dayjs().format("YYYY-MM");
-    const currentYear = dayjs().format("YYYY");
-
-    // Employee statistics
-    const totalEmployees = employees.length;
-    const magazineEmployees = employees.filter(
-      (emp) =>
-        emp.position === "magazine" ||
-        emp.position === "Magazine" ||
-        emp.position === 0
-    ).length;
-    const terrenEmployees = employees.filter(
-      (emp) =>
-        emp.position === "terren" ||
-        emp.position === "Terren" ||
-        emp.position === 1
-    ).length;
-
-    // Calculate total salaries
-    const totalSalaries = employees.reduce(
-      (sum, emp) => sum + (emp.monthlySalary || 0),
-      0
-    );
-
-    // Current month calculations
-    const currentMonthExpenses = expenses
-      .filter((exp) => dayjs(exp.date).format("YYYY-MM") === currentMonth)
-      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
-
-    const currentMonthIncomes = incomes
-      .filter((inc) => dayjs(inc.date).format("YYYY-MM") === currentMonth)
-      .reduce((sum, inc) => sum + (inc.amount || 0), 0);
-
-    const currentMonthPurchases = purchases
-      .filter(
-        (pur) => dayjs(pur.purchaseDate).format("YYYY-MM") === currentMonth
-      )
-      .reduce((sum, pur) => sum + (pur.totalPrice || 0), 0);
-
-    const currentMonthRents = rents
-      .filter(
-        (rent) => dayjs(rent.paymentDate).format("YYYY-MM") === currentMonth
-      )
-      .reduce((sum, rent) => sum + (rent.monthlyAmount || 0), 0);
-
-    // Year to date calculations
-    const yearToDateExpenses = expenses
-      .filter((exp) => dayjs(exp.date).format("YYYY") === currentYear)
-      .reduce((sum, exp) => sum + (exp.amount || 0), 0);
-
-    const yearToDateIncomes = incomes
-      .filter((inc) => dayjs(inc.date).format("YYYY") === currentYear)
-      .reduce((sum, inc) => sum + (inc.amount || 0), 0);
-
-    const yearToDatePurchases = purchases
-      .filter((pur) => dayjs(pur.purchaseDate).format("YYYY") === currentYear)
-      .reduce((sum, pur) => sum + (pur.totalPrice || 0), 0);
-
-    const yearToDateRents = rents
-      .filter((rent) => dayjs(rent.paymentDate).format("YYYY") === currentYear)
-      .reduce((sum, rent) => sum + (rent.monthlyAmount || 0), 0);
-
-    // Calculate profits
-    const currentMonthProfit =
-      currentMonthIncomes -
-      currentMonthExpenses -
-      currentMonthPurchases -
-      currentMonthRents -
-      totalSalaries;
-    const yearToDateProfit =
-      yearToDateIncomes -
-      yearToDateExpenses -
-      yearToDatePurchases -
-      yearToDateRents -
-      totalSalaries * 12;
-
-    // Additional statistics
-    const totalExpenses = expenses.reduce(
-      (sum, exp) => sum + (exp.amount || 0),
-      0
-    );
-    const totalIncomes = incomes.reduce(
-      (sum, inc) => sum + (inc.amount || 0),
-      0
-    );
-    const totalPurchases = purchases.reduce(
-      (sum, pur) => sum + (pur.totalPrice || 0),
-      0
-    );
-    const totalRents = rents.reduce(
-      (sum, rent) => sum + (rent.monthlyAmount || 0),
-      0
-    );
-
-    return {
-      // Employee stats
-      totalEmployees,
-      warehouseEmployees: magazineEmployees,
-      fieldEmployees: terrenEmployees,
-      currentMonthSalaries: totalSalaries,
-
-      // Current month stats
-      currentMonthIncome: currentMonthIncomes,
-      currentMonthExpenses:
-        currentMonthExpenses + currentMonthPurchases + currentMonthRents,
-      currentMonthProfit,
-
-      // Year to date stats
-      yearToDateIncome: yearToDateIncomes,
-      yearToDateExpenses:
-        yearToDateExpenses + yearToDatePurchases + yearToDateRents,
-      yearToDateProfit,
-
-      // Additional stats
-      totalExpenses,
-      totalIncomes,
-      totalPurchases,
-      totalRents,
-
-      // Performance metrics
-      profitMargin:
-        totalIncomes > 0
-          ? ((totalIncomes - totalExpenses - totalPurchases - totalRents) /
-              totalIncomes) *
-            100
-          : 0,
-      averageSalary: totalEmployees > 0 ? totalSalaries / totalEmployees : 0,
-
-      // Merge with backend stats if available
-      ...dashboardStats,
-    };
-  };
+  useEffect(() => {
+    fetchAllDashboardData();
+  }, [fetchAllDashboardData]);
 
   if (loading) {
     return (
@@ -341,9 +306,8 @@ function Dashboard() {
       {/* Quick Actions, Recent Data Tables, and Summary Card remain below */}
 
       <Row gutter={[16, 16]} className="mt-8">
-        {isAdmin() && (
-          <>
-            <Col xs={24} sm={12} md={8} lg={6}>
+        {canManageEmployees && (
+          <Col xs={24} sm={12} md={8} lg={6}>
               <Card
                 hoverable
                 className="text-center cursor-pointer bg-gradient-to-br from-blue-50 to-indigo-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
@@ -354,8 +318,10 @@ function Dashboard() {
                   Menaxho Punëtorët
                 </div>
               </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
+          </Col>
+        )}
+        {canManageRents && (
+          <Col xs={24} sm={12} md={8} lg={6}>
               <Card
                 hoverable
                 className="text-center cursor-pointer bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
@@ -364,8 +330,10 @@ function Dashboard() {
                 <HomeOutlined className="text-2xl text-purple-600 mb-2" />
                 <div className="font-medium text-gray-700">Menaxho Qirat</div>
               </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
+          </Col>
+        )}
+        {canManageIncomes && (
+          <Col xs={24} sm={12} md={8} lg={6}>
               <Card
                 hoverable
                 className="text-center cursor-pointer bg-gradient-to-br from-green-50 to-emerald-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
@@ -376,8 +344,10 @@ function Dashboard() {
                   Ndjek Të Ardhurat
                 </div>
               </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
+          </Col>
+        )}
+        {canManageDebts && (
+          <Col xs={24} sm={12} md={8} lg={6}>
               <Card
                 hoverable
                 className="text-center cursor-pointer bg-gradient-to-br from-red-50 to-pink-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
@@ -386,8 +356,10 @@ function Dashboard() {
                 <ExclamationCircleOutlined className="text-2xl text-red-600 mb-2" />
                 <div className="font-medium text-gray-700">Menaxho Borxhet</div>
               </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
+          </Col>
+        )}
+        {canViewReports && (
+          <Col xs={24} sm={12} md={8} lg={6}>
               <Card
                 hoverable
                 className="text-center cursor-pointer bg-gradient-to-br from-cyan-50 to-teal-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
@@ -396,36 +368,38 @@ function Dashboard() {
                 <BarChartOutlined className="text-2xl text-cyan-600 mb-2" />
                 <div className="font-medium text-gray-700">Shiko Raportet</div>
               </Card>
-            </Col>
-          </>
+          </Col>
         )}
-        <Col xs={24} sm={12} md={8} lg={6}>
-          <Card
-            hoverable
-            className="text-center cursor-pointer bg-gradient-to-br from-red-50 to-rose-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-            onClick={() => navigate("/expenses")}
-          >
-            <DollarOutlined className="text-2xl text-red-600 mb-2" />
-            <div className="font-medium text-gray-700">Ndjek Shpenzimet</div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8} lg={6}>
-          <Card
-            hoverable
-            className="text-center cursor-pointer bg-gradient-to-br from-orange-50 to-amber-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-            onClick={() => navigate("/purchases")}
-          >
-            <ShoppingOutlined className="text-2xl text-orange-600 mb-2" />
-            <div className="font-medium text-gray-700">Menaxho Blerjet</div>
-          </Card>
-        </Col>
+        {canManageExpenses && (
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Card
+              hoverable
+              className="text-center cursor-pointer bg-gradient-to-br from-red-50 to-rose-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
+              onClick={() => navigate("/expenses")}
+            >
+              <DollarOutlined className="text-2xl text-red-600 mb-2" />
+              <div className="font-medium text-gray-700">Ndjek Shpenzimet</div>
+            </Card>
+          </Col>
+        )}
+        {canManagePurchases && (
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Card
+              hoverable
+              className="text-center cursor-pointer bg-gradient-to-br from-orange-50 to-amber-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
+              onClick={() => navigate("/purchases")}
+            >
+              <ShoppingOutlined className="text-2xl text-orange-600 mb-2" />
+              <div className="font-medium text-gray-700">Menaxho Blerjet</div>
+            </Card>
+          </Col>
+        )}
       </Row>
 
       {/* Recent Data Tables */}
       <Row gutter={[16, 16]} className="mt-8">
-        {isAdmin() && (
-          <>
-            <Col xs={24} lg={12}>
+        {canManageEmployees && (
+          <Col xs={24} lg={12}>
               <Card
                 title="Punëtorët e Fundit"
                 className="bg-white border-0 shadow-lg"
@@ -480,8 +454,10 @@ function Dashboard() {
                   ]}
                 />
               </Card>
-            </Col>
-            <Col xs={24} lg={12}>
+          </Col>
+        )}
+        {canManageIncomes && (
+          <Col xs={24} lg={12}>
               <Card
                 title="Të Ardhurat e Fundit"
                 className="bg-white border-0 shadow-lg"
@@ -524,13 +500,13 @@ function Dashboard() {
                   ]}
                 />
               </Card>
-            </Col>
-          </>
+          </Col>
         )}
       </Row>
 
       <Row gutter={[16, 16]} className="mt-6">
-        <Col xs={24} lg={12}>
+        {canManageExpenses && (
+          <Col xs={24} lg={12}>
           <Card
             title="Shpenzimet e Fundit"
             className="bg-white border-0 shadow-lg"
@@ -573,8 +549,10 @@ function Dashboard() {
               ]}
             />
           </Card>
-        </Col>
-        <Col xs={24} lg={12}>
+          </Col>
+        )}
+        {canManagePurchases && (
+          <Col xs={24} lg={12}>
           <Card
             title="Blerjet e Fundit"
             className="bg-white border-0 shadow-lg"
@@ -617,7 +595,8 @@ function Dashboard() {
               ]}
             />
           </Card>
-        </Col>
+          </Col>
+        )}
       </Row>
 
       {/* Remove the summary card at the bottom */}

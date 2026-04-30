@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
@@ -10,6 +11,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Policy = AppPermissions.PurchasesManage)]
     public class PurchasesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -220,11 +222,12 @@ namespace backend.Controllers
         [HttpGet("summary")]
         public async Task<ActionResult<object>> GetPurchaseSummary()
         {
-            var totalPurchases = await _context.Purchases.SumAsync(p => p.TotalPrice);
-            var purchaseCount = await _context.Purchases.CountAsync();
+            var purchasesQuery = GetAccessiblePurchases();
+            var totalPurchases = await purchasesQuery.SumAsync(p => p.TotalPrice);
+            var purchaseCount = await purchasesQuery.CountAsync();
             var averagePurchase = purchaseCount > 0 ? totalPurchases / purchaseCount : 0;
 
-            var summaryByItem = await _context.Purchases
+            var summaryByItem = await purchasesQuery
                 .GroupBy(p => p.ItemName)
                 .Select(g => new
                 {
@@ -248,13 +251,26 @@ namespace backend.Controllers
         [HttpGet("items")]
         public async Task<ActionResult<IEnumerable<string>>> GetItemNames()
         {
-            var items = await _context.Purchases
+            var items = await GetAccessiblePurchases()
                 .Select(p => p.ItemName)
                 .Distinct()
                 .OrderBy(i => i)
                 .ToListAsync();
 
             return Ok(items);
+        }
+
+        private IQueryable<Purchase> GetAccessiblePurchases()
+        {
+            IQueryable<Purchase> purchasesQuery = _context.Purchases;
+
+            if (!_currentUserService.IsAdmin())
+            {
+                var currentUserId = _currentUserService.GetCurrentUserId();
+                purchasesQuery = purchasesQuery.Where(p => p.CreatedById == currentUserId);
+            }
+
+            return purchasesQuery;
         }
     }
 } 

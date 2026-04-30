@@ -15,6 +15,7 @@ import { PrinterOutlined } from "@ant-design/icons";
 import { computeInvoiceTotals, formatMkd } from "../utils/invoiceTotals";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 import { useAuth } from "../contexts/AuthContext";
+import { PERMISSIONS } from "../config/permissions";
 
 const { Title, Text } = Typography;
 
@@ -38,7 +39,8 @@ const initialRows = Array.from({ length: 8 }, (_, i) => ({
 }));
 
 function TemplatePrint() {
-  const { isAdmin } = useAuth();
+  const { hasPermission } = useAuth();
+  const canManageStock = hasPermission(PERMISSIONS.STOCK_MANAGE);
   const [rows, setRows] = React.useState(initialRows);
   const [header, setHeader] = React.useState({
     customer: "",
@@ -116,7 +118,7 @@ function TemplatePrint() {
   };
 
   const handlePrint = async () => {
-    if (deductStockOnPrint && isAdmin()) {
+    if (deductStockOnPrint && canManageStock) {
       setPrintLoading(true);
       try {
         const res = await apiClient.post(
@@ -177,7 +179,7 @@ function TemplatePrint() {
           >
             Print
           </Button>
-          {isAdmin() && (
+          {canManageStock && (
             <Space align="center" wrap>
               <Switch
                 checked={deductStockOnPrint}
@@ -217,8 +219,8 @@ function TemplatePrint() {
           <img
             src={
               process.env.NODE_ENV === "development"
-                ? "/rio-logo.png"
-                : "./rio-logo.png"
+                ? "/prolux-logo.png"
+                : "./prolux-logo.png"
             }
             alt="ProLux Group Logo"
             style={{ height: 50 }}

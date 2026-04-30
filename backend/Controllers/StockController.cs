@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using backend.Authorization;
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
@@ -10,7 +11,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/stock")]
-    [Authorize]
+    [Authorize(Policy = AppPermissions.StockManage)]
     public class StockController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

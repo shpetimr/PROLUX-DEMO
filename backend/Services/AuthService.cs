@@ -2,76 +2,100 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
+using backend.Authorization;
+using backend.Configuration;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
+using backend.Security;
 
 namespace backend.Services
 {
     public class AuthService : IAuthService
     {
         private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
+        private readonly JwtSettings _jwtSettings;
 
         public AuthService(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
-            _configuration = configuration;
+            _jwtSettings = JwtSettingsLoader.GetRequiredJwtSettings(configuration);
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == loginDto.Username);
+            var username = loginDto.Username.Trim();
 
-            if (user == null || !VerifyPassword(loginDto.Password, user.PasswordHash))
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(loginDto.Password))
             {
                 throw new UnauthorizedAccessException("Invalid username or password");
+            }
+
+            var normalizedUsername = username.ToUpperInvariant();
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Username.ToUpper() == normalizedUsername);
+
+            if (user == null || !PasswordSecurity.VerifyPassword(loginDto.Password, user.PasswordHash))
+            {
+                throw new UnauthorizedAccessException("Invalid username or password");
+            }
+
+            if (PasswordSecurity.NeedsRehash(user.PasswordHash))
+            {
+                user.PasswordHash = PasswordSecurity.HashPassword(loginDto.Password);
             }
 
             // Update last login
             user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            var userDto = new UserResponseDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                FullName = user.FullName,
-                Role = user.Role,
-                CreatedAt = user.CreatedAt,
-                LastLoginAt = user.LastLoginAt
-            };
-
+            var userDto = ToUserResponseDto(user);
             var token = GenerateJwtToken(userDto);
 
             return new AuthResponseDto
             {
+                Id = user.Id,
                 Token = token,
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                Permissions = userDto.Permissions,
                 ExpiresAt = DateTime.UtcNow.AddDays(7) // Token expires in 7 days
             };
         }
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
         {
+            var username = registerDto.Username.Trim();
+            var fullName = registerDto.FullName.Trim();
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                throw new InvalidOperationException("Username is required");
+            }
+
+            if (string.IsNullOrWhiteSpace(fullName))
+            {
+                throw new InvalidOperationException("Full name is required");
+            }
+
+            PasswordSecurity.EnsureStrongPassword(registerDto.Password, username, fullName);
+
             // Check if username already exists
-            if (await _context.Users.AnyAsync(u => u.Username == registerDto.Username))
+            var normalizedUsername = username.ToUpperInvariant();
+            if (await _context.Users.AnyAsync(u => u.Username.ToUpper() == normalizedUsername))
             {
                 throw new InvalidOperationException("Username already exists");
             }
 
-            var passwordHash = HashPassword(registerDto.Password);
+            var passwordHash = PasswordSecurity.HashPassword(registerDto.Password);
 
             var user = new User
             {
-                Username = registerDto.Username,
+                Username = username,
                 PasswordHash = passwordHash,
-                FullName = registerDto.FullName,
+                FullName = fullName,
                 Role = registerDto.Role,
                 CreatedAt = DateTime.UtcNow
             };
@@ -79,60 +103,65 @@ namespace backend.Services
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            var userDto = new UserResponseDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                FullName = user.FullName,
-                Role = user.Role,
-                CreatedAt = user.CreatedAt,
-                LastLoginAt = user.LastLoginAt
-            };
-
+            var userDto = ToUserResponseDto(user);
             var token = GenerateJwtToken(userDto);
 
             return new AuthResponseDto
             {
+                Id = user.Id,
                 Token = token,
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                Permissions = userDto.Permissions,
                 ExpiresAt = DateTime.UtcNow.AddDays(7)
             };
         }
 
-        public async Task<bool> ValidateTokenAsync(string token)
+        public Task<bool> ValidateTokenAsync(string token)
         {
             try
             {
                 var tokenHandler = new JwtSecurityTokenHandler();
-                var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"] ?? "your-secret-key-here");
+                var key = Encoding.UTF8.GetBytes(_jwtSettings.Key);
 
                 tokenHandler.ValidateToken(token, new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
+                    ValidateIssuer = true,
+                    ValidIssuer = _jwtSettings.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = _jwtSettings.Audience,
+                    ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
                 }, out SecurityToken validatedToken);
 
-                return true;
+                return Task.FromResult(true);
             }
             catch
             {
-                return false;
+                return Task.FromResult(false);
             }
+        }
+
+        public async Task<UserResponseDto?> GetCurrentUserAsync(int userId)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(entity => entity.Id == userId);
+            return user == null ? null : ToUserResponseDto(user);
         }
 
         public string GenerateJwtToken(UserResponseDto user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"] ?? "your-secret-key-here");
+            var key = Encoding.UTF8.GetBytes(_jwtSettings.Key);
 
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.GivenName, user.FullName),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
@@ -141,6 +170,8 @@ namespace backend.Services
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
+                Issuer = _jwtSettings.Issuer,
+                Audience = _jwtSettings.Audience,
                 Expires = DateTime.UtcNow.AddDays(7),
                 SigningCredentials = new SigningCredentials(
                     new SymmetricSecurityKey(key),
@@ -151,17 +182,18 @@ namespace backend.Services
             return tokenHandler.WriteToken(token);
         }
 
-        private string HashPassword(string password)
+        private static UserResponseDto ToUserResponseDto(User user)
         {
-            using var sha256 = SHA256.Create();
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(hashedBytes);
-        }
-
-        private bool VerifyPassword(string password, string hash)
-        {
-            var hashedPassword = HashPassword(password);
-            return hashedPassword == hash;
+            return new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                FullName = user.FullName,
+                Role = user.Role,
+                Permissions = AppPermissions.GetPermissionsForRole(user.Role),
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = user.LastLoginAt
+            };
         }
     }
 } 

@@ -1,5 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
+using backend.Configuration;
 using backend.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace backend.Controllers
 {
@@ -7,30 +10,60 @@ namespace backend.Controllers
     [Route("api/[controller]")]
     public class HealthController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ApplicationDbContext _dbContext;
+        private readonly DatabaseOptions _databaseOptions;
 
-        public HealthController(ApplicationDbContext context)
+        public HealthController(ApplicationDbContext dbContext, DatabaseOptions databaseOptions)
         {
-            _context = context;
+            _dbContext = dbContext;
+            _databaseOptions = databaseOptions;
         }
 
         [HttpGet]
-        public IActionResult Get()
-        {
-            return Ok(new { status = "OK", timestamp = DateTime.UtcNow });
-        }
-
-        [HttpPost("clear-database")]
-        public async Task<IActionResult> ClearDatabase()
+        [AllowAnonymous]
+        public async Task<IActionResult> Get(CancellationToken cancellationToken)
         {
             try
             {
-                await DatabaseSeeder.ClearAllDataAsync(_context);
-                return Ok(new { message = "Database cleared successfully", timestamp = DateTime.UtcNow });
+                var databaseAvailable = await _dbContext.Database.CanConnectAsync(cancellationToken);
+                if (!databaseAvailable)
+                {
+                    return StatusCode(503, new
+                    {
+                        status = "Degraded",
+                        timestamp = DateTime.UtcNow,
+                        database = new
+                        {
+                            status = "Unavailable",
+                            provider = _databaseOptions.ProviderName
+                        }
+                    });
+                }
+
+                return Ok(new
+                {
+                    status = "OK",
+                    timestamp = DateTime.UtcNow,
+                    database = new
+                    {
+                        status = "OK",
+                        provider = _databaseOptions.ProviderName
+                    }
+                });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = $"Error clearing database: {ex.Message}" });
+                return StatusCode(503, new
+                {
+                    status = "Degraded",
+                    timestamp = DateTime.UtcNow,
+                    database = new
+                    {
+                        status = "Unavailable",
+                        provider = _databaseOptions.ProviderName,
+                        error = ex.GetType().Name
+                    }
+                });
             }
         }
     }

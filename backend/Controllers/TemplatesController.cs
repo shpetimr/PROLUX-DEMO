@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using backend.DTOs;
+using backend.Authorization;
 using backend.Services;
 using Microsoft.AspNetCore.Authorization;
 
@@ -7,7 +8,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/templates")]
-    [Authorize] // Shto këtë për të lejuar vetëm user të loguar
+    [Authorize(Policy = AppPermissions.TemplatesPrint)]
     public class TemplatesController : ControllerBase
     {
         [HttpPost("invoice/print")]
