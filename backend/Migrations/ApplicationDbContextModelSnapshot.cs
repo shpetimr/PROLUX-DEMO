@@ -429,6 +429,71 @@ namespace backend.Migrations
                     b.ToTable("SalaryRecords");
                 });
 
+            modelBuilder.Entity("backend.Models.StockItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("ReorderLevel")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StockItems");
+                });
+
+            modelBuilder.Entity("backend.Models.StockMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("MovementKind")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("QuantityChange")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("StockItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockItemId");
+
+                    b.ToTable("StockMovements");
+                });
+
             modelBuilder.Entity("backend.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -567,11 +632,27 @@ namespace backend.Migrations
                     b.Navigation("Employee");
                 });
 
+            modelBuilder.Entity("backend.Models.StockMovement", b =>
+                {
+                    b.HasOne("backend.Models.StockItem", "StockItem")
+                        .WithMany("Movements")
+                        .HasForeignKey("StockItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("StockItem");
+                });
+
             modelBuilder.Entity("backend.Models.Employee", b =>
                 {
                     b.Navigation("AttendanceRecords");
 
                     b.Navigation("SalaryRecords");
+                });
+
+            modelBuilder.Entity("backend.Models.StockItem", b =>
+                {
+                    b.Navigation("Movements");
                 });
 #pragma warning restore 612, 618
         }
