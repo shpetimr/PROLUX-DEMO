@@ -149,27 +149,7 @@ function Expenses() {
     try {
       setLoading(true);
 
-      // Mbledh tÃ« gjitha shpenzimet
-      const response = await apiClient.get(API_ENDPOINTS.EXPENSES);
-      const allExpenses = response.data;
-
-      // DÃ«rgon tÃ« dhÃ«nat nÃ« raportin financiar
-      const reportData = {
-        expenses: allExpenses,
-        totalAmount: allExpenses.reduce(
-          (sum, exp) => sum + (exp.amount || 0),
-          0
-        ),
-        count: allExpenses.length,
-        reportType: "expenses",
-        generatedAt: new Date().toISOString(),
-      };
-
-      // DÃ«rgon nÃ« endpoint-in e raportit financiar
-      await apiClient.post(
-        `${API_ENDPOINTS.REPORTS}/financial/expenses`,
-        reportData
-      );
+      await apiClient.get(API_ENDPOINTS.EXPENSE_REPORTS.FINANCIAL_IMPACT);
 
       message.success("TÃ« dhÃ«nat u dÃ«rguan me sukses nÃ« raportin financiar!");
 

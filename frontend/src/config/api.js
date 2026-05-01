@@ -154,7 +154,6 @@ export const API_ENDPOINTS = {
 
   EMPLOYEES: "/employees",
   EMPLOYEE_BY_ID: (id) => `/employees/${id}`,
-  CALCULATE_SALARY: (id) => `/employees/${id}/calculate-salary`,
 
   ATTENDANCE: "/attendance",
   ATTENDANCE_BY_ID: (id) => `/attendance/${id}`,
@@ -164,15 +163,13 @@ export const API_ENDPOINTS = {
 
   DASHBOARD_STATS: "/reports/dashboard",
   DASHBOARD_COMPREHENSIVE: "/reports/dashboard/comprehensive",
-  DASHBOARD_ALT: "/dashboard",
-  DASHBOARD_V1: "/v1/dashboard",
 
   EXPENSES: "/expenses",
   INCOMES: "/incomes",
   PURCHASES: "/purchases",
   RENTS: "/rents",
   DEBTS: "/debts",
-  DEBTS_STATISTICS: "/debts/statistics",
+  DEBTS_STATISTICS: "/debts/summary",
 
   // Projects/Works management
   PROJECTS: "/projects",
@@ -184,17 +181,18 @@ export const API_ENDPOINTS = {
     DAILY: "/expenses/calculations/daily",
     WEEKLY: "/expenses/calculations/weekly",
     MONTHLY: "/expenses/calculations/monthly",
-    BY_TYPE: "/expenses/calculations/by-type",
-    BY_DATE_RANGE: "/expenses/calculations/by-date-range",
+    BY_TYPE: "/expenses/summary",
+    BY_DATE_RANGE: "/expenses/calculations/period",
   },
 
   // Comprehensive reports
   REPORTS: "/reports",
   EXPENSE_REPORTS: {
     COMPREHENSIVE: "/reports/expenses/comprehensive",
-    SUMMARY: "/reports/expenses/summary",
-    DETAILED: "/reports/expenses/detailed",
-    EXPORT: "/reports/expenses/export",
+    SUMMARY: "/expenses/summary",
+    FINANCIAL_IMPACT: "/reports/expenses/financial-impact",
+    TRENDS: "/reports/expenses/trends",
+    FORECAST: "/reports/expenses/forecast",
   },
 
   // Financial calculations
@@ -203,7 +201,10 @@ export const API_ENDPOINTS = {
     WEEKLY: "/reports/financial/weekly",
     MONTHLY: "/reports/financial/monthly",
     ANNUAL: "/reports/financial/annual",
-    BY_DATE_RANGE: "/reports/financial/by-date-range",
+    COMPREHENSIVE: "/reports/financial/comprehensive",
+    SUMMARY: "/reports/financial/summary",
+    BY_DATE_RANGE: "/reports/financial",
+    PERIOD_TOTALS: "/reports/financial/period-totals",
   },
 
   STOCK_ITEMS: "/stock/items",

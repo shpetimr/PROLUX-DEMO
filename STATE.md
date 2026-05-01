@@ -20,20 +20,24 @@
 ---
 
 ### Phase 3 – Cloud / Database move
-
-## DONE
+### Tasks done:
 - Create database + hosting accounts
 - Replace SQLite with cloud database
 - Add environment variables (env)
 
-## NEXT
+---
 
+### Phase 4 – Deployment and verification
+## DONE
+
+
+## NEXT
+- Prepare app for release
+- Connect frontend + backend + database
+- Final live testing
 
 ---
 
 ## UPCOMING PHASES
 
-### Phase 4 – Deployment and verification
-- Prepare app for release
-- Connect frontend + backend + database
-- Final live testing
+
