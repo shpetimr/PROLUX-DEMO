@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using backend.Services;
 
 namespace backend.Models
 {
@@ -53,15 +54,7 @@ namespace backend.Models
         
         public decimal OvertimeRate { get; set; } = 150; // 150 denarë per orë overtime
         
-        // Comprehensive salary calculation
-        public decimal CalculatedMonthlySalary => 
-            (DaysWorkedThisMonth * DailyWage) + 
-            (HalfDaysThisMonth * DailyWage / 2) + 
-            (TotalOvertimeHoursThisMonth * OvertimeRate) + 
-            CalculatedDailyBonuses + 
-            MonthlyBonuses - 
-            CalculatedDailyPenalties - 
-            MonthlyPenalties;
+        public decimal CalculatedMonthlySalary => SalaryCalculator.CalculateMonthlySalary(this);
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

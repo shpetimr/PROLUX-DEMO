@@ -20,8 +20,7 @@ namespace backend.Services
             if (employee == null)
                 throw new ArgumentException("Employee not found");
 
-            // Use the comprehensive salary calculation from the Employee model
-            decimal totalSalary = employee.CalculatedMonthlySalary;
+            decimal totalSalary = SalaryCalculator.CalculateMonthlySalary(employee);
             
             // Debug logging
             Console.WriteLine($"=== SALARY CALCULATION DEBUG ===");
@@ -37,7 +36,7 @@ namespace backend.Services
             Console.WriteLine($"Total Salary: {totalSalary}");
             Console.WriteLine($"=== END SALARY CALCULATION DEBUG ===");
             
-            return Math.Max(0, totalSalary); // Ensure salary is not negative
+            return totalSalary;
         }
 
         public decimal GetDailyWageForPosition(EmployeePosition position)
