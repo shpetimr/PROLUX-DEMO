@@ -151,6 +151,7 @@ export const API_ENDPOINTS = {
   LOGIN: "/auth/login",
   REGISTER: "/auth/register",
   AUTH_ME: "/auth/me",
+  USERS: "/auth/users",
   VALIDATE_TOKEN: "/auth/validate",
 
   EMPLOYEES: "/employees",
@@ -212,6 +213,9 @@ export const API_ENDPOINTS = {
   STOCK_ITEM_BY_ID: (id) => `/stock/items/${id}`,
   STOCK_ITEM_MOVEMENTS: (id) => `/stock/items/${id}/movements`,
   STOCK_APPLY_INVOICE_DEDUCTIONS: "/stock/apply-invoice-deductions",
+
+  WORKER_TASKS: "/worker-tasks",
+  WORKER_TASK_BY_ID: (id) => `/worker-tasks/${id}`,
 };
 
 export default apiClient;

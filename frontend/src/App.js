@@ -13,6 +13,7 @@ import Rents from "./pages/Rents";
 import Incomes from "./pages/Incomes";
 import Debts from "./pages/Debts";
 import Users from "./pages/Users";
+import WorkerTasks from "./pages/WorkerTasks";
 
 import Reports from "./pages/Reports";
 import Projects from "./pages/Projects";
@@ -169,6 +170,16 @@ function App() {
                     requiredPermission={PERMISSIONS.STOCK_MANAGE}
                   >
                     <Stock />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="worker-tasks"
+                element={
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.WORKERS_MANAGE_TASKS}
+                  >
+                    <WorkerTasks />
                   </ProtectedRoute>
                 }
               />

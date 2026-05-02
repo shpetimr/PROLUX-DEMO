@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   STOCK_MANAGE: "stock.manage",
   ATTENDANCE_MANAGE: "attendance.manage",
   USERS_MANAGE: "users.manage",
+  WORKERS_MANAGE_TASKS: "workers.manageTasks",
   WORKERS_VIEW_OWN_DASHBOARD: "workers.viewOwnDashboard",
   WORKERS_VIEW_OWN_TASKS: "workers.viewOwnTasks",
   WORKERS_UPDATE_OWN_TASK_STATUS: "workers.updateOwnTaskStatus",

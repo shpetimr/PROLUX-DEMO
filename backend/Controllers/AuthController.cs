@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using backend.Authorization;
+using backend.Data;
 using backend.Services;
 using backend.DTOs;
 
@@ -12,11 +14,16 @@ namespace backend.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ICurrentUserService _currentUserService;
+        private readonly ApplicationDbContext _context;
 
-        public AuthController(IAuthService authService, ICurrentUserService currentUserService)
+        public AuthController(
+            IAuthService authService,
+            ICurrentUserService currentUserService,
+            ApplicationDbContext context)
         {
             _authService = authService;
             _currentUserService = currentUserService;
+            _context = context;
         }
 
         [HttpPost("login")]
@@ -74,6 +81,37 @@ namespace backend.Controllers
             }
 
             return Ok(user);
+        }
+
+        [HttpGet("users")]
+        [Authorize(Policy = AppPermissions.UsersManage)]
+        public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetUsers()
+        {
+            var users = await _context.Users
+                .AsNoTracking()
+                .OrderBy(user => user.FullName)
+                .ThenBy(user => user.Username)
+                .Select(user => new
+                {
+                    user.Id,
+                    user.Username,
+                    user.FullName,
+                    user.Role,
+                    user.CreatedAt,
+                    user.LastLoginAt
+                })
+                .ToListAsync();
+
+            return Ok(users.Select(user => new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                FullName = user.FullName,
+                Role = user.Role,
+                Permissions = AppPermissions.GetPermissionsForRole(user.Role),
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = user.LastLoginAt
+            }));
         }
 
         [HttpPost("validate")]

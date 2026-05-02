@@ -24,6 +24,7 @@ import {
   ExclamationCircleOutlined,
   FileTextOutlined,
   InboxOutlined,
+  CheckSquareOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -116,6 +117,12 @@ function Layout() {
         icon: <InboxOutlined />,
         label: "Stoku",
         requiredPermission: PERMISSIONS.STOCK_MANAGE,
+      },
+      {
+        key: "/worker-tasks",
+        icon: <CheckSquareOutlined />,
+        label: "Worker Tasks",
+        requiredPermission: PERMISSIONS.WORKERS_MANAGE_TASKS,
       },
       {
         key: "/users",
