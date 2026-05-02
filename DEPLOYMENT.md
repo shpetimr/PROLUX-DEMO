@@ -19,7 +19,7 @@ Use the repository root with the included `netlify.toml`.
 - Required production variable:
 
 ```env
-REACT_APP_API_URL=https://your-railway-backend.up.railway.app/api
+REACT_APP_API_URL=https://prolux-production.up.railway.app/api
 ```
 
 The production build guard fails Netlify production builds when
@@ -43,8 +43,11 @@ DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require
 JWT_KEY=replace-with-43-plus-character-random-secret
 JWT_ISSUER=PROLUX.Backend
 JWT_AUDIENCE=PROLUX.Web
-CORS_ALLOWED_ORIGINS=https://your-netlify-site.netlify.app
+CORS_ALLOWED_ORIGINS=https://prolux-group.netlify.app
 ```
+
+`CORS_ALLOWED_ORIGINS` must be the frontend origin only: scheme and host, no
+`/api`, no hash route, and no page path.
 
 One-time admin provisioning variables:
 

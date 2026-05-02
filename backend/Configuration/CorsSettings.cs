@@ -72,7 +72,17 @@ namespace backend.Configuration
                 return normalized;
             }
 
-            return normalized.TrimEnd('/');
+            if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+            {
+                return normalized.TrimEnd('/');
+            }
+
+            var host = uri.HostNameType == UriHostNameType.IPv6
+                ? $"[{uri.IdnHost}]"
+                : uri.IdnHost;
+            var port = uri.IsDefaultPort ? string.Empty : $":{uri.Port}";
+
+            return $"{uri.Scheme}://{host}{port}";
         }
 
         private static IReadOnlyList<string> GetConfiguredOrigins(IConfiguration configuration)
