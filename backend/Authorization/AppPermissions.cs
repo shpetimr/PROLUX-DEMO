@@ -18,6 +18,10 @@ namespace backend.Authorization
         public const string StockManage = "stock.manage";
         public const string AttendanceManage = "attendance.manage";
         public const string UsersManage = "users.manage";
+        public const string WorkersViewOwnDashboard = "workers.viewOwnDashboard";
+        public const string WorkersViewOwnTasks = "workers.viewOwnTasks";
+        public const string WorkersUpdateOwnTaskStatus = "workers.updateOwnTaskStatus";
+        public const string WorkersViewOwnSalary = "workers.viewOwnSalary";
 
         public static IReadOnlyList<string> All { get; } = new[]
         {
@@ -34,7 +38,11 @@ namespace backend.Authorization
             ReportsView,
             StockManage,
             AttendanceManage,
-            UsersManage
+            UsersManage,
+            WorkersViewOwnDashboard,
+            WorkersViewOwnTasks,
+            WorkersUpdateOwnTaskStatus,
+            WorkersViewOwnSalary
         };
 
         private static readonly IReadOnlyDictionary<UserRole, IReadOnlyList<string>> PermissionsByRole =
@@ -47,7 +55,11 @@ namespace backend.Authorization
                     TemplatesPrint,
                     OffersPrint,
                     ExpensesManage,
-                    PurchasesManage
+                    PurchasesManage,
+                    WorkersViewOwnDashboard,
+                    WorkersViewOwnTasks,
+                    WorkersUpdateOwnTaskStatus,
+                    WorkersViewOwnSalary
                 }
             };
 
