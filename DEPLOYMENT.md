@@ -25,6 +25,10 @@ REACT_APP_API_URL=https://prolux-production.up.railway.app/api
 The production build guard fails Netlify production builds when
 `REACT_APP_API_URL` is missing, non-HTTPS, or points to localhost.
 
+The included `netlify.toml` also proxies `/api/*` to the Railway backend. On
+Netlify production hosts, the frontend automatically uses this same-origin
+`/api` path to avoid browser CORS failures.
+
 ## Railway backend
 
 Deploy the backend as a separate Railway service. Set Railway's service root

@@ -40,7 +40,32 @@ const normalizeBaseUrl = (value) => {
     return "/api";
   }
 
+  if (isProductionBuild && shouldUseNetlifyApiProxy(configuredValue)) {
+    return "/api";
+  }
+
   return configuredValue.replace(/\/+$/, "");
+};
+
+const shouldUseNetlifyApiProxy = (configuredValue) => {
+  if (
+    typeof window === "undefined" ||
+    process.env.REACT_APP_DISABLE_NETLIFY_API_PROXY === "true"
+  ) {
+    return false;
+  }
+
+  const currentHostname = window.location.hostname.toLowerCase();
+  if (!currentHostname.endsWith(".netlify.app")) {
+    return false;
+  }
+
+  try {
+    const apiUrl = new URL(configuredValue, window.location.origin);
+    return apiUrl.origin !== window.location.origin;
+  } catch {
+    return false;
+  }
 };
 
 const getRuntimeApiUrl = () => {

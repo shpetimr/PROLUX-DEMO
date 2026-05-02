@@ -8,6 +8,12 @@
   PUBLIC_URL = "/"
 
 [[redirects]]
+  from = "/api/*"
+  to = "https://prolux-production.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
