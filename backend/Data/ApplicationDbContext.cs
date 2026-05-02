@@ -23,6 +23,7 @@ namespace backend.Data
         public DbSet<Project> Projects { get; set; }
         public DbSet<StockItem> StockItems { get; set; }
         public DbSet<StockMovement> StockMovements { get; set; }
+        public DbSet<WorkerTask> WorkerTasks { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -200,6 +201,25 @@ namespace backend.Data
                 entity.Property(e => e.MovementKind).HasMaxLength(50);
                 entity.Property(e => e.Note).HasMaxLength(500);
                 entity.HasIndex(e => e.StockItemId);
+            });
+
+            modelBuilder.Entity<WorkerTask>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Description).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.Deadline).IsRequired();
+                entity.Property(e => e.Status).IsRequired().HasConversion<string>();
+                entity.HasOne(e => e.AssignedUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.AssignedUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.AssignedUserId);
+                entity.HasIndex(e => e.CreatedById);
             });
         }
 

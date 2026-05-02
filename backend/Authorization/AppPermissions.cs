@@ -18,6 +18,7 @@ namespace backend.Authorization
         public const string StockManage = "stock.manage";
         public const string AttendanceManage = "attendance.manage";
         public const string UsersManage = "users.manage";
+        public const string WorkersManageTasks = "workers.manageTasks";
         public const string WorkersViewOwnDashboard = "workers.viewOwnDashboard";
         public const string WorkersViewOwnTasks = "workers.viewOwnTasks";
         public const string WorkersUpdateOwnTaskStatus = "workers.updateOwnTaskStatus";
@@ -39,6 +40,7 @@ namespace backend.Authorization
             StockManage,
             AttendanceManage,
             UsersManage,
+            WorkersManageTasks,
             WorkersViewOwnDashboard,
             WorkersViewOwnTasks,
             WorkersUpdateOwnTaskStatus,
