@@ -216,6 +216,7 @@ export const API_ENDPOINTS = {
 
   WORKER_TASKS: "/worker-tasks",
   WORKER_TASK_BY_ID: (id) => `/worker-tasks/${id}`,
+  WORKER_TASK_STATUS: (id) => `/worker-tasks/${id}/status`,
 };
 
 export default apiClient;

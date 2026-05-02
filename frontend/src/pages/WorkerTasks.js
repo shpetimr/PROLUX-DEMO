@@ -27,6 +27,8 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import apiClient, { API_ENDPOINTS } from "../config/api";
+import { useAuth } from "../contexts/AuthContext";
+import { PERMISSIONS } from "../config/permissions";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -91,9 +93,16 @@ function WorkerTasks() {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [form] = Form.useForm();
+  const { hasPermission } = useAuth();
+
+  const canManageTasks = hasPermission(PERMISSIONS.WORKERS_MANAGE_TASKS);
+  const canUpdateOwnTaskStatus = hasPermission(
+    PERMISSIONS.WORKERS_UPDATE_OWN_TASK_STATUS
+  );
 
   const fetchTasks = useCallback(async () => {
     setLoadingTasks(true);
@@ -123,8 +132,10 @@ function WorkerTasks() {
 
   useEffect(() => {
     fetchTasks();
-    fetchUsers();
-  }, [fetchTasks, fetchUsers]);
+    if (canManageTasks) {
+      fetchUsers();
+    }
+  }, [fetchTasks, fetchUsers, canManageTasks]);
 
   const userOptions = useMemo(
     () =>
@@ -161,6 +172,10 @@ function WorkerTasks() {
   };
 
   const handleSubmit = async (values) => {
+    if (!canManageTasks) {
+      return;
+    }
+
     const payload = {
       title: values.title.trim(),
       description: values.description.trim(),
@@ -201,6 +216,27 @@ function WorkerTasks() {
     }
   };
 
+  const handleStatusChange = async (taskId, status) => {
+    setUpdatingStatusTaskId(taskId);
+    try {
+      await apiClient.patch(API_ENDPOINTS.WORKER_TASK_STATUS(taskId), {
+        status,
+      });
+      setTasks((currentTasks) =>
+        currentTasks.map((task) =>
+          task.id === taskId ? { ...task, status } : task
+        )
+      );
+      message.success("Task status updated.");
+    } catch (error) {
+      message.error(
+        getApiErrorMessage(error, "Failed to update task status.")
+      );
+    } finally {
+      setUpdatingStatusTaskId(null);
+    }
+  };
+
   const columns = [
     {
       title: "Title",
@@ -220,6 +256,7 @@ function WorkerTasks() {
       dataIndex: "assignedUserFullName",
       key: "assignedUserFullName",
       width: 180,
+      hidden: !canManageTasks,
       render: (name) => (
         <Space size={6}>
           <UserOutlined className="text-blue-500" />
@@ -249,14 +286,32 @@ function WorkerTasks() {
       title: "Status",
       dataIndex: "status",
       key: "status",
-      width: 140,
+      width: canManageTasks ? 140 : 180,
       filters: taskStatuses.map((status) => ({
         text: status.label,
         value: status.value,
       })),
       onFilter: (value, record) => record.status === value,
-      render: (status) => {
+      render: (status, record) => {
         const meta = getStatusMeta(status);
+        if (!canManageTasks && canUpdateOwnTaskStatus) {
+          return (
+            <Select
+              value={status}
+              options={taskStatuses.map(({ value, label }) => ({
+                value,
+                label,
+              }))}
+              onChange={(nextStatus) =>
+                handleStatusChange(record.id, nextStatus)
+              }
+              loading={updatingStatusTaskId === record.id}
+              disabled={updatingStatusTaskId === record.id}
+              style={{ width: 150 }}
+            />
+          );
+        }
+
         return (
           <Tag color={meta.color} icon={meta.icon}>
             {meta.label}
@@ -269,12 +324,14 @@ function WorkerTasks() {
       dataIndex: "createdByFullName",
       key: "createdByFullName",
       width: 160,
+      hidden: !canManageTasks,
       render: (name) => name || "-",
     },
     {
       title: "Actions",
       key: "actions",
       width: 120,
+      hidden: !canManageTasks,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="Edit">
@@ -312,18 +369,24 @@ function WorkerTasks() {
         <Space align="center" size={12}>
           <CheckSquareOutlined className="text-2xl text-blue-600" />
           <Title level={2} className="m-0">
-            Worker Tasks
+            {canManageTasks ? "Worker Tasks" : "My Tasks"}
           </Title>
         </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-          New Task
-        </Button>
+        {canManageTasks && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={openCreateModal}
+          >
+            New Task
+          </Button>
+        )}
       </div>
 
       <Table
         rowKey="id"
         loading={loadingTasks}
-        columns={columns}
+        columns={columns.filter((column) => !column.hidden)}
         dataSource={tasks}
         pagination={{
           pageSize: 10,
@@ -331,7 +394,7 @@ function WorkerTasks() {
           showTotal: (total, range) =>
             `${range[0]}-${range[1]} of ${total} tasks`,
         }}
-        scroll={{ x: 1100 }}
+        scroll={{ x: canManageTasks ? 1100 : 760 }}
       />
 
       <Modal

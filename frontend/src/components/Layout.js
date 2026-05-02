@@ -121,8 +121,8 @@ function Layout() {
       {
         key: "/worker-tasks",
         icon: <CheckSquareOutlined />,
-        label: "Worker Tasks",
-        requiredPermission: PERMISSIONS.WORKERS_MANAGE_TASKS,
+        label: isAdmin() ? "Worker Tasks" : "My Tasks",
+        requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_TASKS,
       },
       {
         key: "/users",

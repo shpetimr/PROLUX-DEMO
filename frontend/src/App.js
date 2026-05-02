@@ -177,7 +177,7 @@ function App() {
                 path="worker-tasks"
                 element={
                   <ProtectedRoute
-                    requiredPermission={PERMISSIONS.WORKERS_MANAGE_TASKS}
+                    requiredPermission={PERMISSIONS.WORKERS_VIEW_OWN_TASKS}
                   >
                     <WorkerTasks />
                   </ProtectedRoute>

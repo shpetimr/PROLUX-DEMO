@@ -25,6 +25,7 @@ import dayjs from "dayjs";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { PERMISSIONS } from "../config/permissions";
+import WorkerTasks from "./WorkerTasks";
 
 const { Title, Text } = Typography;
 
@@ -145,6 +146,41 @@ const calculateComprehensiveStats = (
   };
 };
 
+function WorkerDashboard() {
+  const { user } = useAuth();
+
+  return (
+    <div>
+      <div className="mb-6">
+        <div>
+          <Title level={2}>My Dashboard</Title>
+          <Text className="text-gray-600">
+            Welcome, {user?.fullName || user?.username || "User"}
+          </Text>
+        </div>
+      </div>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <Card className="bg-white border-0 shadow-md">
+            <DollarOutlined className="text-2xl text-green-600 mb-2" />
+            <div>
+              <Text type="secondary">Salary</Text>
+              <Title level={4} className="m-0">
+                Not available yet
+              </Title>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
+      <div className="mt-8">
+        <WorkerTasks />
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -167,6 +203,8 @@ function Dashboard() {
   const canManageIncomes = hasPermission(PERMISSIONS.INCOMES_MANAGE);
   const canManageDebts = hasPermission(PERMISSIONS.DEBTS_MANAGE);
   const canViewReports = hasPermission(PERMISSIONS.REPORTS_VIEW);
+  const showWorkerDashboard =
+    !isAdmin() && hasPermission(PERMISSIONS.WORKERS_VIEW_OWN_DASHBOARD);
 
   const fetchAllDashboardData = useCallback(async () => {
     setLoading(true);
@@ -244,8 +282,17 @@ function Dashboard() {
   ]);
 
   useEffect(() => {
+    if (showWorkerDashboard) {
+      setLoading(false);
+      return;
+    }
+
     fetchAllDashboardData();
-  }, [fetchAllDashboardData]);
+  }, [fetchAllDashboardData, showWorkerDashboard]);
+
+  if (showWorkerDashboard) {
+    return <WorkerDashboard />;
+  }
 
   if (loading) {
     return (
