@@ -17,6 +17,7 @@ import {
   BarChartOutlined,
   LogoutOutlined,
   UserOutlined,
+  UserAddOutlined,
   CrownOutlined,
   PrinterOutlined,
   ProjectOutlined,
@@ -115,6 +116,12 @@ function Layout() {
         icon: <InboxOutlined />,
         label: "Stoku",
         requiredPermission: PERMISSIONS.STOCK_MANAGE,
+      },
+      {
+        key: "/users",
+        icon: <UserAddOutlined />,
+        label: "Users",
+        requiredPermission: PERMISSIONS.USERS_MANAGE,
       },
     ];
 

@@ -12,6 +12,7 @@ import Purchases from "./pages/Purchases";
 import Rents from "./pages/Rents";
 import Incomes from "./pages/Incomes";
 import Debts from "./pages/Debts";
+import Users from "./pages/Users";
 
 import Reports from "./pages/Reports";
 import Projects from "./pages/Projects";
@@ -168,6 +169,16 @@ function App() {
                     requiredPermission={PERMISSIONS.STOCK_MANAGE}
                   >
                     <Stock />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="users"
+                element={
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.USERS_MANAGE}
+                  >
+                    <Users />
                   </ProtectedRoute>
                 }
               />

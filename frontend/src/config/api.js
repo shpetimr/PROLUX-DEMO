@@ -149,6 +149,7 @@ apiClient.interceptors.response.use(
 
 export const API_ENDPOINTS = {
   LOGIN: "/auth/login",
+  REGISTER: "/auth/register",
   AUTH_ME: "/auth/me",
   VALIDATE_TOKEN: "/auth/validate",
 
