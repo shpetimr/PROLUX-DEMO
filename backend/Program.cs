@@ -148,6 +148,7 @@ using (var scope = app.Services.CreateScope())
         }
 
         await StockSchemaBootstrapper.EnsureAsync(context);
+        await WorkerTaskSchemaBootstrapper.EnsureAsync(context);
         Console.WriteLine("Database connection established successfully.");
         var dbLogPath = Path.Combine(AppContext.BaseDirectory, "backend.log");
         File.AppendAllText(dbLogPath, $"{DateTime.Now}: Database connection established successfully\n");
