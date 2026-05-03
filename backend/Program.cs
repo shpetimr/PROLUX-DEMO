@@ -148,6 +148,7 @@ using (var scope = app.Services.CreateScope())
         }
 
         await StockSchemaBootstrapper.EnsureAsync(context);
+        await UserEmployeeLinkSchemaBootstrapper.EnsureAsync(context);
         await WorkerTaskSchemaBootstrapper.EnsureAsync(context);
         Console.WriteLine("Database connection established successfully.");
         var dbLogPath = Path.Combine(AppContext.BaseDirectory, "backend.log");
@@ -189,6 +190,8 @@ using (var scope = app.Services.CreateScope())
                 Console.WriteLine($"[Auth] {action}");
             }
         }
+
+        await UserEmployeeLinkSchemaBootstrapper.EnsureAsync(context);
 
         var audit = await authMaintenance.AuditUsersAsync(
             commandOptions.ShouldProvisionAdmin ? AdminBootstrapSettingsLoader.GetRequired(builder.Configuration).Username : null);

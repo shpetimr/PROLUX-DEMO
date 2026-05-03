@@ -177,6 +177,7 @@ export const API_ENDPOINTS = {
   REGISTER: "/auth/register",
   AUTH_ME: "/auth/me",
   USERS: "/auth/users",
+  WORKERS: "/auth/workers",
   VALIDATE_TOKEN: "/auth/validate",
 
   EMPLOYEES: "/employees",

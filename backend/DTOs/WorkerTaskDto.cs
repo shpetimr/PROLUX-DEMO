@@ -11,7 +11,9 @@ namespace backend.DTOs
         public DateTime Deadline { get; set; }
         public WorkerTaskStatus Status { get; set; }
         public int AssignedUserId { get; set; }
+        public int AssignedEmployeeId { get; set; }
         public string AssignedUserFullName { get; set; } = string.Empty;
+        public string AssignedEmployeeFullName { get; set; } = string.Empty;
         public int CreatedById { get; set; }
         public string CreatedByFullName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }

@@ -147,6 +147,11 @@ namespace backend.Data
                 entity.Property(e => e.FullName).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Role).HasConversion<string>();
                 entity.HasIndex(e => e.Username).IsUnique();
+                entity.HasOne(e => e.Employee)
+                    .WithOne(e => e.UserAccount)
+                    .HasForeignKey<User>(e => e.EmployeeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.EmployeeId).IsUnique();
             });
 
             // Debt configuration

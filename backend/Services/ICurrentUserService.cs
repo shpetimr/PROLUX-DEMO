@@ -6,7 +6,8 @@ namespace backend.Services
     {
         User? GetCurrentUser();
         int GetCurrentUserId();
+        int? GetCurrentEmployeeId();
         bool IsAdmin();
         bool IsUser();
     }
-} 
+}

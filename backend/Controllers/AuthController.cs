@@ -5,6 +5,7 @@ using backend.Authorization;
 using backend.Data;
 using backend.Services;
 using backend.DTOs;
+using backend.Models;
 
 namespace backend.Controllers
 {
@@ -89,6 +90,7 @@ namespace backend.Controllers
         {
             var users = await _context.Users
                 .AsNoTracking()
+                .Include(user => user.Employee)
                 .OrderBy(user => user.FullName)
                 .ThenBy(user => user.Username)
                 .Select(user => new
@@ -97,6 +99,8 @@ namespace backend.Controllers
                     user.Username,
                     user.FullName,
                     user.Role,
+                    user.EmployeeId,
+                    EmployeeFullName = user.Employee == null ? null : user.Employee.FullName,
                     user.CreatedAt,
                     user.LastLoginAt
                 })
@@ -108,6 +112,45 @@ namespace backend.Controllers
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                EmployeeId = user.EmployeeId,
+                EmployeeFullName = user.EmployeeFullName,
+                Permissions = AppPermissions.GetPermissionsForRole(user.Role),
+                CreatedAt = user.CreatedAt,
+                LastLoginAt = user.LastLoginAt
+            }));
+        }
+
+        [HttpGet("workers")]
+        [Authorize(Policy = AppPermissions.WorkersManageTasks)]
+        public async Task<ActionResult<IEnumerable<UserResponseDto>>> GetWorkers()
+        {
+            var workers = await _context.Users
+                .AsNoTracking()
+                .Include(user => user.Employee)
+                .Where(user => user.Role == UserRole.User && user.EmployeeId != null)
+                .OrderBy(user => user.Employee!.FullName)
+                .ThenBy(user => user.Username)
+                .Select(user => new
+                {
+                    user.Id,
+                    user.Username,
+                    user.FullName,
+                    user.Role,
+                    user.EmployeeId,
+                    EmployeeFullName = user.Employee == null ? null : user.Employee.FullName,
+                    user.CreatedAt,
+                    user.LastLoginAt
+                })
+                .ToListAsync();
+
+            return Ok(workers.Select(user => new UserResponseDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                FullName = user.EmployeeFullName ?? user.FullName,
+                Role = user.Role,
+                EmployeeId = user.EmployeeId,
+                EmployeeFullName = user.EmployeeFullName,
                 Permissions = AppPermissions.GetPermissionsForRole(user.Role),
                 CreatedAt = user.CreatedAt,
                 LastLoginAt = user.LastLoginAt

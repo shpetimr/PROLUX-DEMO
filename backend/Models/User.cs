@@ -20,6 +20,9 @@ namespace backend.Models
         
         [Required]
         public UserRole Role { get; set; }
+
+        public int? EmployeeId { get; set; }
+        public virtual Employee? Employee { get; set; }
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLoginAt { get; set; }
@@ -30,4 +33,4 @@ namespace backend.Models
         Admin,
         User
     }
-} 
+}

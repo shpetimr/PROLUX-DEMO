@@ -29,6 +29,7 @@ namespace backend.Controllers
             var tasksQuery = _context.WorkerTasks
                 .AsNoTracking()
                 .Include(task => task.AssignedUser)
+                    .ThenInclude(user => user.Employee)
                 .Include(task => task.CreatedBy)
                 .AsQueryable();
 
@@ -49,7 +50,13 @@ namespace backend.Controllers
                     Deadline = task.Deadline,
                     Status = task.Status,
                     AssignedUserId = task.AssignedUserId,
-                    AssignedUserFullName = task.AssignedUser.FullName,
+                    AssignedEmployeeId = task.AssignedUser.EmployeeId ?? 0,
+                    AssignedUserFullName = task.AssignedUser.Employee == null
+                        ? task.AssignedUser.FullName
+                        : task.AssignedUser.Employee.FullName,
+                    AssignedEmployeeFullName = task.AssignedUser.Employee == null
+                        ? task.AssignedUser.FullName
+                        : task.AssignedUser.Employee.FullName,
                     CreatedById = task.CreatedById,
                     CreatedByFullName = task.CreatedBy.FullName,
                     CreatedAt = task.CreatedAt,
@@ -66,6 +73,7 @@ namespace backend.Controllers
             var task = await _context.WorkerTasks
                 .AsNoTracking()
                 .Include(entity => entity.AssignedUser)
+                    .ThenInclude(user => user.Employee)
                 .Include(entity => entity.CreatedBy)
                 .FirstOrDefaultAsync(entity => entity.Id == id);
 
@@ -92,10 +100,10 @@ namespace backend.Controllers
                 return Unauthorized();
             }
 
-            var assignedUser = await _context.Users.FindAsync(dto.AssignedUserId);
+            var assignedUser = await FindAssignableWorkerAsync(dto.AssignedUserId);
             if (assignedUser == null)
             {
-                return BadRequest(new { message = "Assigned user was not found." });
+                return BadRequest(new { message = "Assigned worker account was not found or is not linked to an employee." });
             }
 
             var task = new WorkerTask
@@ -128,17 +136,17 @@ namespace backend.Controllers
                 return NotFound();
             }
 
-            var assignedUserExists = await _context.Users.AnyAsync(user => user.Id == dto.AssignedUserId);
-            if (!assignedUserExists)
+            var assignedUser = await FindAssignableWorkerAsync(dto.AssignedUserId);
+            if (assignedUser == null)
             {
-                return BadRequest(new { message = "Assigned user was not found." });
+                return BadRequest(new { message = "Assigned worker account was not found or is not linked to an employee." });
             }
 
             task.Title = dto.Title.Trim();
             task.Description = dto.Description.Trim();
             task.Deadline = dto.Deadline;
             task.Status = dto.Status!.Value;
-            task.AssignedUserId = dto.AssignedUserId;
+            task.AssignedUserId = assignedUser.Id;
             task.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -191,8 +199,20 @@ namespace backend.Controllers
                 || task.AssignedUserId == _currentUserService.GetCurrentUserId();
         }
 
+        private async Task<User?> FindAssignableWorkerAsync(int userId)
+        {
+            return await _context.Users
+                .Include(user => user.Employee)
+                .FirstOrDefaultAsync(user =>
+                    user.Id == userId &&
+                    user.Role == UserRole.User &&
+                    user.EmployeeId != null);
+        }
+
         private static WorkerTaskDto ToDto(WorkerTask task)
         {
+            var assignedEmployeeFullName = task.AssignedUser.Employee?.FullName ?? task.AssignedUser.FullName;
+
             return new WorkerTaskDto
             {
                 Id = task.Id,
@@ -201,7 +221,9 @@ namespace backend.Controllers
                 Deadline = task.Deadline,
                 Status = task.Status,
                 AssignedUserId = task.AssignedUserId,
-                AssignedUserFullName = task.AssignedUser.FullName,
+                AssignedEmployeeId = task.AssignedUser.EmployeeId ?? 0,
+                AssignedUserFullName = assignedEmployeeFullName,
+                AssignedEmployeeFullName = assignedEmployeeFullName,
                 CreatedById = task.CreatedById,
                 CreatedByFullName = task.CreatedBy.FullName,
                 CreatedAt = task.CreatedAt,

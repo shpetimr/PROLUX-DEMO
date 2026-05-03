@@ -66,6 +66,7 @@ namespace backend.Models
         // Navigation properties
         public virtual ICollection<SalaryRecord> SalaryRecords { get; set; } = new List<SalaryRecord>();
         public virtual ICollection<AttendanceRecord> AttendanceRecords { get; set; } = new List<AttendanceRecord>();
+        public virtual User? UserAccount { get; set; }
     }
     
     public enum EmployeePosition

@@ -34,6 +34,26 @@ namespace backend.Services
             return 0;
         }
 
+        public int? GetCurrentEmployeeId()
+        {
+            var employeeIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("employeeId")?.Value;
+            if (int.TryParse(employeeIdClaim, out var employeeId))
+            {
+                return employeeId;
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId == 0)
+            {
+                return null;
+            }
+
+            return _context.Users
+                .Where(user => user.Id == userId)
+                .Select(user => user.EmployeeId)
+                .FirstOrDefault();
+        }
+
         public bool IsAdmin()
         {
             var user = GetCurrentUser();
@@ -46,4 +66,4 @@ namespace backend.Services
             return user?.Role == UserRole.User;
         }
     }
-} 
+}

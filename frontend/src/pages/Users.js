@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
+  DatePicker,
   Form,
   Input,
+  InputNumber,
   Select,
   Space,
   Typography,
@@ -16,15 +18,24 @@ import {
   UserAddOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import dayjs from "dayjs";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 import { ROLES } from "../config/permissions";
 
 const { Title, Text } = Typography;
 
 const roleOptions = [
-  { value: ROLES.USER, label: "User" },
+  { value: ROLES.USER, label: "Worker" },
   { value: ROLES.ADMIN, label: "Admin" },
 ];
+
+const positionOptions = [
+  { value: "magazine", label: "Magazine" },
+  { value: "terren", label: "Terren" },
+];
+
+const getDefaultDailyWage = (position) =>
+  position === "terren" ? 2460 : 1850;
 
 const getApiErrorMessage = (error) => {
   const data = error?.response?.data;
@@ -65,6 +76,41 @@ function Users() {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const [createdUser, setCreatedUser] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const selectedRole = Form.useWatch("role", form);
+  const selectedEmployeeId = Form.useWatch("employeeId", form);
+  const currentRole = selectedRole ?? ROLES.USER;
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      setLoadingEmployees(true);
+      try {
+        const response = await apiClient.get(API_ENDPOINTS.EMPLOYEES);
+        setEmployees(Array.isArray(response.data) ? response.data : []);
+      } catch {
+        setEmployees([]);
+      } finally {
+        setLoadingEmployees(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
+
+  const employeeOptions = useMemo(
+    () =>
+      employees
+        .filter((employee) => !employee.linkedUserId)
+        .map((employee) => ({
+          value: employee.id,
+          label: `${employee.fullName} (${employee.position})`,
+        })),
+    [employees]
+  );
+
+  const shouldCollectEmployeeDetails =
+    currentRole === ROLES.USER && !selectedEmployeeId;
 
   const validatePassword = (_, value) => {
     if (!value) {
@@ -125,6 +171,23 @@ function Users() {
       role: values.role,
     };
 
+    if (values.role === ROLES.USER) {
+      if (values.employeeId) {
+        payload.employeeId = values.employeeId;
+      } else {
+        const employeePosition = values.employeePosition || "magazine";
+        const dailyWage =
+          values.dailyWage ?? getDefaultDailyWage(employeePosition);
+
+        payload.employeePosition = employeePosition;
+        payload.hireDate = values.hireDate
+          ? values.hireDate.format("YYYY-MM-DD")
+          : dayjs().format("YYYY-MM-DD");
+        payload.dailyWage = dailyWage;
+        payload.dailyRate = dailyWage;
+      }
+    }
+
     try {
       const response = await apiClient.post(API_ENDPOINTS.REGISTER, payload);
       const user = response.data ?? {};
@@ -134,10 +197,28 @@ function Users() {
         fullName: user.fullName ?? payload.fullName,
         role: user.role ?? payload.role,
       });
+      if (user.employeeId) {
+        setEmployees((currentEmployees) =>
+          currentEmployees.map((employee) =>
+            employee.id === user.employeeId
+              ? {
+                  ...employee,
+                  linkedUserId: user.id,
+                  linkedUsername: user.username ?? payload.username,
+                }
+              : employee
+          )
+        );
+      }
 
       message.success("User account created.");
       form.resetFields();
-      form.setFieldsValue({ role: ROLES.USER });
+      form.setFieldsValue({
+        role: ROLES.USER,
+        employeePosition: "magazine",
+        hireDate: dayjs(),
+        dailyWage: getDefaultDailyWage("magazine"),
+      });
     } catch (error) {
       message.error(getApiErrorMessage(error));
     } finally {
@@ -163,7 +244,12 @@ function Users() {
         <Form
           form={form}
           layout="vertical"
-          initialValues={{ role: ROLES.USER }}
+          initialValues={{
+            role: ROLES.USER,
+            employeePosition: "magazine",
+            hireDate: dayjs(),
+            dailyWage: getDefaultDailyWage("magazine"),
+          }}
           onFinish={handleSubmit}
           autoComplete="off"
         >
@@ -232,8 +318,91 @@ function Users() {
             <Select
               options={roleOptions}
               suffixIcon={<SafetyCertificateOutlined />}
+              onChange={(role) => {
+                if (role === ROLES.USER) {
+                  form.setFieldsValue({
+                    employeePosition: "magazine",
+                    hireDate: form.getFieldValue("hireDate") || dayjs(),
+                    dailyWage:
+                      form.getFieldValue("dailyWage") ??
+                      getDefaultDailyWage("magazine"),
+                  });
+                }
+              }}
             />
           </Form.Item>
+
+          {currentRole === ROLES.USER && (
+            <>
+              <Form.Item label="Employee record" name="employeeId">
+                <Select
+                  allowClear
+                  showSearch
+                  loading={loadingEmployees}
+                  options={employeeOptions}
+                  optionFilterProp="label"
+                  placeholder="Create new employee"
+                  onChange={(employeeId) => {
+                    const employee = employees.find(
+                      (item) => item.id === employeeId
+                    );
+                    if (employee && !form.getFieldValue("fullName")) {
+                      form.setFieldsValue({ fullName: employee.fullName });
+                    }
+                  }}
+                />
+              </Form.Item>
+
+              {shouldCollectEmployeeDetails && (
+                <>
+                  <Form.Item
+                    label="Employee position"
+                    name="employeePosition"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Employee position is required.",
+                      },
+                    ]}
+                  >
+                    <Select
+                      options={positionOptions}
+                      onChange={(position) =>
+                        form.setFieldsValue({
+                          dailyWage: getDefaultDailyWage(position),
+                        })
+                      }
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Hire date"
+                    name="hireDate"
+                    rules={[
+                      { required: true, message: "Hire date is required." },
+                    ]}
+                  >
+                    <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+                  </Form.Item>
+
+                  <Form.Item
+                    label="Daily wage"
+                    name="dailyWage"
+                    rules={[
+                      { required: true, message: "Daily wage is required." },
+                      {
+                        type: "number",
+                        min: 0,
+                        message: "Daily wage must be 0 or greater.",
+                      },
+                    ]}
+                  >
+                    <InputNumber min={0} style={{ width: "100%" }} />
+                  </Form.Item>
+                </>
+              )}
+            </>
+          )}
 
           <Form.Item className="mb-0">
             <Button

@@ -28,7 +28,8 @@ namespace backend.Controllers
         public async Task<ActionResult<IEnumerable<EmployeeResponseDto>>> GetEmployees()
         {
             // Only admins can see all employees, users can only see their own
-            IQueryable<Employee> employeesQuery = _context.Employees;
+            IQueryable<Employee> employeesQuery = _context.Employees
+                .Include(e => e.UserAccount);
             
             if (!_currentUserService.IsAdmin())
             {
@@ -68,6 +69,8 @@ namespace backend.Controllers
                     createdAt = e.CreatedAt,
                     updatedAt = e.UpdatedAt,
                     createdById = e.CreatedById,
+                    linkedUserId = e.UserAccount?.Id,
+                    linkedUsername = e.UserAccount?.Username,
                     currencyCode = "MKD",
                     currencySymbol = "MKD"
                 });
@@ -85,7 +88,9 @@ namespace backend.Controllers
                 return Forbid();
             }
             
-            var employee = await _context.Employees.FindAsync(id);
+            var employee = await _context.Employees
+                .Include(e => e.UserAccount)
+                .FirstOrDefaultAsync(e => e.Id == id);
 
             if (employee == null)
             {
@@ -117,6 +122,8 @@ namespace backend.Controllers
                 createdAt = employee.CreatedAt,
                 updatedAt = employee.UpdatedAt,
                 createdById = employee.CreatedById,
+                linkedUserId = employee.UserAccount?.Id,
+                linkedUsername = employee.UserAccount?.Username,
                 currencyCode = "MKD",
                 currencySymbol = "MKD"
             };
@@ -228,6 +235,8 @@ namespace backend.Controllers
                 createdAt = employee.CreatedAt,
                 updatedAt = employee.UpdatedAt,
                 createdById = employee.CreatedById,
+                linkedUserId = employee.UserAccount?.Id,
+                linkedUsername = employee.UserAccount?.Username,
                 currencyCode = "MKD",
                 currencySymbol = "MKD"
             };
@@ -254,7 +263,9 @@ namespace backend.Controllers
                 return BadRequest(ModelState);
             }
             
-            var employee = await _context.Employees.FindAsync(id);
+            var employee = await _context.Employees
+                .Include(e => e.UserAccount)
+                .FirstOrDefaultAsync(e => e.Id == id);
 
             if (employee == null)
             {
@@ -266,7 +277,13 @@ namespace backend.Controllers
             Console.WriteLine($"Before update - dailyWage: {employee.DailyWage}");
 
             if (dto.fullName != null)
+            {
                 employee.FullName = dto.fullName;
+                if (employee.UserAccount != null)
+                {
+                    employee.UserAccount.FullName = dto.fullName;
+                }
+            }
 
             if (dto.position != null)
             {
@@ -330,10 +347,17 @@ namespace backend.Controllers
             {
                 return Forbid();
             }
-            var employee = await _context.Employees.FindAsync(id);
+            var employee = await _context.Employees
+                .Include(e => e.UserAccount)
+                .FirstOrDefaultAsync(e => e.Id == id);
             if (employee == null)
             {
                 return NotFound();
+            }
+
+            if (employee.UserAccount != null)
+            {
+                return BadRequest(new { message = "This employee is linked to a worker login account and cannot be deleted." });
             }
 
             _context.Employees.Remove(employee);

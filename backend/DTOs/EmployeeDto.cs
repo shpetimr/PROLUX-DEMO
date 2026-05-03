@@ -101,7 +101,9 @@ namespace backend.DTOs
         public DateTime createdAt { get; set; }
         public DateTime? updatedAt { get; set; }
         public int? createdById { get; set; }
+        public int? linkedUserId { get; set; }
+        public string? linkedUsername { get; set; }
         public string currencyCode { get; set; } = "MKD";
         public string currencySymbol { get; set; } = "MKD";
     }
-} 
+}

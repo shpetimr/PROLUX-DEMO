@@ -503,6 +503,9 @@ namespace backend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("EmployeeId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -528,6 +531,9 @@ namespace backend.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.HasIndex("EmployeeId")
                         .IsUnique();
 
                     b.ToTable("Users");
@@ -687,6 +693,16 @@ namespace backend.Migrations
                     b.Navigation("StockItem");
                 });
 
+            modelBuilder.Entity("backend.Models.User", b =>
+                {
+                    b.HasOne("backend.Models.Employee", "Employee")
+                        .WithOne("UserAccount")
+                        .HasForeignKey("backend.Models.User", "EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("backend.Models.WorkerTask", b =>
                 {
                     b.HasOne("backend.Models.User", "AssignedUser")
@@ -711,6 +727,8 @@ namespace backend.Migrations
                     b.Navigation("AttendanceRecords");
 
                     b.Navigation("SalaryRecords");
+
+                    b.Navigation("UserAccount");
                 });
 
             modelBuilder.Entity("backend.Models.StockItem", b =>

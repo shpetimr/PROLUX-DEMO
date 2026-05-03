@@ -16,11 +16,16 @@ namespace backend.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly JwtSettings _jwtSettings;
+        private readonly ICurrentUserService _currentUserService;
 
-        public AuthService(ApplicationDbContext context, IConfiguration configuration)
+        public AuthService(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            ICurrentUserService currentUserService)
         {
             _context = context;
             _jwtSettings = JwtSettingsLoader.GetRequiredJwtSettings(configuration);
+            _currentUserService = currentUserService;
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
@@ -34,6 +39,7 @@ namespace backend.Services
 
             var normalizedUsername = username.ToUpperInvariant();
             var user = await _context.Users
+                .Include(u => u.Employee)
                 .FirstOrDefaultAsync(u => u.Username.ToUpper() == normalizedUsername);
 
             if (user == null || !PasswordSecurity.VerifyPassword(loginDto.Password, user.PasswordHash))
@@ -44,6 +50,16 @@ namespace backend.Services
             if (PasswordSecurity.NeedsRehash(user.PasswordHash))
             {
                 user.PasswordHash = PasswordSecurity.HashPassword(loginDto.Password);
+            }
+
+            if (user.Role == UserRole.User && user.EmployeeId == null)
+            {
+                var existingEmployee = await FindSingleUnlinkedEmployeeByNameAsync(user.FullName);
+                user.Employee = existingEmployee
+                    ?? CreateEmployeeForWorker(
+                        user.FullName,
+                        user.CreatedAt,
+                        await GetFallbackCreatorUserIdAsync(user.Id));
             }
 
             // Update last login
@@ -60,6 +76,8 @@ namespace backend.Services
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                EmployeeId = user.EmployeeId,
+                EmployeeFullName = user.Employee?.FullName,
                 Permissions = userDto.Permissions,
                 ExpiresAt = DateTime.UtcNow.AddDays(7) // Token expires in 7 days
             };
@@ -90,6 +108,18 @@ namespace backend.Services
             }
 
             var passwordHash = PasswordSecurity.HashPassword(registerDto.Password);
+            Employee? linkedEmployee = null;
+            if (registerDto.Role == UserRole.User)
+            {
+                var creatorUserId = _currentUserService.GetCurrentUserId();
+                if (creatorUserId == 0)
+                {
+                    throw new InvalidOperationException("A worker account must be created by an authenticated administrator.");
+                }
+
+                linkedEmployee = await ResolveEmployeeForWorkerAsync(registerDto, fullName, creatorUserId);
+                fullName = linkedEmployee.FullName;
+            }
 
             var user = new User
             {
@@ -97,6 +127,7 @@ namespace backend.Services
                 PasswordHash = passwordHash,
                 FullName = fullName,
                 Role = registerDto.Role,
+                Employee = linkedEmployee,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -113,6 +144,8 @@ namespace backend.Services
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                EmployeeId = user.EmployeeId,
+                EmployeeFullName = user.Employee?.FullName,
                 Permissions = userDto.Permissions,
                 ExpiresAt = DateTime.UtcNow.AddDays(7)
             };
@@ -147,7 +180,9 @@ namespace backend.Services
 
         public async Task<UserResponseDto?> GetCurrentUserAsync(int userId)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(entity => entity.Id == userId);
+            var user = await _context.Users
+                .Include(entity => entity.Employee)
+                .FirstOrDefaultAsync(entity => entity.Id == userId);
             return user == null ? null : ToUserResponseDto(user);
         }
 
@@ -166,6 +201,11 @@ namespace backend.Services
                 new Claim(ClaimTypes.GivenName, user.FullName),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
             };
+
+            if (user.EmployeeId.HasValue)
+            {
+                claims.Add(new Claim("employeeId", user.EmployeeId.Value.ToString()));
+            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -190,9 +230,141 @@ namespace backend.Services
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                EmployeeId = user.EmployeeId,
+                EmployeeFullName = user.Employee?.FullName,
                 Permissions = AppPermissions.GetPermissionsForRole(user.Role),
                 CreatedAt = user.CreatedAt,
                 LastLoginAt = user.LastLoginAt
+            };
+        }
+
+        private async Task<Employee> ResolveEmployeeForWorkerAsync(
+            RegisterDto registerDto,
+            string fullName,
+            int creatorUserId)
+        {
+            if (registerDto.EmployeeId.HasValue)
+            {
+                var employee = await _context.Employees
+                    .FirstOrDefaultAsync(entity => entity.Id == registerDto.EmployeeId.Value);
+
+                if (employee == null)
+                {
+                    throw new InvalidOperationException("Selected employee was not found.");
+                }
+
+                var isAlreadyLinked = await _context.Users.AnyAsync(user =>
+                    user.EmployeeId == employee.Id);
+                if (isAlreadyLinked)
+                {
+                    throw new InvalidOperationException("Selected employee already has a worker login account.");
+                }
+
+                return employee;
+            }
+
+            var existingEmployee = await FindSingleUnlinkedEmployeeByNameAsync(fullName);
+            if (existingEmployee != null)
+            {
+                return existingEmployee;
+            }
+
+            return CreateEmployeeForWorker(
+                fullName,
+                ParseHireDateOrDefault(registerDto.HireDate),
+                creatorUserId,
+                ParseEmployeePositionOrDefault(registerDto.EmployeePosition),
+                registerDto.DailyWage,
+                registerDto.DailyRate);
+        }
+
+        private async Task<Employee?> FindSingleUnlinkedEmployeeByNameAsync(string fullName)
+        {
+            var normalizedFullName = fullName.Trim().ToUpperInvariant();
+            var candidates = await _context.Employees
+                .Where(employee => employee.FullName.ToUpper() == normalizedFullName)
+                .OrderBy(employee => employee.Id)
+                .ToListAsync();
+
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+
+            var linkedEmployeeIds = await _context.Users
+                .Where(user => user.EmployeeId.HasValue)
+                .Select(user => user.EmployeeId!.Value)
+                .ToListAsync();
+
+            var unlinkedCandidates = candidates
+                .Where(employee => !linkedEmployeeIds.Contains(employee.Id))
+                .ToList();
+
+            return unlinkedCandidates.Count == 1 ? unlinkedCandidates[0] : null;
+        }
+
+        private Employee CreateEmployeeForWorker(
+            string fullName,
+            DateTime hireDate,
+            int creatorUserId,
+            EmployeePosition position = EmployeePosition.Magazine,
+            decimal? dailyWage = null,
+            decimal? dailyRate = null)
+        {
+            var defaultDailyWage = GetDefaultDailyWage(position);
+            var employee = new Employee
+            {
+                FullName = fullName.Trim(),
+                Position = position,
+                HireDate = hireDate,
+                BaseSalary = 0,
+                DailyWage = dailyWage ?? defaultDailyWage,
+                DaysWorkedThisMonth = 0,
+                MonthlyBonuses = 0,
+                MonthlyPenalties = 0,
+                DailyRate = dailyRate ?? dailyWage ?? defaultDailyWage,
+                CreatedAt = DateTime.UtcNow,
+                CreatedById = creatorUserId
+            };
+
+            _context.Employees.Add(employee);
+            return employee;
+        }
+
+        private async Task<int> GetFallbackCreatorUserIdAsync(int preferredUserId)
+        {
+            var adminId = await _context.Users
+                .Where(user => user.Role == UserRole.Admin)
+                .OrderBy(user => user.Id)
+                .Select(user => user.Id)
+                .FirstOrDefaultAsync();
+
+            return adminId != 0 ? adminId : preferredUserId;
+        }
+
+        private static EmployeePosition ParseEmployeePositionOrDefault(string? position)
+        {
+            return position?.Trim().ToLowerInvariant() switch
+            {
+                "terren" => EmployeePosition.Terren,
+                "magazine" => EmployeePosition.Magazine,
+                _ => EmployeePosition.Magazine
+            };
+        }
+
+        private static DateTime ParseHireDateOrDefault(string? hireDate)
+        {
+            return DateTime.TryParse(hireDate, out var parsedHireDate)
+                ? parsedHireDate
+                : DateTime.UtcNow.Date;
+        }
+
+        private static decimal GetDefaultDailyWage(EmployeePosition position)
+        {
+            return position switch
+            {
+                EmployeePosition.Terren => 2460m,
+                _ => 1850m
             };
         }
     }

@@ -89,9 +89,9 @@ const getApiErrorMessage = (error, fallback) => {
 
 function WorkerTasks() {
   const [tasks, setTasks] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [workers, setWorkers] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -118,32 +118,32 @@ function WorkerTasks() {
     }
   }, []);
 
-  const fetchUsers = useCallback(async () => {
-    setLoadingUsers(true);
+  const fetchWorkers = useCallback(async () => {
+    setLoadingWorkers(true);
     try {
-      const response = await apiClient.get(API_ENDPOINTS.USERS);
-      setUsers(Array.isArray(response.data) ? response.data : []);
+      const response = await apiClient.get(API_ENDPOINTS.WORKERS);
+      setWorkers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      message.error(getApiErrorMessage(error, "Failed to load users."));
+      message.error(getApiErrorMessage(error, "Failed to load workers."));
     } finally {
-      setLoadingUsers(false);
+      setLoadingWorkers(false);
     }
   }, []);
 
   useEffect(() => {
     fetchTasks();
     if (canManageTasks) {
-      fetchUsers();
+      fetchWorkers();
     }
-  }, [fetchTasks, fetchUsers, canManageTasks]);
+  }, [fetchTasks, fetchWorkers, canManageTasks]);
 
-  const userOptions = useMemo(
+  const workerOptions = useMemo(
     () =>
-      users.map((user) => ({
-        value: user.id,
-        label: `${user.fullName} (${user.username})`,
+      workers.map((worker) => ({
+        value: worker.id,
+        label: `${worker.employeeFullName || worker.fullName} (${worker.username})`,
       })),
-    [users]
+    [workers]
   );
 
   const openCreateModal = () => {
@@ -443,17 +443,17 @@ function WorkerTasks() {
 
           <Form.Item
             name="assignedUserId"
-            label="Assigned worker/user"
+            label="Assigned worker"
             rules={[
-              { required: true, message: "Assigned worker/user is required." },
+              { required: true, message: "Assigned worker is required." },
             ]}
           >
             <Select
               showSearch
-              loading={loadingUsers}
-              options={userOptions}
+              loading={loadingWorkers}
+              options={workerOptions}
               optionFilterProp="label"
-              placeholder="Select user"
+              placeholder="Select worker"
             />
           </Form.Item>
 
@@ -480,7 +480,7 @@ function WorkerTasks() {
                 type="primary"
                 htmlType="submit"
                 loading={saving}
-                disabled={loadingUsers}
+                disabled={loadingWorkers}
               >
                 {editingTask ? "Update" : "Create"}
               </Button>
