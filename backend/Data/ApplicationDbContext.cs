@@ -25,6 +25,7 @@ namespace backend.Data
         public DbSet<StockItem> StockItems { get; set; }
         public DbSet<StockMovement> StockMovements { get; set; }
         public DbSet<WorkerTask> WorkerTasks { get; set; }
+        public DbSet<WorkSale> WorkSales { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -247,6 +248,26 @@ namespace backend.Data
                     .HasForeignKey(e => e.CreatedById)
                     .OnDelete(DeleteBehavior.Restrict);
                 entity.HasIndex(e => e.AssignedUserId);
+                entity.HasIndex(e => e.CreatedById);
+            });
+
+            modelBuilder.Entity<WorkSale>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.WorkName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.TotalWorkM2).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.ClientPricePerM2).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.SubcontractorPricePerM2).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.TotalRevenue).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.TotalCost).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Profit).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Date).IsRequired();
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.Date);
                 entity.HasIndex(e => e.CreatedById);
             });
         }

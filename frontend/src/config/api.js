@@ -207,6 +207,9 @@ export const API_ENDPOINTS = {
   PROJECT_BY_ID: (id) => `/projects/${id}`,
   PROJECTS_BY_STATUS: (status) => `/projects/status/${status}`,
 
+  WORK_SALES: "/work-sales",
+  WORK_SALE_BY_ID: (id) => `/work-sales/${id}`,
+
   // Expense calculations and reports
   EXPENSE_CALCULATIONS: {
     DAILY: "/expenses/calculations/daily",

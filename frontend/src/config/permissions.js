@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   DEBTS_MANAGE: "debts.manage",
   PROJECTS_MANAGE: "projects.manage",
   REPORTS_VIEW: "reports.view",
+  WORK_SALES_MANAGE: "workSales.manage",
   STOCK_MANAGE: "stock.manage",
   ATTENDANCE_MANAGE: "attendance.manage",
   USERS_MANAGE: "users.manage",

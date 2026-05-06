@@ -16,6 +16,7 @@ namespace backend.Authorization
         public const string DebtsManage = "debts.manage";
         public const string ProjectsManage = "projects.manage";
         public const string ReportsView = "reports.view";
+        public const string WorkSalesManage = "workSales.manage";
         public const string StockManage = "stock.manage";
         public const string AttendanceManage = "attendance.manage";
         public const string UsersManage = "users.manage";
@@ -39,6 +40,7 @@ namespace backend.Authorization
             DebtsManage,
             ProjectsManage,
             ReportsView,
+            WorkSalesManage,
             StockManage,
             AttendanceManage,
             UsersManage,

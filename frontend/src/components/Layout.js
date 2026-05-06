@@ -119,6 +119,13 @@ function Layout() {
         requiredPermission: PERMISSIONS.REPORTS_VIEW,
       },
       {
+        key: "/work-sales",
+        icon: <DollarOutlined />,
+        label: "Work Sales",
+        adminOnly: true,
+        requiredPermission: PERMISSIONS.WORK_SALES_MANAGE,
+      },
+      {
         key: "/stock/material",
         icon: <InboxOutlined />,
         label: "Material Stock",
