@@ -6,6 +6,7 @@ namespace backend.Models
         public string Name { get; set; } = "";
         public string? Sku { get; set; }
         public string Unit { get; set; } = "pcs";
+        public StockType StockType { get; set; } = StockType.Material;
         public string? Description { get; set; }
         public decimal? ReorderLevel { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

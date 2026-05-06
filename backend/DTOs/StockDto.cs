@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using backend.Models;
 
 namespace backend.DTOs
 {
@@ -8,6 +9,7 @@ namespace backend.DTOs
         public string Name { get; set; } = "";
         public string? Sku { get; set; }
         public string Unit { get; set; } = "";
+        public StockType StockType { get; set; } = StockType.Material;
         public string? Description { get; set; }
         public decimal? ReorderLevel { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -26,6 +28,8 @@ namespace backend.DTOs
         [StringLength(20)]
         public string Unit { get; set; } = "pcs";
 
+        public StockType StockType { get; set; } = StockType.Material;
+
         [StringLength(500)]
         public string? Description { get; set; }
 
@@ -43,6 +47,8 @@ namespace backend.DTOs
 
         [StringLength(20)]
         public string Unit { get; set; } = "pcs";
+
+        public StockType StockType { get; set; } = StockType.Material;
 
         [StringLength(500)]
         public string? Description { get; set; }

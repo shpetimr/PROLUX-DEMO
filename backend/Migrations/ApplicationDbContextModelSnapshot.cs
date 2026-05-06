@@ -513,6 +513,11 @@ namespace backend.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<backend.Models.StockType>("StockType")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasConversion<string>();
+
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasMaxLength(20)

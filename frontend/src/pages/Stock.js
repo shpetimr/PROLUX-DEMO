@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   Table,
   Button,
@@ -32,8 +32,28 @@ const movementKindOptions = [
 ];
 
 
+const STOCK_TYPES = {
+  All: "All",
+  Material: "Material",
+  Product: "Product",
+};
+
+const stockTypeOptions = [
+  { value: STOCK_TYPES.Material, label: "Material" },
+  { value: STOCK_TYPES.Product, label: "Produkt" },
+];
+
+const stockTypeFilterOptions = [
+  { value: STOCK_TYPES.All, label: "Te gjitha" },
+  ...stockTypeOptions,
+];
+
+const getStockTypeLabel = (value) =>
+  stockTypeOptions.find((option) => option.value === value)?.label || "Material";
+
 function Stock() {
   const [items, setItems] = useState([]);
+  const [stockTypeFilter, setStockTypeFilter] = useState(STOCK_TYPES.All);
   const [loading, setLoading] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -54,7 +74,14 @@ function Stock() {
     try {
       const res = await apiClient.get(API_ENDPOINTS.STOCK_ITEMS);
       const data = res.data;
-      setItems(Array.isArray(data) ? data : []);
+      setItems(
+        Array.isArray(data)
+          ? data.map((row) => ({
+              ...row,
+              stockType: row.stockType || STOCK_TYPES.Material,
+            }))
+          : []
+      );
     } catch {
       message.error("Nuk u lexua stoku.");
     } finally {
@@ -66,10 +93,20 @@ function Stock() {
     fetchItems();
   }, [fetchItems]);
 
+  const filteredItems = useMemo(() => {
+    if (stockTypeFilter === STOCK_TYPES.All) {
+      return items;
+    }
+
+    return items.filter(
+      (item) => (item.stockType || STOCK_TYPES.Material) === stockTypeFilter
+    );
+  }, [items, stockTypeFilter]);
+
   const openCreateItem = () => {
     setEditingItem(null);
     itemForm.resetFields();
-    itemForm.setFieldsValue({ unit: "pcs" });
+    itemForm.setFieldsValue({ unit: "pcs", stockType: STOCK_TYPES.Material });
     setItemModalOpen(true);
   };
 
@@ -79,6 +116,7 @@ function Stock() {
       name: record.name,
       sku: record.sku,
       unit: record.unit || "pcs",
+      stockType: record.stockType || STOCK_TYPES.Material,
       description: record.description,
       reorderLevel: record.reorderLevel,
     });
@@ -107,6 +145,7 @@ function Stock() {
               ...prev,
               {
                 ...row,
+                stockType: row.stockType || STOCK_TYPES.Material,
                 currentQuantity:
                   row.currentQuantity != null ? Number(row.currentQuantity) : 0,
               },
@@ -217,6 +256,20 @@ function Stock() {
   const columns = [
     { title: "Emri", dataIndex: "name", key: "name" },
     { title: "SKU", dataIndex: "sku", key: "sku", render: (t) => t || "—" },
+    {
+      title: "Tipi",
+      dataIndex: "stockType",
+      key: "stockType",
+      width: 110,
+      render: (value) => {
+        const type = value || STOCK_TYPES.Material;
+        return (
+          <Tag color={type === STOCK_TYPES.Product ? "volcano" : "blue"}>
+            {getStockTypeLabel(type)}
+          </Tag>
+        );
+      },
+    },
     { title: "Njësia", dataIndex: "unit", key: "unit", width: 90 },
     {
       title: "Sasia",
@@ -288,9 +341,17 @@ function Stock() {
         <Title level={2} style={{ margin: 0 }}>
           Stoku
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateItem}>
-          Artikull i ri
-        </Button>
+        <Space wrap>
+          <Select
+            value={stockTypeFilter}
+            onChange={setStockTypeFilter}
+            options={stockTypeFilterOptions}
+            style={{ width: 150 }}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateItem}>
+            Artikull i ri
+          </Button>
+        </Space>
       </div>
       <Text type="secondary">
         Sasia llogaritet nga shuma e të gjitha lëvizjeve (hyrje +, dalje −).
@@ -302,7 +363,7 @@ function Stock() {
         rowKey="id"
         loading={loading}
         columns={columns}
-        dataSource={items}
+        dataSource={filteredItems}
         pagination={{ pageSize: 15, showTotal: (t) => `${t} artikuj` }}
       />
 
@@ -332,6 +393,13 @@ function Stock() {
           </Form.Item>
           <Form.Item name="unit" label="Njësia">
             <Input placeholder="pcs, m2, kg..." />
+          </Form.Item>
+          <Form.Item
+            name="stockType"
+            label="Tipi"
+            rules={[{ required: true, message: "Zgjidhni tipin" }]}
+          >
+            <Select options={stockTypeOptions} />
           </Form.Item>
           <Form.Item name="description" label="Përshkrimi">
             <Input.TextArea rows={2} />

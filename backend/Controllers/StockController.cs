@@ -22,9 +22,18 @@ namespace backend.Controllers
         }
 
         [HttpGet("items")]
-        public async Task<ActionResult<IEnumerable<StockItemResponseDto>>> GetItems()
+        public async Task<ActionResult<IEnumerable<StockItemResponseDto>>> GetItems([FromQuery] StockType? stockType)
         {
-            var items = await _context.StockItems.AsNoTracking().OrderBy(i => i.Name).ToListAsync();
+            if (stockType.HasValue && !IsValidStockType(stockType.Value))
+                return BadRequest(new { message = "StockType must be Material or Product." });
+
+            var query = _context.StockItems.AsNoTracking();
+            if (stockType.HasValue)
+            {
+                query = query.Where(i => i.StockType == stockType.Value);
+            }
+
+            var items = await query.OrderBy(i => i.Name).ToListAsync();
             var ids = items.Select(i => i.Id).ToList();
 
             Dictionary<int, decimal> balances;
@@ -47,6 +56,7 @@ namespace backend.Controllers
                 Name = i.Name,
                 Sku = i.Sku,
                 Unit = i.Unit,
+                StockType = i.StockType,
                 Description = i.Description,
                 ReorderLevel = i.ReorderLevel,
                 CreatedAt = i.CreatedAt,
@@ -69,6 +79,7 @@ namespace backend.Controllers
                 Name = item.Name,
                 Sku = item.Sku,
                 Unit = item.Unit,
+                StockType = item.StockType,
                 Description = item.Description,
                 ReorderLevel = item.ReorderLevel,
                 CreatedAt = item.CreatedAt,
@@ -79,11 +90,15 @@ namespace backend.Controllers
         [HttpPost("items")]
         public async Task<ActionResult<StockItemResponseDto>> CreateItem([FromBody] CreateStockItemDto dto)
         {
+            if (!IsValidStockType(dto.StockType))
+                return BadRequest(new { message = "StockType must be Material or Product." });
+
             var entity = new StockItem
             {
                 Name = dto.Name.Trim(),
                 Sku = string.IsNullOrWhiteSpace(dto.Sku) ? null : dto.Sku.Trim(),
                 Unit = string.IsNullOrWhiteSpace(dto.Unit) ? "pcs" : dto.Unit.Trim(),
+                StockType = dto.StockType,
                 Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
                 ReorderLevel = dto.ReorderLevel,
                 CreatedAt = DateTime.UtcNow
@@ -97,6 +112,7 @@ namespace backend.Controllers
                 Name = entity.Name,
                 Sku = entity.Sku,
                 Unit = entity.Unit,
+                StockType = entity.StockType,
                 Description = entity.Description,
                 ReorderLevel = entity.ReorderLevel,
                 CreatedAt = entity.CreatedAt,
@@ -108,12 +124,16 @@ namespace backend.Controllers
         [HttpPut("items/{id:int}")]
         public async Task<IActionResult> UpdateItem(int id, [FromBody] UpdateStockItemDto dto)
         {
+            if (!IsValidStockType(dto.StockType))
+                return BadRequest(new { message = "StockType must be Material or Product." });
+
             var entity = await _context.StockItems.FirstOrDefaultAsync(i => i.Id == id);
             if (entity == null) return NotFound();
 
             entity.Name = dto.Name.Trim();
             entity.Sku = string.IsNullOrWhiteSpace(dto.Sku) ? null : dto.Sku.Trim();
             entity.Unit = string.IsNullOrWhiteSpace(dto.Unit) ? "pcs" : dto.Unit.Trim();
+            entity.StockType = dto.StockType;
             entity.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
             entity.ReorderLevel = dto.ReorderLevel;
 
@@ -296,6 +316,11 @@ namespace backend.Controllers
             return decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)
                 ? d
                 : 0m;
+        }
+
+        private static bool IsValidStockType(StockType stockType)
+        {
+            return Enum.IsDefined(stockType);
         }
     }
 }
