@@ -113,6 +113,7 @@ namespace backend.DTOs
         public int WorkerTasksInProcess { get; set; }
         public int WorkerTasksCompleted { get; set; }
         public decimal AverageSalary { get; set; }
+        public decimal ProfitMargin { get; set; }
         public string currencyCode { get; set; } = "MKD";
         public string currencySymbol { get; set; } = "MKD";
     }

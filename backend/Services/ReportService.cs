@@ -278,6 +278,9 @@ namespace backend.Services
                 var totalRents = isAdmin ? await _context.Rents.SumAsync(r => r.MonthlyAmount) : 0m;
                 totalExpenses += allTimeWorkSaleTotals.Cost;
                 totalIncomes += allTimeWorkSaleTotals.Revenue;
+                var profitMargin = totalIncomes > 0
+                    ? ((totalIncomes - totalExpenses - totalPurchases - totalRents) / totalIncomes) * 100
+                    : 0m;
                 
                 return new DashboardStatsDto
                 {
@@ -317,7 +320,8 @@ namespace backend.Services
                     WorkerTasksWaiting = allTimeWorkerTaskCounts.Waiting,
                     WorkerTasksInProcess = allTimeWorkerTaskCounts.InProcess,
                     WorkerTasksCompleted = allTimeWorkerTaskCounts.Completed,
-                    AverageSalary = averageSalary
+                    AverageSalary = averageSalary,
+                    ProfitMargin = profitMargin
                 };
             }
             catch (Exception)

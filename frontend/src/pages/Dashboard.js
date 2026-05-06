@@ -30,123 +30,6 @@ import { WorkerSalarySummary } from "./WorkerSalary";
 
 const { Title, Text } = Typography;
 
-const calculateComprehensiveStats = (
-  employees,
-  expenses,
-  incomes,
-  purchases,
-  rents,
-  dashboardStats
-) => {
-  const currentMonth = dayjs().format("YYYY-MM");
-  const currentYear = dayjs().format("YYYY");
-
-  const totalEmployees = employees.length;
-  const magazineEmployees = employees.filter(
-    (emp) =>
-      emp.position === "magazine" ||
-      emp.position === "Magazine" ||
-      emp.position === 0
-  ).length;
-  const terrenEmployees = employees.filter(
-    (emp) =>
-      emp.position === "terren" ||
-      emp.position === "Terren" ||
-      emp.position === 1
-  ).length;
-
-  const totalSalaries = employees.reduce(
-    (sum, emp) => sum + (emp.monthlySalary || 0),
-    0
-  );
-
-  const currentMonthExpenses = expenses
-    .filter((exp) => dayjs(exp.date).format("YYYY-MM") === currentMonth)
-    .reduce((sum, exp) => sum + (exp.amount || 0), 0);
-
-  const currentMonthIncomes = incomes
-    .filter((inc) => dayjs(inc.date).format("YYYY-MM") === currentMonth)
-    .reduce((sum, inc) => sum + (inc.amount || 0), 0);
-
-  const currentMonthPurchases = purchases
-    .filter((pur) => dayjs(pur.purchaseDate).format("YYYY-MM") === currentMonth)
-    .reduce((sum, pur) => sum + (pur.totalPrice || 0), 0);
-
-  const currentMonthRents = rents
-    .filter((rent) => dayjs(rent.paymentDate).format("YYYY-MM") === currentMonth)
-    .reduce((sum, rent) => sum + (rent.monthlyAmount || 0), 0);
-
-  const yearToDateExpenses = expenses
-    .filter((exp) => dayjs(exp.date).format("YYYY") === currentYear)
-    .reduce((sum, exp) => sum + (exp.amount || 0), 0);
-
-  const yearToDateIncomes = incomes
-    .filter((inc) => dayjs(inc.date).format("YYYY") === currentYear)
-    .reduce((sum, inc) => sum + (inc.amount || 0), 0);
-
-  const yearToDatePurchases = purchases
-    .filter((pur) => dayjs(pur.purchaseDate).format("YYYY") === currentYear)
-    .reduce((sum, pur) => sum + (pur.totalPrice || 0), 0);
-
-  const yearToDateRents = rents
-    .filter((rent) => dayjs(rent.paymentDate).format("YYYY") === currentYear)
-    .reduce((sum, rent) => sum + (rent.monthlyAmount || 0), 0);
-
-  const currentMonthProfit =
-    currentMonthIncomes -
-    currentMonthExpenses -
-    currentMonthPurchases -
-    currentMonthRents -
-    totalSalaries;
-  const yearToDateProfit =
-    yearToDateIncomes -
-    yearToDateExpenses -
-    yearToDatePurchases -
-    yearToDateRents -
-    totalSalaries * 12;
-
-  const totalExpenses = expenses.reduce(
-    (sum, exp) => sum + (exp.amount || 0),
-    0
-  );
-  const totalIncomes = incomes.reduce((sum, inc) => sum + (inc.amount || 0), 0);
-  const totalPurchases = purchases.reduce(
-    (sum, pur) => sum + (pur.totalPrice || 0),
-    0
-  );
-  const totalRents = rents.reduce(
-    (sum, rent) => sum + (rent.monthlyAmount || 0),
-    0
-  );
-
-  return {
-    totalEmployees,
-    warehouseEmployees: magazineEmployees,
-    fieldEmployees: terrenEmployees,
-    currentMonthSalaries: totalSalaries,
-    currentMonthIncome: currentMonthIncomes,
-    currentMonthExpenses:
-      currentMonthExpenses + currentMonthPurchases + currentMonthRents,
-    currentMonthProfit,
-    yearToDateIncome: yearToDateIncomes,
-    yearToDateExpenses:
-      yearToDateExpenses + yearToDatePurchases + yearToDateRents,
-    yearToDateProfit,
-    totalExpenses,
-    totalIncomes,
-    totalPurchases,
-    totalRents,
-    profitMargin:
-      totalIncomes > 0
-        ? ((totalIncomes - totalExpenses - totalPurchases - totalRents) /
-            totalIncomes) *
-          100
-        : 0,
-    averageSalary: totalEmployees > 0 ? totalSalaries / totalEmployees : 0,
-    ...dashboardStats,
-  };
-};
-
 function WorkerDashboard() {
   const { user } = useAuth();
 
@@ -237,18 +120,15 @@ function Dashboard() {
       const purchases = responseData.purchases ?? [];
       const rents = responseData.rents ?? [];
       const dashboardStats = responseData.dashboardStats ?? {};
+      const normalizedDashboardStats =
+        dashboardStats &&
+        typeof dashboardStats === "object" &&
+        !Array.isArray(dashboardStats)
+          ? dashboardStats
+          : {};
 
-      // Calculate comprehensive statistics
-      const calculatedStats = calculateComprehensiveStats(
-        employees,
-        expenses,
-        incomes,
-        purchases,
-        rents,
-        dashboardStats
-      );
-
-      setStats(calculatedStats);
+      // Statistics are calculated by /reports/dashboard. Entity lists only feed recent tables.
+      setStats(normalizedDashboardStats);
       setRecentData({
         employees: employees.slice(0, 5), // Latest 5 employees
         expenses: expenses.slice(0, 5), // Latest 5 expenses
