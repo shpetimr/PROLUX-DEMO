@@ -12,6 +12,14 @@ namespace backend.DTOs
         public decimal TotalIncome { get; set; }
         public decimal NetProfit { get; set; }
         public int EmployeeCount { get; set; }
+        public decimal TotalWorkSalesRevenue { get; set; }
+        public decimal TotalWorkSalesCost { get; set; }
+        public decimal TotalWorkSalesProfit { get; set; }
+        public int WorkSalesCount { get; set; }
+        public int WorkerTasksTotal { get; set; }
+        public int WorkerTasksWaiting { get; set; }
+        public int WorkerTasksInProcess { get; set; }
+        public int WorkerTasksCompleted { get; set; }
         public decimal TotalRents { get; set; }
         public decimal NetBalance { get; set; }
         public string currencyCode { get; set; } = "MKD";
@@ -29,6 +37,14 @@ namespace backend.DTOs
         public decimal TotalIncome { get; set; }
         public decimal NetProfit { get; set; }
         public int EmployeeCount { get; set; }
+        public decimal TotalWorkSalesRevenue { get; set; }
+        public decimal TotalWorkSalesCost { get; set; }
+        public decimal TotalWorkSalesProfit { get; set; }
+        public int WorkSalesCount { get; set; }
+        public int WorkerTasksTotal { get; set; }
+        public int WorkerTasksWaiting { get; set; }
+        public int WorkerTasksInProcess { get; set; }
+        public int WorkerTasksCompleted { get; set; }
         public string currencyCode { get; set; } = "MKD";
         public string currencySymbol { get; set; } = "MKD";
     }
@@ -43,6 +59,14 @@ namespace backend.DTOs
         public decimal TotalIncome { get; set; }
         public decimal NetProfit { get; set; }
         public int EmployeeCount { get; set; }
+        public decimal TotalWorkSalesRevenue { get; set; }
+        public decimal TotalWorkSalesCost { get; set; }
+        public decimal TotalWorkSalesProfit { get; set; }
+        public int WorkSalesCount { get; set; }
+        public int WorkerTasksTotal { get; set; }
+        public int WorkerTasksWaiting { get; set; }
+        public int WorkerTasksInProcess { get; set; }
+        public int WorkerTasksCompleted { get; set; }
         public List<MonthlyReportDto> MonthlyBreakdown { get; set; } = new();
         public string currencyCode { get; set; } = "MKD";
         public string currencySymbol { get; set; } = "MKD";
@@ -57,8 +81,21 @@ namespace backend.DTOs
         public decimal CurrentMonthExpenses { get; set; }
         public decimal CurrentMonthIncome { get; set; }
         public decimal CurrentMonthProfit { get; set; }
+        public decimal CurrentMonthPurchases { get; set; }
+        public decimal CurrentMonthRents { get; set; }
+        public decimal CurrentMonthWorkSalesRevenue { get; set; }
+        public decimal CurrentMonthWorkSalesCost { get; set; }
+        public decimal CurrentMonthWorkSalesProfit { get; set; }
+        public int CurrentMonthWorkSalesCount { get; set; }
         public decimal YearToDateIncome { get; set; }
         public decimal YearToDateExpenses { get; set; }
+        public decimal YearToDatePurchases { get; set; }
+        public decimal YearToDateRents { get; set; }
+        public decimal YearToDateSalaries { get; set; }
+        public decimal YearToDateWorkSalesRevenue { get; set; }
+        public decimal YearToDateWorkSalesCost { get; set; }
+        public decimal YearToDateWorkSalesProfit { get; set; }
+        public int YearToDateWorkSalesCount { get; set; }
         public decimal YearToDateProfit { get; set; }
         
         // Additional statistics for comprehensive dashboard
@@ -66,6 +103,15 @@ namespace backend.DTOs
         public decimal TotalIncomes { get; set; }
         public decimal TotalPurchases { get; set; }
         public decimal TotalRents { get; set; }
+        public decimal TotalSalaries { get; set; }
+        public decimal TotalWorkSalesRevenue { get; set; }
+        public decimal TotalWorkSalesCost { get; set; }
+        public decimal TotalWorkSalesProfit { get; set; }
+        public int TotalWorkSalesCount { get; set; }
+        public int WorkerTasksTotal { get; set; }
+        public int WorkerTasksWaiting { get; set; }
+        public int WorkerTasksInProcess { get; set; }
+        public int WorkerTasksCompleted { get; set; }
         public decimal AverageSalary { get; set; }
         public string currencyCode { get; set; } = "MKD";
         public string currencySymbol { get; set; } = "MKD";
@@ -195,4 +241,4 @@ namespace backend.DTOs
         public bool IncludeDetails { get; set; } = true;
         public bool IncludeBreakdowns { get; set; } = true;
     }
-} 
+}

@@ -76,6 +76,8 @@ namespace backend.Services
             }
 
             var workSaleTotals = await GetWorkSaleFinancialTotalsAsync(normalizedStartDate, endExclusive);
+            var salaryTotals = await GetSalaryFinancialTotalsAsync(normalizedStartDate, endExclusive);
+            var workerTaskCounts = await GetWorkerTaskCountsAsync(normalizedStartDate, endExclusive);
 
             var baseExpenses = (decimal)await expenses.SumAsync(e => (double)e.Amount);
             var totalRent = (decimal)await rents.SumAsync(r => (double)r.MonthlyAmount);
@@ -83,17 +85,28 @@ namespace backend.Services
             var baseIncome = (decimal)await incomes.SumAsync(i => (double)i.Amount);
             var totalExpenses = baseExpenses + workSaleTotals.Cost;
             var totalIncome = baseIncome + workSaleTotals.Revenue;
-            var netBalance = totalIncome - (totalExpenses + totalRent + totalPurchases);
+            var netBalance = totalIncome - (totalExpenses + totalRent + totalPurchases + salaryTotals.TotalSalaries);
 
             return new FinancialReportDto
             {
-                TotalSalaries = 0, // Salary calculation removed
+                TotalSalaries = salaryTotals.TotalSalaries,
+                TotalDaysWorked = salaryTotals.TotalDaysWorked,
                 TotalExpenses = totalExpenses,
+                TotalRent = totalRent,
                 TotalPurchases = totalPurchases,
                 TotalRents = totalRent,
                 TotalIncome = totalIncome,
                 NetProfit = netBalance,
                 NetBalance = netBalance,
+                EmployeeCount = salaryTotals.EmployeeCount,
+                TotalWorkSalesRevenue = workSaleTotals.Revenue,
+                TotalWorkSalesCost = workSaleTotals.Cost,
+                TotalWorkSalesProfit = workSaleTotals.Profit,
+                WorkSalesCount = workSaleTotals.Count,
+                WorkerTasksTotal = workerTaskCounts.Total,
+                WorkerTasksWaiting = workerTaskCounts.Waiting,
+                WorkerTasksInProcess = workerTaskCounts.InProcess,
+                WorkerTasksCompleted = workerTaskCounts.Completed,
                 StartDate = normalizedStartDate ?? DateTime.MinValue,
                 EndDate = normalizedEndDate ?? DateTime.MaxValue
             };
@@ -116,7 +129,15 @@ namespace backend.Services
                 TotalPurchases = report.TotalPurchases,
                 TotalIncome = report.TotalIncome,
                 NetProfit = report.NetBalance,
-                EmployeeCount = report.EmployeeCount
+                EmployeeCount = report.EmployeeCount,
+                TotalWorkSalesRevenue = report.TotalWorkSalesRevenue,
+                TotalWorkSalesCost = report.TotalWorkSalesCost,
+                TotalWorkSalesProfit = report.TotalWorkSalesProfit,
+                WorkSalesCount = report.WorkSalesCount,
+                WorkerTasksTotal = report.WorkerTasksTotal,
+                WorkerTasksWaiting = report.WorkerTasksWaiting,
+                WorkerTasksInProcess = report.WorkerTasksInProcess,
+                WorkerTasksCompleted = report.WorkerTasksCompleted
             };
         }
 
@@ -138,6 +159,14 @@ namespace backend.Services
                 TotalIncome = report.TotalIncome,
                 NetProfit = report.NetBalance,
                 EmployeeCount = report.EmployeeCount,
+                TotalWorkSalesRevenue = report.TotalWorkSalesRevenue,
+                TotalWorkSalesCost = report.TotalWorkSalesCost,
+                TotalWorkSalesProfit = report.TotalWorkSalesProfit,
+                WorkSalesCount = report.WorkSalesCount,
+                WorkerTasksTotal = report.WorkerTasksTotal,
+                WorkerTasksWaiting = report.WorkerTasksWaiting,
+                WorkerTasksInProcess = report.WorkerTasksInProcess,
+                WorkerTasksCompleted = report.WorkerTasksCompleted,
                 MonthlyBreakdown = monthlyBreakdown
             };
         }
@@ -150,6 +179,7 @@ namespace backend.Services
                 var currentMonthStart = DateTimeUtc.MonthStart(currentDate.Year, currentDate.Month);
                 var currentMonthEnd = currentMonthStart.AddMonths(1);
                 var yearStart = DateTimeUtc.YearStart(currentDate.Year);
+                var todayExclusive = DateTimeUtc.Date(currentDate).AddDays(1);
                 
                 // Filter data based on user role
                 var currentUserId = _currentUserService.GetCurrentUserId();
@@ -169,9 +199,11 @@ namespace backend.Services
                 var terrenEmployees = isAdmin ? await _context.Employees.CountAsync(e => e.Position == Models.EmployeePosition.Terren) : 0;
                 
                 // Calculate current month salaries using new system
-                var employees = isAdmin ? await _context.Employees.ToListAsync() : new List<Models.Employee>();
-                var currentMonthSalaries = employees.Sum(e => e.CalculatedMonthlySalary);
-                var averageSalary = employees.Any() ? currentMonthSalaries / employees.Count : 0;
+                var currentMonthSalaryTotals = await GetSalaryFinancialTotalsAsync(currentMonthStart, currentMonthEnd);
+                var currentMonthSalaries = currentMonthSalaryTotals.TotalSalaries;
+                var averageSalary = currentMonthSalaryTotals.EmployeeCount > 0
+                    ? currentMonthSalaries / currentMonthSalaryTotals.EmployeeCount
+                    : 0;
                 
                 // Calculate current month financial data
                 var currentMonthExpenses = await expensesQuery
@@ -204,8 +236,9 @@ namespace backend.Services
                 
                 // Calculate year to date data
                 var yearToDateWorkSaleTotals = isAdmin
-                    ? await GetWorkSaleFinancialTotalsAsync(yearStart, DateTimeUtc.Date(currentDate).AddDays(1))
+                    ? await GetWorkSaleFinancialTotalsAsync(yearStart, todayExclusive)
                     : WorkSaleFinancialTotals.Empty;
+                var yearToDateSalaryTotals = await GetSalaryFinancialTotalsAsync(yearStart, todayExclusive);
 
                 var yearToDateIncome = isAdmin
                     ? await _context.Incomes
@@ -218,13 +251,26 @@ namespace backend.Services
                     .Where(e => e.Date >= yearStart && e.Date <= currentDate)
                     .SumAsync(e => e.Amount);
                 yearToDateExpenses += yearToDateWorkSaleTotals.Cost;
+
+                var yearToDatePurchases = await purchasesQuery
+                    .Where(p => p.PurchaseDate >= yearStart && p.PurchaseDate <= currentDate)
+                    .SumAsync(p => p.TotalPrice);
+
+                var yearToDateRents = isAdmin
+                    ? await _context.Rents
+                        .Where(r => r.PaymentDate >= yearStart && r.PaymentDate <= currentDate)
+                        .SumAsync(r => r.MonthlyAmount)
+                    : 0m;
                     
-                var yearToDateProfit = yearToDateIncome - yearToDateExpenses;
+                var yearToDateProfit = yearToDateIncome -
+                    (yearToDateExpenses + yearToDatePurchases + yearToDateRents + yearToDateSalaryTotals.TotalSalaries);
                 
                 // Calculate total data
                 var allTimeWorkSaleTotals = isAdmin
                     ? await GetWorkSaleFinancialTotalsAsync(null, null)
                     : WorkSaleFinancialTotals.Empty;
+                var allTimeSalaryTotals = await GetSalaryFinancialTotalsAsync(null, null);
+                var allTimeWorkerTaskCounts = await GetWorkerTaskCountsAsync(null, null);
 
                 var totalExpenses = await expensesQuery.SumAsync(e => e.Amount);
                 var totalIncomes = isAdmin ? await _context.Incomes.SumAsync(i => i.Amount) : 0m;
@@ -242,13 +288,35 @@ namespace backend.Services
                     CurrentMonthExpenses = currentMonthExpenses,
                     CurrentMonthIncome = currentMonthIncome,
                     CurrentMonthProfit = currentMonthProfit,
+                    CurrentMonthPurchases = currentMonthPurchases,
+                    CurrentMonthRents = currentMonthRents,
+                    CurrentMonthWorkSalesRevenue = currentMonthWorkSaleTotals.Revenue,
+                    CurrentMonthWorkSalesCost = currentMonthWorkSaleTotals.Cost,
+                    CurrentMonthWorkSalesProfit = currentMonthWorkSaleTotals.Profit,
+                    CurrentMonthWorkSalesCount = currentMonthWorkSaleTotals.Count,
                     YearToDateIncome = yearToDateIncome,
                     YearToDateExpenses = yearToDateExpenses,
+                    YearToDatePurchases = yearToDatePurchases,
+                    YearToDateRents = yearToDateRents,
+                    YearToDateSalaries = yearToDateSalaryTotals.TotalSalaries,
+                    YearToDateWorkSalesRevenue = yearToDateWorkSaleTotals.Revenue,
+                    YearToDateWorkSalesCost = yearToDateWorkSaleTotals.Cost,
+                    YearToDateWorkSalesProfit = yearToDateWorkSaleTotals.Profit,
+                    YearToDateWorkSalesCount = yearToDateWorkSaleTotals.Count,
                     YearToDateProfit = yearToDateProfit,
                     TotalExpenses = totalExpenses,
                     TotalIncomes = totalIncomes,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalSalaries = allTimeSalaryTotals.TotalSalaries,
+                    TotalWorkSalesRevenue = allTimeWorkSaleTotals.Revenue,
+                    TotalWorkSalesCost = allTimeWorkSaleTotals.Cost,
+                    TotalWorkSalesProfit = allTimeWorkSaleTotals.Profit,
+                    TotalWorkSalesCount = allTimeWorkSaleTotals.Count,
+                    WorkerTasksTotal = allTimeWorkerTaskCounts.Total,
+                    WorkerTasksWaiting = allTimeWorkerTaskCounts.Waiting,
+                    WorkerTasksInProcess = allTimeWorkerTaskCounts.InProcess,
+                    WorkerTasksCompleted = allTimeWorkerTaskCounts.Completed,
                     AverageSalary = averageSalary
                 };
             }
@@ -284,15 +352,17 @@ namespace backend.Services
                 .Where(workSale => workSale.Date >= targetDate && workSale.Date < nextDate)
                 .ToListAsync();
             var workSaleTotals = GetWorkSaleFinancialTotals(dailyWorkSales);
+            var salaryTotals = await GetSalaryFinancialTotalsAsync(targetDate, nextDate);
+            var workerTaskCounts = await GetWorkerTaskCountsAsync(targetDate, nextDate);
 
             var totalExpenses = dailyExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
             var totalIncome = dailyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var totalRents = dailyRents.Sum(r => r.MonthlyAmount);
-            var totalOutflow = totalExpenses + totalPurchases + totalRents;
+            var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
             var netIncome = totalIncome - totalOutflow;
 
-            var expensesByType = BuildExpenseBreakdown(dailyExpenses, totalOutflow, workSaleTotals);
+            var expensesByType = BuildExpenseBreakdown(dailyExpenses, totalOutflow, workSaleTotals, salaryTotals);
 
             return new
             {
@@ -303,6 +373,8 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalSalaries = salaryTotals.TotalSalaries,
+                    TotalEmployeePayments = salaryTotals.TotalSalaries,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
@@ -317,7 +389,15 @@ namespace backend.Services
                     Incomes = dailyIncomes.Count,
                     Purchases = dailyPurchases.Count,
                     Rents = dailyRents.Count,
-                    WorkSales = dailyWorkSales.Count
+                    WorkSales = dailyWorkSales.Count,
+                    WorkerTasks = workerTaskCounts.Total
+                },
+                WorkerTaskCounts = new
+                {
+                    Total = workerTaskCounts.Total,
+                    Waiting = workerTaskCounts.Waiting,
+                    InProcess = workerTaskCounts.InProcess,
+                    Completed = workerTaskCounts.Completed
                 },
                 HourlyBreakdown = Enumerable.Range(0, 24)
                     .Select(hour => new
@@ -362,12 +442,14 @@ namespace backend.Services
                 .Where(workSale => workSale.Date >= startOfWeek && workSale.Date < endOfWeek)
                 .ToListAsync();
             var workSaleTotals = GetWorkSaleFinancialTotals(weeklyWorkSales);
+            var salaryTotals = await GetSalaryFinancialTotalsAsync(startOfWeek, endOfWeek);
+            var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfWeek, endOfWeek);
 
             var totalExpenses = weeklyExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
             var totalIncome = weeklyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = weeklyPurchases.Sum(p => p.TotalPrice);
             var totalRents = weeklyRents.Sum(r => r.MonthlyAmount);
-            var totalOutflow = totalExpenses + totalPurchases + totalRents;
+            var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
             var netIncome = totalIncome - totalOutflow;
 
             var dailyBreakdown = Enumerable.Range(0, 7)
@@ -409,6 +491,8 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalSalaries = salaryTotals.TotalSalaries,
+                    TotalEmployeePayments = salaryTotals.TotalSalaries,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
@@ -424,9 +508,17 @@ namespace backend.Services
                     Incomes = weeklyIncomes.Count,
                     Purchases = weeklyPurchases.Count,
                     Rents = weeklyRents.Count,
-                    WorkSales = weeklyWorkSales.Count
+                    WorkSales = weeklyWorkSales.Count,
+                    WorkerTasks = workerTaskCounts.Total
                 },
-                ExpenseBreakdown = BuildExpenseBreakdown(weeklyExpenses, totalOutflow, workSaleTotals)
+                WorkerTaskCounts = new
+                {
+                    Total = workerTaskCounts.Total,
+                    Waiting = workerTaskCounts.Waiting,
+                    InProcess = workerTaskCounts.InProcess,
+                    Completed = workerTaskCounts.Completed
+                },
+                ExpenseBreakdown = BuildExpenseBreakdown(weeklyExpenses, totalOutflow, workSaleTotals, salaryTotals)
             };
         }
 
@@ -458,13 +550,11 @@ namespace backend.Services
                 .Where(workSale => workSale.Date >= startOfMonth && workSale.Date < endOfMonth)
                 .ToListAsync();
             var workSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales);
+            var salaryTotals = await GetSalaryFinancialTotalsAsync(startOfMonth, endOfMonth);
+            var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfMonth, endOfMonth);
 
             // Calculate employee salaries for the month
-            var employees = await _context.Employees.ToListAsync();
-            var totalSalaries = employees.Sum(e => e.CalculatedMonthlySalary);
-            var totalBonuses = employees.Sum(e => e.MonthlyBonuses + e.CalculatedDailyBonuses);
-            var totalPenalties = employees.Sum(e => e.MonthlyPenalties + e.CalculatedDailyPenalties);
-            var totalEmployeePayments = totalSalaries;
+            var totalEmployeePayments = salaryTotals.TotalSalaries;
             
             var totalExpenses = monthlyExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
             var totalIncome = monthlyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
@@ -546,6 +636,7 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalSalaries = totalEmployeePayments,
                     TotalEmployeePayments = totalEmployeePayments,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
@@ -563,9 +654,17 @@ namespace backend.Services
                     Incomes = monthlyIncomes.Count,
                     Purchases = monthlyPurchases.Count,
                     Rents = monthlyRents.Count,
-                    WorkSales = monthlyWorkSales.Count
+                    WorkSales = monthlyWorkSales.Count,
+                    WorkerTasks = workerTaskCounts.Total
                 },
-                ExpenseBreakdown = BuildExpenseBreakdown(monthlyExpenses, totalOutflow, workSaleTotals)
+                WorkerTaskCounts = new
+                {
+                    Total = workerTaskCounts.Total,
+                    Waiting = workerTaskCounts.Waiting,
+                    InProcess = workerTaskCounts.InProcess,
+                    Completed = workerTaskCounts.Completed
+                },
+                ExpenseBreakdown = BuildExpenseBreakdown(monthlyExpenses, totalOutflow, workSaleTotals, salaryTotals)
             };
         }
 
@@ -595,12 +694,14 @@ namespace backend.Services
                 .Where(workSale => workSale.Date >= startOfYear && workSale.Date < endOfYear)
                 .ToListAsync();
             var workSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales);
+            var salaryTotals = await GetSalaryFinancialTotalsAsync(startOfYear, endOfYear);
+            var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfYear, endOfYear);
 
             var totalExpenses = annualExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
             var totalIncome = annualIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = annualPurchases.Sum(p => p.TotalPrice);
             var totalRents = annualRents.Sum(r => r.MonthlyAmount);
-            var totalOutflow = totalExpenses + totalPurchases + totalRents;
+            var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
             var netIncome = totalIncome - totalOutflow;
 
             var monthlyBreakdown = Enumerable.Range(1, 12)
@@ -672,6 +773,8 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalSalaries = salaryTotals.TotalSalaries,
+                    TotalEmployeePayments = salaryTotals.TotalSalaries,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
@@ -690,9 +793,17 @@ namespace backend.Services
                     Incomes = annualIncomes.Count,
                     Purchases = annualPurchases.Count,
                     Rents = annualRents.Count,
-                    WorkSales = annualWorkSales.Count
+                    WorkSales = annualWorkSales.Count,
+                    WorkerTasks = workerTaskCounts.Total
                 },
-                ExpenseBreakdown = BuildExpenseBreakdown(annualExpenses, totalOutflow, workSaleTotals)
+                WorkerTaskCounts = new
+                {
+                    Total = workerTaskCounts.Total,
+                    Waiting = workerTaskCounts.Waiting,
+                    InProcess = workerTaskCounts.InProcess,
+                    Completed = workerTaskCounts.Completed
+                },
+                ExpenseBreakdown = BuildExpenseBreakdown(annualExpenses, totalOutflow, workSaleTotals, salaryTotals)
             };
         }
 
@@ -1080,6 +1191,127 @@ namespace backend.Services
             };
         }
 
+        private async Task<SalaryFinancialTotals> GetSalaryFinancialTotalsAsync(DateTime? startDate, DateTime? endExclusive)
+        {
+            if (!_currentUserService.IsAdmin())
+            {
+                return SalaryFinancialTotals.Empty;
+            }
+
+            var normalizedStartDate = startDate.HasValue ? DateTimeUtc.Date(startDate.Value) : (DateTime?)null;
+            var normalizedEndExclusive = endExclusive.HasValue ? DateTimeUtc.Date(endExclusive.Value) : (DateTime?)null;
+
+            if (normalizedStartDate.HasValue &&
+                normalizedEndExclusive.HasValue &&
+                normalizedEndExclusive.Value <= normalizedStartDate.Value)
+            {
+                return SalaryFinancialTotals.Empty;
+            }
+
+            var salaryRecords = _context.SalaryRecords.AsNoTracking().AsQueryable();
+
+            if (normalizedStartDate.HasValue)
+            {
+                var firstMonth = DateTimeUtc.MonthStart(normalizedStartDate.Value.Year, normalizedStartDate.Value.Month);
+                salaryRecords = salaryRecords.Where(record => record.Month >= firstMonth);
+            }
+
+            if (normalizedEndExclusive.HasValue)
+            {
+                var monthEndExclusive = GetMonthAfterLastCoveredDate(normalizedEndExclusive.Value);
+                salaryRecords = salaryRecords.Where(record => record.Month < monthEndExclusive);
+            }
+
+            var records = await salaryRecords.ToListAsync();
+            if (records.Count == 0)
+            {
+                return await EstimateSalaryFinancialTotalsAsync(normalizedStartDate, normalizedEndExclusive);
+            }
+
+            var totalSalaries = 0m;
+            var totalDaysWorked = 0m;
+
+            foreach (var record in records)
+            {
+                var coverageFactor = GetMonthCoverageFactor(record.Month, normalizedStartDate, normalizedEndExclusive);
+                totalSalaries += record.TotalSalary * coverageFactor;
+                totalDaysWorked += record.DaysWorked * coverageFactor;
+            }
+
+            return new SalaryFinancialTotals
+            {
+                TotalSalaries = RoundMoney(totalSalaries),
+                TotalDaysWorked = RoundCount(totalDaysWorked),
+                EmployeeCount = records.Select(record => record.EmployeeId).Distinct().Count()
+            };
+        }
+
+        private async Task<SalaryFinancialTotals> EstimateSalaryFinancialTotalsAsync(DateTime? startDate, DateTime? endExclusive)
+        {
+            var employees = await _context.Employees.AsNoTracking().ToListAsync();
+            if (employees.Count == 0)
+            {
+                return SalaryFinancialTotals.Empty;
+            }
+
+            var today = DateTimeUtc.Today();
+            var effectiveStart = startDate ?? DateTimeUtc.MonthStart(today.Year, today.Month);
+            var effectiveEndExclusive = endExclusive ?? today.AddDays(1);
+
+            if (effectiveEndExclusive <= effectiveStart)
+            {
+                return new SalaryFinancialTotals { EmployeeCount = employees.Count };
+            }
+
+            var monthCoverageFactor = GetCoveredMonthStarts(effectiveStart, effectiveEndExclusive)
+                .Sum(monthStart => GetMonthCoverageFactor(monthStart, effectiveStart, effectiveEndExclusive));
+
+            var monthlySalaries = employees.Sum(employee => employee.CalculatedMonthlySalary);
+            var monthlyDaysWorked = employees.Sum(employee => employee.DaysWorkedThisMonth);
+
+            return new SalaryFinancialTotals
+            {
+                TotalSalaries = RoundMoney(monthlySalaries * monthCoverageFactor),
+                TotalDaysWorked = RoundCount(monthlyDaysWorked * monthCoverageFactor),
+                EmployeeCount = employees.Count
+            };
+        }
+
+        private IQueryable<WorkerTask> GetWorkerTasksForPeriod(DateTime? startDate, DateTime? endExclusive)
+        {
+            var workerTasks = _context.WorkerTasks.AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                workerTasks = workerTasks.Where(task => task.CreatedAt >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                workerTasks = workerTasks.Where(task => task.CreatedAt < endExclusive.Value);
+            }
+
+            return workerTasks;
+        }
+
+        private async Task<WorkerTaskCounts> GetWorkerTaskCountsAsync(DateTime? startDate, DateTime? endExclusive)
+        {
+            if (!_currentUserService.IsAdmin())
+            {
+                return WorkerTaskCounts.Empty;
+            }
+
+            var workerTasks = GetWorkerTasksForPeriod(startDate, endExclusive);
+
+            return new WorkerTaskCounts
+            {
+                Total = await workerTasks.CountAsync(),
+                Waiting = await workerTasks.CountAsync(task => task.Status == WorkerTaskStatus.Waiting),
+                InProcess = await workerTasks.CountAsync(task => task.Status == WorkerTaskStatus.InProcess),
+                Completed = await workerTasks.CountAsync(task => task.Status == WorkerTaskStatus.Completed)
+            };
+        }
+
         private IQueryable<WorkSale> GetWorkSalesForPeriod(DateTime? startDate, DateTime? endExclusive)
         {
             var workSales = _context.WorkSales.AsQueryable();
@@ -1126,7 +1358,8 @@ namespace backend.Services
         private static List<ExpenseBreakdownItem> BuildExpenseBreakdown(
             IEnumerable<Expense> expenses,
             decimal totalOutflow,
-            WorkSaleFinancialTotals workSaleTotals)
+            WorkSaleFinancialTotals workSaleTotals,
+            SalaryFinancialTotals? salaryTotals = null)
         {
             var breakdown = expenses
                 .GroupBy(e => e.ExpenseType)
@@ -1150,9 +1383,95 @@ namespace backend.Services
                 });
             }
 
+            if (salaryTotals is { TotalSalaries: > 0 })
+            {
+                breakdown.Add(new ExpenseBreakdownItem
+                {
+                    Type = "Salaries",
+                    Total = salaryTotals.TotalSalaries,
+                    Count = salaryTotals.EmployeeCount,
+                    Percentage = totalOutflow > 0 ? (salaryTotals.TotalSalaries / totalOutflow) * 100 : 0
+                });
+            }
+
             return breakdown
                 .OrderByDescending(item => item.Total)
                 .ToList();
+        }
+
+        private static List<DateTime> GetCoveredMonthStarts(DateTime startDate, DateTime endExclusive)
+        {
+            var monthStarts = new List<DateTime>();
+            var cursor = DateTimeUtc.MonthStart(startDate.Year, startDate.Month);
+
+            while (cursor < endExclusive)
+            {
+                monthStarts.Add(cursor);
+                cursor = cursor.AddMonths(1);
+            }
+
+            return monthStarts;
+        }
+
+        private static DateTime GetMonthAfterLastCoveredDate(DateTime endExclusive)
+        {
+            var lastCoveredDate = endExclusive.AddTicks(-1);
+            return DateTimeUtc.MonthStart(lastCoveredDate.Year, lastCoveredDate.Month).AddMonths(1);
+        }
+
+        private static decimal GetMonthCoverageFactor(DateTime month, DateTime? startDate, DateTime? endExclusive)
+        {
+            var monthStart = DateTimeUtc.MonthStart(month.Year, month.Month);
+            var monthEnd = monthStart.AddMonths(1);
+            var overlapStart = startDate.HasValue && startDate.Value > monthStart ? startDate.Value : monthStart;
+            var overlapEnd = endExclusive.HasValue && endExclusive.Value < monthEnd ? endExclusive.Value : monthEnd;
+
+            if (overlapEnd <= overlapStart)
+            {
+                return 0m;
+            }
+
+            if (overlapStart <= monthStart && overlapEnd >= monthEnd)
+            {
+                return 1m;
+            }
+
+            var workingDays = CountWeekdays(overlapStart, overlapEnd);
+            return Math.Min(1m, workingDays / (decimal)SalaryCalculator.StandardWorkingDaysPerMonth);
+        }
+
+        private static int CountWeekdays(DateTime startDate, DateTime endExclusive)
+        {
+            var count = 0;
+
+            for (var day = startDate.Date; day < endExclusive.Date; day = day.AddDays(1))
+            {
+                if (day.DayOfWeek != DayOfWeek.Saturday && day.DayOfWeek != DayOfWeek.Sunday)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static decimal RoundMoney(decimal value)
+        {
+            return Math.Round(value, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static int RoundCount(decimal value)
+        {
+            return (int)Math.Round(value, MidpointRounding.AwayFromZero);
+        }
+
+        private sealed class SalaryFinancialTotals
+        {
+            public static SalaryFinancialTotals Empty { get; } = new();
+
+            public decimal TotalSalaries { get; init; }
+            public int TotalDaysWorked { get; init; }
+            public int EmployeeCount { get; init; }
         }
 
         private sealed class WorkSaleFinancialTotals
@@ -1163,6 +1482,16 @@ namespace backend.Services
             public decimal Cost { get; init; }
             public decimal Profit { get; init; }
             public int Count { get; init; }
+        }
+
+        private sealed class WorkerTaskCounts
+        {
+            public static WorkerTaskCounts Empty { get; } = new();
+
+            public int Total { get; init; }
+            public int Waiting { get; init; }
+            public int InProcess { get; init; }
+            public int Completed { get; init; }
         }
 
         private sealed class ExpenseBreakdownItem

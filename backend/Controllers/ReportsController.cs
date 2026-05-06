@@ -370,6 +370,7 @@ namespace backend.Controllers
                 var start = DateTimeUtc.Date(startDate ?? DateTime.UtcNow.Date.AddMonths(-1));
                 var end = DateTimeUtc.Date(endDate ?? DateTime.UtcNow.Date);
                 var endExclusive = end.AddDays(1);
+                var periodReport = await _reportService.GetFinancialReportAsync(start, end);
 
                 // Get all financial data for the period
                 var baseExpenses = await _context.Expenses
@@ -406,7 +407,8 @@ namespace backend.Controllers
 
                 var incomes = baseIncomes + workSalesRevenue;
                 var expenses = baseExpenses + workSalesCost;
-                var totalOutflow = expenses + purchases + rents;
+                var totalSalaries = periodReport.TotalSalaries;
+                var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
                 var profitMargin = incomes > 0 ? (netIncome / incomes) * 100 : 0;
 
@@ -448,6 +450,8 @@ namespace backend.Controllers
                         TotalExpenses = expenses,
                         TotalPurchases = purchases,
                         TotalRents = rents,
+                        TotalSalaries = totalSalaries,
+                        TotalEmployeePayments = totalSalaries,
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
@@ -461,6 +465,13 @@ namespace backend.Controllers
                         Inflow = incomes,
                         Outflow = totalOutflow,
                         Net = netIncome
+                    },
+                    WorkerTaskCounts = new
+                    {
+                        Total = periodReport.WorkerTasksTotal,
+                        Waiting = periodReport.WorkerTasksWaiting,
+                        InProcess = periodReport.WorkerTasksInProcess,
+                        Completed = periodReport.WorkerTasksCompleted
                     }
                 });
             }
@@ -743,6 +754,7 @@ namespace backend.Controllers
                 var start = DateTimeUtc.Date(startDate ?? DateTime.UtcNow.Date.AddMonths(-1));
                 var end = DateTimeUtc.Date(endDate ?? DateTime.UtcNow.Date);
                 var endExclusive = end.AddDays(1);
+                var periodReport = await _reportService.GetFinancialReportAsync(start, end);
 
                 // Get all financial data for the period
                 var baseExpenses = await _context.Expenses
@@ -779,7 +791,8 @@ namespace backend.Controllers
 
                 var incomes = baseIncomes + workSalesRevenue;
                 var expenses = baseExpenses + workSalesCost;
-                var totalOutflow = expenses + purchases + rents;
+                var totalSalaries = periodReport.TotalSalaries;
+                var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
                 var profitMargin = incomes > 0 ? (netIncome / incomes) * 100 : 0;
 
@@ -860,6 +873,8 @@ namespace backend.Controllers
                         TotalExpenses = expenses,
                         TotalPurchases = purchases,
                         TotalRents = rents,
+                        TotalSalaries = totalSalaries,
+                        TotalEmployeePayments = totalSalaries,
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
@@ -880,6 +895,13 @@ namespace backend.Controllers
                         Inflow = incomes,
                         Outflow = totalOutflow,
                         Net = netIncome
+                    },
+                    WorkerTaskCounts = new
+                    {
+                        Total = periodReport.WorkerTasksTotal,
+                        Waiting = periodReport.WorkerTasksWaiting,
+                        InProcess = periodReport.WorkerTasksInProcess,
+                        Completed = periodReport.WorkerTasksCompleted
                     }
                 });
             }
@@ -909,12 +931,20 @@ namespace backend.Controllers
                     purchases = new { total = (decimal)obj.FinancialSummary.TotalPurchases, count = obj.TransactionCounts.Purchases },
                     rents = new { total = (decimal)obj.FinancialSummary.TotalRents, count = obj.TransactionCounts.Rents },
                     incomes = new { total = (decimal)obj.FinancialSummary.TotalIncome, count = obj.TransactionCounts.Incomes },
+                    salaries = new { total = (decimal)obj.FinancialSummary.TotalSalaries },
                     workSales = new
                     {
                         revenue = (decimal)obj.FinancialSummary.TotalWorkSalesRevenue,
                         cost = (decimal)obj.FinancialSummary.TotalWorkSalesCost,
                         profit = (decimal)obj.FinancialSummary.TotalWorkSalesProfit,
                         count = obj.TransactionCounts.WorkSales
+                    },
+                    workerTasks = new
+                    {
+                        total = obj.WorkerTaskCounts.Total,
+                        waiting = obj.WorkerTaskCounts.Waiting,
+                        inProcess = obj.WorkerTaskCounts.InProcess,
+                        completed = obj.WorkerTaskCounts.Completed
                     }
                 };
             }
