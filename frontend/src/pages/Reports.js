@@ -14,11 +14,15 @@ import {
   Layout,
 } from "antd";
 import {
+  AppstoreOutlined,
   DollarOutlined,
+  FileDoneOutlined,
   RiseOutlined,
   FallOutlined,
   BarChartOutlined,
   ReloadOutlined,
+  TeamOutlined,
+  ToolOutlined,
 } from "@ant-design/icons";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 import dayjs from "dayjs";
@@ -27,9 +31,27 @@ import { useDataChange } from "../contexts/DataChangeContext";
 
 dayjs.extend(utc);
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 const { Content } = Layout;
+
+const emptyStockSegment = {
+  itemCount: 0,
+  currentQuantity: 0,
+  lowStockCount: 0,
+  quantityIn: 0,
+  quantityOut: 0,
+  movementCount: 0,
+};
+
+const normalizeStockSegment = (segment = {}) => ({
+  itemCount: Number(segment.itemCount || 0),
+  currentQuantity: Number(segment.currentQuantity || 0),
+  lowStockCount: Number(segment.lowStockCount || 0),
+  quantityIn: Number(segment.quantityIn || 0),
+  quantityOut: Number(segment.quantityOut || 0),
+  movementCount: Number(segment.movementCount || 0),
+});
 
 function Reports() {
   const [loading, setLoading] = useState(false);
@@ -40,6 +62,16 @@ function Reports() {
     totalPurchases: 0,
     totalRents: 0,
     totalSalaries: 0,
+    totalArchivedInvoices: 0,
+    archivedInvoicesCount: 0,
+    totalWorkSalesRevenue: 0,
+    totalWorkSalesCost: 0,
+    totalWorkSalesProfit: 0,
+    workSalesCount: 0,
+    stockSplit: {
+      material: emptyStockSegment,
+      product: emptyStockSegment,
+    },
     netProfit: 0,
     margin: 0,
   });
@@ -92,6 +124,19 @@ function Reports() {
       const totalPurchases = Number(summary.totalPurchases || 0);
       const totalRents = Number(summary.totalRents || 0);
       const totalSalaries = Number(summary.totalEmployeePayments || 0);
+      const totalArchivedInvoices = Number(
+        summary.totalArchivedInvoices || response.data?.archivedInvoices?.total || 0
+      );
+      const archivedInvoicesCount = Number(
+        summary.archivedInvoicesCount || response.data?.archivedInvoices?.count || 0
+      );
+      const totalWorkSalesRevenue = Number(summary.totalWorkSalesRevenue || 0);
+      const totalWorkSalesCost = Number(summary.totalWorkSalesCost || 0);
+      const totalWorkSalesProfit = Number(summary.totalWorkSalesProfit || 0);
+      const workSalesCount = Number(
+        response.data?.transactionCounts?.workSales || 0
+      );
+      const stockSplit = response.data?.stockSplit || {};
       const netProfit = Number(summary.netIncome || 0);
       const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
 
@@ -101,6 +146,16 @@ function Reports() {
         totalPurchases,
         totalRents,
         totalSalaries,
+        totalArchivedInvoices,
+        archivedInvoicesCount,
+        totalWorkSalesRevenue,
+        totalWorkSalesCost,
+        totalWorkSalesProfit,
+        workSalesCount,
+        stockSplit: {
+          material: normalizeStockSegment(stockSplit.material),
+          product: normalizeStockSegment(stockSplit.product),
+        },
         netProfit,
         margin,
       });
@@ -189,6 +244,18 @@ function Reports() {
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
+                    title="Salary"
+                    value={monthlyTotals.totalSalaries}
+                    precision={2}
+                    valueStyle={{ color: "#fa8c16" }}
+                    prefix={<TeamOutlined />}
+                    suffix="DEN"
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
                     title="Fitimi Neto"
                     value={monthlyTotals.netProfit}
                     precision={2}
@@ -217,11 +284,111 @@ function Reports() {
               </Col> */}
             </Row>
 
+            <Row gutter={[16, 16]} className="mb-8">
+              <Col xs={24} sm={12} md={6}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
+                    title="Archived Invoices"
+                    value={monthlyTotals.totalArchivedInvoices}
+                    precision={2}
+                    valueStyle={{ color: "#13c2c2" }}
+                    prefix={<FileDoneOutlined />}
+                    suffix="DEN"
+                  />
+                  <Text type="secondary">
+                    {monthlyTotals.archivedInvoicesCount} invoices
+                  </Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
+                    title="WorkSales Revenue"
+                    value={monthlyTotals.totalWorkSalesRevenue}
+                    precision={2}
+                    valueStyle={{ color: "#52c41a" }}
+                    prefix={<ToolOutlined />}
+                    suffix="DEN"
+                  />
+                  <Text type="secondary">
+                    {monthlyTotals.workSalesCount} work sales
+                  </Text>
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
+                    title="WorkSales Cost"
+                    value={monthlyTotals.totalWorkSalesCost}
+                    precision={2}
+                    valueStyle={{ color: "#ff4d4f" }}
+                    prefix={<FallOutlined />}
+                    suffix="DEN"
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
+                    title="WorkSales Profit"
+                    value={monthlyTotals.totalWorkSalesProfit}
+                    precision={2}
+                    valueStyle={{
+                      color:
+                        monthlyTotals.totalWorkSalesProfit >= 0
+                          ? "#1890ff"
+                          : "#ff4d4f",
+                    }}
+                    prefix={<DollarOutlined />}
+                    suffix="DEN"
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            <Row gutter={[16, 16]} className="mb-8">
+              <Col xs={24} md={12}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
+                    title="Material Stock"
+                    value={monthlyTotals.stockSplit.material.currentQuantity}
+                    precision={2}
+                    valueStyle={{ color: "#1677ff" }}
+                    prefix={<AppstoreOutlined />}
+                    suffix="qty"
+                  />
+                  <Text type="secondary">
+                    {monthlyTotals.stockSplit.material.itemCount} items,{" "}
+                    {monthlyTotals.stockSplit.material.quantityOut.toFixed(2)} used this month
+                  </Text>
+                </Card>
+              </Col>
+              <Col xs={24} md={12}>
+                <Card className="shadow-md hover:shadow-lg transition-shadow">
+                  <Statistic
+                    title="Product Stock"
+                    value={monthlyTotals.stockSplit.product.currentQuantity}
+                    precision={2}
+                    valueStyle={{ color: "#722ed1" }}
+                    prefix={<AppstoreOutlined />}
+                    suffix="qty"
+                  />
+                  <Text type="secondary">
+                    {monthlyTotals.stockSplit.product.itemCount} items,{" "}
+                    {monthlyTotals.stockSplit.product.quantityOut.toFixed(2)} used this month
+                  </Text>
+                </Card>
+              </Col>
+            </Row>
+
             {/* No Data Warning */}
             {monthlyTotals.totalIncome === 0 &&
               monthlyTotals.totalExpenses === 0 &&
               monthlyTotals.totalPurchases === 0 &&
-              monthlyTotals.totalRents === 0 && (
+              monthlyTotals.totalRents === 0 &&
+              monthlyTotals.totalSalaries === 0 &&
+              monthlyTotals.totalArchivedInvoices === 0 &&
+              monthlyTotals.totalWorkSalesRevenue === 0 && (
                 <Row className="mt-6">
                   <Col span={24}>
                     <Alert
@@ -248,7 +415,7 @@ function Reports() {
                     selectedMonthDisplay?.albanianName
                   } ${
                     selectedMonth.split("-")[0]
-                  }. TÃƒÂ« dhÃƒÂ«nat pÃƒÂ«rditÃƒÂ«sohen automatikisht kur ndryshoni muajin ose klikoni butonin "Rifresko". Raporti pÃƒÂ«rfshin tÃƒÂ« gjitha transaksionet financiare dhe llogaritjet e fitimit.`}
+                  }. Te dhenat vijne nga backend dhe perfshijne salary, archived invoices, WorkSales dhe stock split Material/Product.`}
                   type="info"
                   showIcon
                   className="shadow-sm"

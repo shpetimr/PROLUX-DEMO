@@ -12,10 +12,16 @@ namespace backend.DTOs
         public decimal TotalIncome { get; set; }
         public decimal NetProfit { get; set; }
         public int EmployeeCount { get; set; }
+        public decimal TotalArchivedInvoices { get; set; }
+        public int ArchivedInvoicesCount { get; set; }
         public decimal TotalWorkSalesRevenue { get; set; }
         public decimal TotalWorkSalesCost { get; set; }
         public decimal TotalWorkSalesProfit { get; set; }
         public int WorkSalesCount { get; set; }
+        public int MaterialStockItemCount { get; set; }
+        public decimal MaterialStockQuantity { get; set; }
+        public int ProductStockItemCount { get; set; }
+        public decimal ProductStockQuantity { get; set; }
         public int WorkerTasksTotal { get; set; }
         public int WorkerTasksWaiting { get; set; }
         public int WorkerTasksInProcess { get; set; }
@@ -37,10 +43,16 @@ namespace backend.DTOs
         public decimal TotalIncome { get; set; }
         public decimal NetProfit { get; set; }
         public int EmployeeCount { get; set; }
+        public decimal TotalArchivedInvoices { get; set; }
+        public int ArchivedInvoicesCount { get; set; }
         public decimal TotalWorkSalesRevenue { get; set; }
         public decimal TotalWorkSalesCost { get; set; }
         public decimal TotalWorkSalesProfit { get; set; }
         public int WorkSalesCount { get; set; }
+        public int MaterialStockItemCount { get; set; }
+        public decimal MaterialStockQuantity { get; set; }
+        public int ProductStockItemCount { get; set; }
+        public decimal ProductStockQuantity { get; set; }
         public int WorkerTasksTotal { get; set; }
         public int WorkerTasksWaiting { get; set; }
         public int WorkerTasksInProcess { get; set; }
@@ -59,10 +71,16 @@ namespace backend.DTOs
         public decimal TotalIncome { get; set; }
         public decimal NetProfit { get; set; }
         public int EmployeeCount { get; set; }
+        public decimal TotalArchivedInvoices { get; set; }
+        public int ArchivedInvoicesCount { get; set; }
         public decimal TotalWorkSalesRevenue { get; set; }
         public decimal TotalWorkSalesCost { get; set; }
         public decimal TotalWorkSalesProfit { get; set; }
         public int WorkSalesCount { get; set; }
+        public int MaterialStockItemCount { get; set; }
+        public decimal MaterialStockQuantity { get; set; }
+        public int ProductStockItemCount { get; set; }
+        public decimal ProductStockQuantity { get; set; }
         public int WorkerTasksTotal { get; set; }
         public int WorkerTasksWaiting { get; set; }
         public int WorkerTasksInProcess { get; set; }

@@ -405,7 +405,9 @@ namespace backend.Controllers
                     .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
                     .CountAsync();
 
-                var incomes = baseIncomes + workSalesRevenue;
+                var archivedInvoiceRevenue = periodReport.TotalArchivedInvoices;
+                var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
+                var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
                 var expenses = baseExpenses + workSalesCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
@@ -452,6 +454,8 @@ namespace backend.Controllers
                         TotalRents = rents,
                         TotalSalaries = totalSalaries,
                         TotalEmployeePayments = totalSalaries,
+                        TotalArchivedInvoices = archivedInvoiceRevenue,
+                        ArchivedInvoicesCount = archivedInvoiceCount,
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
@@ -472,6 +476,19 @@ namespace backend.Controllers
                         Waiting = periodReport.WorkerTasksWaiting,
                         InProcess = periodReport.WorkerTasksInProcess,
                         Completed = periodReport.WorkerTasksCompleted
+                    },
+                    StockSplit = new
+                    {
+                        Material = new
+                        {
+                            ItemCount = periodReport.MaterialStockItemCount,
+                            CurrentQuantity = periodReport.MaterialStockQuantity
+                        },
+                        Product = new
+                        {
+                            ItemCount = periodReport.ProductStockItemCount,
+                            CurrentQuantity = periodReport.ProductStockQuantity
+                        }
                     }
                 });
             }
@@ -789,7 +806,9 @@ namespace backend.Controllers
                     .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
                     .CountAsync();
 
-                var incomes = baseIncomes + workSalesRevenue;
+                var archivedInvoiceRevenue = periodReport.TotalArchivedInvoices;
+                var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
+                var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
                 var expenses = baseExpenses + workSalesCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
@@ -864,6 +883,22 @@ namespace backend.Controllers
                         .ToList();
                 }
 
+                if (archivedInvoiceCount > 0 || archivedInvoiceRevenue > 0)
+                {
+                    topIncomeSources.Add(new
+                    {
+                        Source = "Archived Invoices",
+                        Total = archivedInvoiceRevenue,
+                        Count = archivedInvoiceCount,
+                        Percentage = incomes > 0 ? (archivedInvoiceRevenue / incomes) * 100 : 0
+                    });
+
+                    topIncomeSources = topIncomeSources
+                        .OrderByDescending(x => x.Total)
+                        .Take(5)
+                        .ToList();
+                }
+
                 return Ok(new
                 {
                     Period = new { StartDate = start, EndDate = end, Days = daysInPeriod },
@@ -875,6 +910,8 @@ namespace backend.Controllers
                         TotalRents = rents,
                         TotalSalaries = totalSalaries,
                         TotalEmployeePayments = totalSalaries,
+                        TotalArchivedInvoices = archivedInvoiceRevenue,
+                        ArchivedInvoicesCount = archivedInvoiceCount,
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
@@ -902,6 +939,19 @@ namespace backend.Controllers
                         Waiting = periodReport.WorkerTasksWaiting,
                         InProcess = periodReport.WorkerTasksInProcess,
                         Completed = periodReport.WorkerTasksCompleted
+                    },
+                    StockSplit = new
+                    {
+                        Material = new
+                        {
+                            ItemCount = periodReport.MaterialStockItemCount,
+                            CurrentQuantity = periodReport.MaterialStockQuantity
+                        },
+                        Product = new
+                        {
+                            ItemCount = periodReport.ProductStockItemCount,
+                            CurrentQuantity = periodReport.ProductStockQuantity
+                        }
                     }
                 });
             }
@@ -932,6 +982,11 @@ namespace backend.Controllers
                     rents = new { total = (decimal)obj.FinancialSummary.TotalRents, count = obj.TransactionCounts.Rents },
                     incomes = new { total = (decimal)obj.FinancialSummary.TotalIncome, count = obj.TransactionCounts.Incomes },
                     salaries = new { total = (decimal)obj.FinancialSummary.TotalSalaries },
+                    archivedInvoices = new
+                    {
+                        total = (decimal)obj.FinancialSummary.TotalArchivedInvoices,
+                        count = obj.TransactionCounts.ArchivedInvoices
+                    },
                     workSales = new
                     {
                         revenue = (decimal)obj.FinancialSummary.TotalWorkSalesRevenue,
@@ -939,6 +994,7 @@ namespace backend.Controllers
                         profit = (decimal)obj.FinancialSummary.TotalWorkSalesProfit,
                         count = obj.TransactionCounts.WorkSales
                     },
+                    stockSplit = obj.StockSplit,
                     workerTasks = new
                     {
                         total = obj.WorkerTaskCounts.Total,
