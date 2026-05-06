@@ -43,17 +43,23 @@ const stockTypeOptions = [
   { value: STOCK_TYPES.Product, label: "Produkt" },
 ];
 
-const stockTypeFilterOptions = [
-  { value: STOCK_TYPES.All, label: "Te gjitha" },
-  ...stockTypeOptions,
-];
+const stockPageTitles = {
+  [STOCK_TYPES.Material]: "Material Stock",
+  [STOCK_TYPES.Product]: "Product Stock",
+};
+
+const normalizeStockType = (value) =>
+  stockTypeOptions.some((option) => option.value === value)
+    ? value
+    : STOCK_TYPES.Material;
 
 const getStockTypeLabel = (value) =>
   stockTypeOptions.find((option) => option.value === value)?.label || "Material";
 
-function Stock() {
+function Stock({ stockType = STOCK_TYPES.Material, title }) {
+  const activeStockType = normalizeStockType(stockType);
+  const pageTitle = title || stockPageTitles[activeStockType];
   const [items, setItems] = useState([]);
-  const [stockTypeFilter, setStockTypeFilter] = useState(STOCK_TYPES.All);
   const [loading, setLoading] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -72,13 +78,15 @@ function Stock() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(API_ENDPOINTS.STOCK_ITEMS);
+      const res = await apiClient.get(API_ENDPOINTS.STOCK_ITEMS, {
+        params: { stockType: activeStockType },
+      });
       const data = res.data;
       setItems(
         Array.isArray(data)
           ? data.map((row) => ({
               ...row,
-              stockType: row.stockType || STOCK_TYPES.Material,
+              stockType: row.stockType || activeStockType,
             }))
           : []
       );
@@ -87,26 +95,24 @@ function Stock() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeStockType]);
 
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
 
-  const filteredItems = useMemo(() => {
-    if (stockTypeFilter === STOCK_TYPES.All) {
-      return items;
-    }
-
-    return items.filter(
-      (item) => (item.stockType || STOCK_TYPES.Material) === stockTypeFilter
-    );
-  }, [items, stockTypeFilter]);
+  const visibleItems = useMemo(
+    () =>
+      items.filter(
+        (item) => (item.stockType || activeStockType) === activeStockType
+      ),
+    [items, activeStockType]
+  );
 
   const openCreateItem = () => {
     setEditingItem(null);
     itemForm.resetFields();
-    itemForm.setFieldsValue({ unit: "pcs", stockType: STOCK_TYPES.Material });
+    itemForm.setFieldsValue({ unit: "pcs", stockType: activeStockType });
     setItemModalOpen(true);
   };
 
@@ -116,7 +122,7 @@ function Stock() {
       name: record.name,
       sku: record.sku,
       unit: record.unit || "pcs",
-      stockType: record.stockType || STOCK_TYPES.Material,
+      stockType: activeStockType,
       description: record.description,
       reorderLevel: record.reorderLevel,
     });
@@ -130,12 +136,13 @@ function Stock() {
 
   const onItemFormFinish = async (values) => {
     setSavingItem(true);
+    const payload = { ...values, stockType: activeStockType };
     try {
       if (editingItem) {
-        await apiClient.put(API_ENDPOINTS.STOCK_ITEM_BY_ID(editingItem.id), values);
+        await apiClient.put(API_ENDPOINTS.STOCK_ITEM_BY_ID(editingItem.id), payload);
         message.success("Artikulli u përditësua.");
       } else {
-        const res = await apiClient.post(API_ENDPOINTS.STOCK_ITEMS, values);
+        const res = await apiClient.post(API_ENDPOINTS.STOCK_ITEMS, payload);
         message.success("Artikulli u shtua.");
         const row = res.data;
         if (row && row.id != null) {
@@ -145,7 +152,7 @@ function Stock() {
               ...prev,
               {
                 ...row,
-                stockType: row.stockType || STOCK_TYPES.Material,
+                stockType: row.stockType || activeStockType,
                 currentQuantity:
                   row.currentQuantity != null ? Number(row.currentQuantity) : 0,
               },
@@ -339,15 +346,9 @@ function Stock() {
         }}
       >
         <Title level={2} style={{ margin: 0 }}>
-          Stoku
+          {pageTitle}
         </Title>
         <Space wrap>
-          <Select
-            value={stockTypeFilter}
-            onChange={setStockTypeFilter}
-            options={stockTypeFilterOptions}
-            style={{ width: 150 }}
-          />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateItem}>
             Artikull i ri
           </Button>
@@ -363,7 +364,7 @@ function Stock() {
         rowKey="id"
         loading={loading}
         columns={columns}
-        dataSource={filteredItems}
+        dataSource={visibleItems}
         pagination={{ pageSize: 15, showTotal: (t) => `${t} artikuj` }}
       />
 
@@ -394,12 +395,8 @@ function Stock() {
           <Form.Item name="unit" label="Njësia">
             <Input placeholder="pcs, m2, kg..." />
           </Form.Item>
-          <Form.Item
-            name="stockType"
-            label="Tipi"
-            rules={[{ required: true, message: "Zgjidhni tipin" }]}
-          >
-            <Select options={stockTypeOptions} />
+          <Form.Item name="stockType" hidden>
+            <Input />
           </Form.Item>
           <Form.Item name="description" label="Përshkrimi">
             <Input.TextArea rows={2} />

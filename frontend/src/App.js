@@ -1,6 +1,7 @@
 import React from "react";
 import {
   HashRouter as Router,
+  Navigate,
   Route,
   Routes,
 } from "react-router-dom";
@@ -27,7 +28,7 @@ import TemplatePrint from "./pages/TemplatePrint";
 import OfferPrint from "./pages/OfferPrint";
 import InvoiceArchive from "./pages/InvoiceArchive";
 import Stock from "./pages/Stock";
-import { PERMISSIONS } from "./config/permissions";
+import { PERMISSIONS, ROLES } from "./config/permissions";
 
 function App() {
   return (
@@ -179,9 +180,32 @@ function App() {
                 path="stock"
                 element={
                   <ProtectedRoute
+                    requiredRole={ROLES.ADMIN}
                     requiredPermission={PERMISSIONS.STOCK_MANAGE}
                   >
-                    <Stock />
+                    <Navigate to="/stock/material" replace />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="stock/material"
+                element={
+                  <ProtectedRoute
+                    requiredRole={ROLES.ADMIN}
+                    requiredPermission={PERMISSIONS.STOCK_MANAGE}
+                  >
+                    <Stock stockType="Material" title="Material Stock" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="stock/product"
+                element={
+                  <ProtectedRoute
+                    requiredRole={ROLES.ADMIN}
+                    requiredPermission={PERMISSIONS.STOCK_MANAGE}
+                  >
+                    <Stock stockType="Product" title="Product Stock" />
                   </ProtectedRoute>
                 }
               />

@@ -119,9 +119,17 @@ function Layout() {
         requiredPermission: PERMISSIONS.REPORTS_VIEW,
       },
       {
-        key: "/stock",
+        key: "/stock/material",
         icon: <InboxOutlined />,
-        label: "Stoku",
+        label: "Material Stock",
+        adminOnly: true,
+        requiredPermission: PERMISSIONS.STOCK_MANAGE,
+      },
+      {
+        key: "/stock/product",
+        icon: <InboxOutlined />,
+        label: "Product Stock",
+        adminOnly: true,
         requiredPermission: PERMISSIONS.STOCK_MANAGE,
       },
       {
@@ -150,7 +158,8 @@ function Layout() {
 
     return items.filter(
       (item) =>
-        !item.requiredPermission || hasPermission(item.requiredPermission)
+        (!item.adminOnly || isAdmin()) &&
+        (!item.requiredPermission || hasPermission(item.requiredPermission))
     );
   };
 
