@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using System.Text.Json;
 using backend.Models;
 using QuestPDF.Fluent;
@@ -188,7 +189,7 @@ namespace backend.Services
                 col.Item().PaddingTop(14).Row(row =>
                 {
                     row.RelativeItem().Element(notes => ComposeArchivedNotes(notes, invoice, snapshot, labels));
-                    row.ConstantItem(220).Element(totals => ComposeArchivedTotals(totals, invoice, labels));
+                    row.ConstantItem(220).Element(totals => ComposeArchivedTotals(totals, invoice, snapshot, labels));
                 });
             });
         }
@@ -277,21 +278,64 @@ namespace backend.Services
             });
         }
 
-        void ComposeArchivedTotals(IContainer container, InvoiceArchive invoice, InvoiceArchivePdfLabels labels)
+        void ComposeArchivedTotals(
+            IContainer container,
+            InvoiceArchive invoice,
+            ArchivedInvoiceSnapshot snapshot,
+            InvoiceArchivePdfLabels labels)
         {
+            var totals = snapshot.Totals;
+            var lineSubtotal = totals?.LineSubtotal ?? invoice.Subtotal;
+            var discountPercent = totals?.DiscountPercent ?? 0;
+            var discountAmount = totals?.DiscountAmount ?? 0;
+            var totalAfterDiscount = totals?.TotalAfterDiscount;
+            var advance = totals?.Advance ?? 0;
+            var balanceDue = totals?.BalanceDue ?? invoice.Total;
+            var hasDiscount = discountPercent > 0 || discountAmount > 0;
+            var hasAdvance = advance > 0;
+            var hasBreakdown = hasDiscount || hasAdvance || totalAfterDiscount.HasValue;
+
             container.BorderTop(1).BorderColor("#CCCCCC").PaddingTop(8).Column(col =>
             {
-                col.Item().Row(row =>
-                {
-                    row.RelativeItem().Text(labels.Subtotal);
-                    row.ConstantItem(90).AlignRight().Text(FormatMoney(invoice.Subtotal)).Bold();
-                });
+                var isFirstRow = true;
 
-                col.Item().PaddingTop(6).Row(row =>
+                void AddRow(string label, string amount, bool bold = false, int fontSize = 10)
                 {
-                    row.RelativeItem().Text(labels.Total).Bold();
-                    row.ConstantItem(90).AlignRight().Text(FormatMoney(invoice.Total)).Bold().FontSize(12);
-                });
+                    var item = isFirstRow ? col.Item() : col.Item().PaddingTop(6);
+                    isFirstRow = false;
+
+                    item.Row(row =>
+                    {
+                        if (bold)
+                        {
+                            row.RelativeItem().Text(label).Bold();
+                            row.ConstantItem(90).AlignRight().Text(amount).Bold().FontSize(fontSize);
+                            return;
+                        }
+
+                        row.RelativeItem().Text(label);
+                        row.ConstantItem(90).AlignRight().Text(amount).Bold().FontSize(fontSize);
+                    });
+                }
+
+                AddRow(labels.Subtotal, FormatMoney(lineSubtotal));
+
+                if (hasDiscount)
+                {
+                    AddRow($"{labels.Discount} ({discountPercent:0.##}%)", $"- {FormatMoney(discountAmount)}");
+                }
+
+                if (totalAfterDiscount.HasValue && hasBreakdown)
+                {
+                    AddRow(labels.TotalAfterDiscount, FormatMoney(totalAfterDiscount.Value));
+                }
+
+                if (hasAdvance)
+                {
+                    AddRow(labels.Advance, $"- {FormatMoney(advance)}");
+                }
+
+                AddRow(hasBreakdown ? labels.BalanceDue : labels.Total, FormatMoney(balanceDue), true, 12);
             });
         }
 
@@ -322,6 +366,7 @@ namespace backend.Services
                 var invoiceDate = TryReadPropertyAsText(root, "date")
                     ?? TryReadPropertyAsText(root, "invoiceDate");
                 var descriptionLines = ReadDescriptionLines(root);
+                var totals = ReadArchivedTotals(root);
 
                 var itemRoot = root.ValueKind == JsonValueKind.Array
                     ? root
@@ -331,7 +376,7 @@ namespace backend.Services
 
                 if (itemRoot is not { ValueKind: JsonValueKind.Array } itemsElement)
                 {
-                    return new ArchivedInvoiceSnapshot(Array.Empty<ArchivedInvoiceItem>(), invoiceDate, descriptionLines);
+                    return new ArchivedInvoiceSnapshot(Array.Empty<ArchivedInvoiceItem>(), invoiceDate, descriptionLines, totals);
                 }
 
                 var items = itemsElement.EnumerateArray()
@@ -362,12 +407,34 @@ namespace backend.Services
                             ?? string.Empty))
                     .ToList();
 
-                return new ArchivedInvoiceSnapshot(items, invoiceDate, descriptionLines);
+                return new ArchivedInvoiceSnapshot(items, invoiceDate, descriptionLines, totals);
             }
             catch (JsonException)
             {
-                return new ArchivedInvoiceSnapshot(Array.Empty<ArchivedInvoiceItem>(), null, Array.Empty<string>());
+                return new ArchivedInvoiceSnapshot(Array.Empty<ArchivedInvoiceItem>(), null, Array.Empty<string>(), null);
             }
+        }
+
+        static ArchivedInvoiceTotals? ReadArchivedTotals(JsonElement root)
+        {
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            var totals = TryGetProperty(root, "totals");
+            if (totals is not { ValueKind: JsonValueKind.Object } totalsElement)
+            {
+                return null;
+            }
+
+            return new ArchivedInvoiceTotals(
+                TryReadPropertyAsDecimal(totalsElement, "lineSubtotal"),
+                TryReadPropertyAsDecimal(totalsElement, "discountPercent"),
+                TryReadPropertyAsDecimal(totalsElement, "discountAmount"),
+                TryReadPropertyAsDecimal(totalsElement, "totalAfterDiscount"),
+                TryReadPropertyAsDecimal(totalsElement, "advance"),
+                TryReadPropertyAsDecimal(totalsElement, "balanceDue"));
         }
 
         static IReadOnlyList<string> ReadDescriptionLines(JsonElement root)
@@ -425,6 +492,12 @@ namespace backend.Services
             return property.HasValue ? ReadElementText(property.Value) : null;
         }
 
+        static decimal? TryReadPropertyAsDecimal(JsonElement element, string propertyName)
+        {
+            var property = TryGetProperty(element, propertyName);
+            return property.HasValue ? ReadElementDecimal(property.Value) : null;
+        }
+
         static string? ReadElementText(JsonElement element)
         {
             return element.ValueKind switch
@@ -435,6 +508,28 @@ namespace backend.Services
                 JsonValueKind.False => "false",
                 _ => null
             };
+        }
+
+        static decimal? ReadElementDecimal(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var numericValue))
+            {
+                return numericValue;
+            }
+
+            if (element.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            var normalized = element.GetString()?.Trim().Replace(',', '.');
+            return decimal.TryParse(
+                normalized,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var stringValue)
+                ? stringValue
+                : null;
         }
 
         static string FormatArchiveDate(DateTime value)
@@ -450,7 +545,8 @@ namespace backend.Services
         sealed record ArchivedInvoiceSnapshot(
             IReadOnlyList<ArchivedInvoiceItem> Items,
             string? InvoiceDate,
-            IReadOnlyList<string> DescriptionLines);
+            IReadOnlyList<string> DescriptionLines,
+            ArchivedInvoiceTotals? Totals);
 
         sealed record ArchivedInvoiceItem(
             string Item,
@@ -459,6 +555,14 @@ namespace backend.Services
             string Quantity,
             string Price,
             string Total);
+
+        sealed record ArchivedInvoiceTotals(
+            decimal? LineSubtotal,
+            decimal? DiscountPercent,
+            decimal? DiscountAmount,
+            decimal? TotalAfterDiscount,
+            decimal? Advance,
+            decimal? BalanceDue);
 
         sealed record InvoiceArchivePdfLabels(
             string Title,
@@ -477,6 +581,10 @@ namespace backend.Services
             string LineTotal,
             string Notes,
             string Subtotal,
+            string Discount,
+            string TotalAfterDiscount,
+            string Advance,
+            string BalanceDue,
             string Total,
             string ContactLine)
         {
@@ -484,43 +592,51 @@ namespace backend.Services
             {
                 return language == InvoiceLanguage.Macedonian
                     ? new InvoiceArchivePdfLabels(
-                        "ФАКТУРА",
-                        "Клиент",
-                        "Адреса",
-                        "Телефон",
-                        "Бр. фактура",
-                        "Датум",
-                        "Архивирано",
-                        "Архивирал",
-                        "Р.Б.",
-                        "Име",
-                        "Материјали",
-                        "m2/парчиња",
-                        "Цена",
-                        "Вкупно",
-                        "Забелешки",
-                        "Меѓузбир",
-                        "Вкупно",
-                        "За повеќе информации контактирајте не:")
+                        "\u0424\u0410\u041A\u0422\u0423\u0420\u0410",
+                        "\u041A\u043B\u0438\u0435\u043D\u0442",
+                        "\u0410\u0434\u0440\u0435\u0441\u0430",
+                        "\u0422\u0435\u043B\u0435\u0444\u043E\u043D",
+                        "\u0411\u0440. \u0444\u0430\u043A\u0442\u0443\u0440\u0430",
+                        "\u0414\u0430\u0442\u0443\u043C",
+                        "\u0410\u0440\u0445\u0438\u0432\u0438\u0440\u0430\u043D\u043E",
+                        "\u0410\u0440\u0445\u0438\u0432\u0438\u0440\u0430\u043B",
+                        "\u0420.\u0411.",
+                        "\u0418\u043C\u0435",
+                        "\u041C\u0430\u0442\u0435\u0440\u0438\u0458\u0430\u043B\u0438",
+                        "m2/\u043F\u0430\u0440\u0447\u0438\u045A\u0430",
+                        "\u0426\u0435\u043D\u0430",
+                        "\u0412\u043A\u0443\u043F\u043D\u043E",
+                        "\u0417\u0430\u0431\u0435\u043B\u0435\u0448\u043A\u0438",
+                        "\u041C\u0435\u0453\u0443\u0437\u0431\u0438\u0440",
+                        "\u041F\u043E\u043F\u0443\u0441\u0442",
+                        "\u0412\u043A\u0443\u043F\u043D\u043E \u043F\u043E \u043F\u043E\u043F\u0443\u0441\u0442",
+                        "\u0410\u0432\u0430\u043D\u0441",
+                        "\u0417\u0430 \u043F\u043B\u0430\u045C\u0430\u045A\u0435",
+                        "\u0412\u043A\u0443\u043F\u043D\u043E",
+                        "\u0417\u0430 \u043F\u043E\u0432\u0435\u045C\u0435 \u0438\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u0438 \u043A\u043E\u043D\u0442\u0430\u043A\u0442\u0438\u0440\u0430\u0458\u0442\u0435 \u043D\u0435:")
                     : new InvoiceArchivePdfLabels(
-                        "FATURË",
+                        "FATUR\u00CB",
                         "Klienti",
                         "Adresa",
                         "Telefoni",
-                        "Nr. faturës",
+                        "Nr. fatur\u00EBs",
                         "Data",
-                        "Arkivuar më",
+                        "Arkivuar m\u00EB",
                         "Arkivuar nga",
                         "Nr.",
                         "Emri",
                         "Materialet",
-                        "m2/copë",
-                        "Çmimi",
+                        "m2/cop\u00EB",
+                        "\u00C7mimi",
                         "Totali",
-                        "Shënime",
-                        "Nëntotali",
+                        "Sh\u00EBnime",
+                        "N\u00EBntotali",
+                        "Zbritja",
+                        "Total pas zbritjes",
+                        "Avans",
+                        "P\u00EBr t\u00EB paguar",
                         "Totali",
-                        "Për çdo informacion shtesë mund të na kontaktoni:");
+                        "P\u00EBr \u00E7do informacion shtes\u00EB mund t\u00EB na kontaktoni:");
             }
         }
     }

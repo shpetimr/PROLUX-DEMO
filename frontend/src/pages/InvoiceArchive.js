@@ -3,9 +3,12 @@ import { Button, Space, Table, Tag, Typography, message } from "antd";
 import {
   DownloadOutlined,
   FilePdfOutlined,
+  FolderOpenOutlined,
+  PrinterOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 
 const { Title } = Typography;
@@ -47,9 +50,11 @@ const downloadBlob = (blob, fileName) => {
 };
 
 function InvoiceArchive() {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exportingId, setExportingId] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -81,6 +86,51 @@ function InvoiceArchive() {
     } finally {
       setExportingId(null);
     }
+  };
+
+  const printPdf = async (invoice) => {
+    setPrintingId(invoice.id);
+    try {
+      const response = await apiClient.get(
+        API_ENDPOINTS.INVOICE_ARCHIVE_PDF(invoice.id),
+        { responseType: "blob" }
+      );
+      const url = window.URL.createObjectURL(response.data);
+      const iframe = document.createElement("iframe");
+
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "0";
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        }, 300);
+      };
+
+      document.body.appendChild(iframe);
+      iframe.src = url;
+      setTimeout(() => {
+        iframe.remove();
+        window.URL.revokeObjectURL(url);
+      }, 120000);
+      message.success("Print dialog opened.");
+    } catch {
+      message.error("Archived invoice could not be printed.");
+    } finally {
+      setPrintingId(null);
+    }
+  };
+
+  const reopenInvoice = (invoice) => {
+    navigate("/template-print", {
+      state: {
+        archivedInvoice: invoice,
+      },
+    });
   };
 
   const columns = [
@@ -139,17 +189,34 @@ function InvoiceArchive() {
     {
       title: "Actions",
       key: "actions",
-      width: 130,
+      width: 260,
       render: (_, record) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<DownloadOutlined />}
-          loading={exportingId === record.id}
-          onClick={() => exportPdf(record)}
-        >
-          PDF
-        </Button>
+        <Space wrap>
+          <Button
+            size="small"
+            icon={<FolderOpenOutlined />}
+            onClick={() => reopenInvoice(record)}
+          >
+            Open
+          </Button>
+          <Button
+            size="small"
+            icon={<PrinterOutlined />}
+            loading={printingId === record.id}
+            onClick={() => printPdf(record)}
+          >
+            Print
+          </Button>
+          <Button
+            type="primary"
+            size="small"
+            icon={<DownloadOutlined />}
+            loading={exportingId === record.id}
+            onClick={() => exportPdf(record)}
+          >
+            PDF
+          </Button>
+        </Space>
       ),
     },
   ];

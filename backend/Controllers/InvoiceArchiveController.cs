@@ -12,7 +12,7 @@ namespace backend.Controllers
 {
     [ApiController]
     [Route("api/invoice-archive")]
-    [Authorize(Policy = AppPermissions.InvoiceArchiveManage)]
+    [Authorize]
     public class InvoiceArchiveController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -30,6 +30,7 @@ namespace backend.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.InvoiceArchiveManage)]
         public async Task<ActionResult<IEnumerable<InvoiceArchiveResponseDto>>> GetArchivedInvoices()
         {
             var invoices = await _context.InvoiceArchives
@@ -59,6 +60,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [Authorize(Policy = AppPermissions.InvoiceArchiveManage)]
         public async Task<ActionResult<InvoiceArchiveResponseDto>> GetArchivedInvoice(int id)
         {
             var invoice = await _context.InvoiceArchives
@@ -75,6 +77,7 @@ namespace backend.Controllers
         }
 
         [HttpGet("{id:int}/pdf")]
+        [Authorize(Policy = AppPermissions.InvoiceArchiveManage)]
         public async Task<IActionResult> ExportArchivedInvoicePdf(int id)
         {
             var invoice = await _context.InvoiceArchives
@@ -92,6 +95,7 @@ namespace backend.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.TemplatesPrint)]
         public async Task<ActionResult<InvoiceArchiveResponseDto>> CreateArchivedInvoice(
             [FromBody] CreateInvoiceArchiveDto dto)
         {
@@ -147,6 +151,7 @@ namespace backend.Controllers
         }
 
         [HttpDelete("{id:int}")]
+        [Authorize(Policy = AppPermissions.InvoiceArchiveManage)]
         public async Task<IActionResult> DeleteArchivedInvoice(int id)
         {
             var invoice = await _context.InvoiceArchives.FindAsync(id);
