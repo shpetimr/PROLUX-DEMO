@@ -372,11 +372,11 @@ namespace backend.Controllers
                 var endExclusive = end.AddDays(1);
 
                 // Get all financial data for the period
-                var expenses = await _context.Expenses
+                var baseExpenses = await _context.Expenses
                     .Where(e => e.Date >= start && e.Date < endExclusive)
                     .SumAsync(e => e.Amount);
 
-                var incomes = await _context.Incomes
+                var baseIncomes = await _context.Incomes
                     .Where(i => i.Date >= start && i.Date < endExclusive)
                     .SumAsync(i => i.Amount);
 
@@ -388,6 +388,24 @@ namespace backend.Controllers
                     .Where(r => r.PaymentDate >= start && r.PaymentDate < endExclusive)
                     .SumAsync(r => r.MonthlyAmount);
 
+                var workSalesRevenue = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .SumAsync(workSale => workSale.TotalRevenue);
+
+                var workSalesCost = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .SumAsync(workSale => workSale.TotalCost);
+
+                var workSalesProfit = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .SumAsync(workSale => workSale.Profit);
+
+                var workSalesCount = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .CountAsync();
+
+                var incomes = baseIncomes + workSalesRevenue;
+                var expenses = baseExpenses + workSalesCost;
                 var totalOutflow = expenses + purchases + rents;
                 var netIncome = incomes - totalOutflow;
                 var profitMargin = incomes > 0 ? (netIncome / incomes) * 100 : 0;
@@ -406,6 +424,21 @@ namespace backend.Controllers
                     .OrderByDescending(x => x.Amount)
                     .ToListAsync();
 
+                if (workSalesCount > 0 || workSalesCost > 0)
+                {
+                    expenseBreakdown.Add(new
+                    {
+                        Type = "Work Sales Cost",
+                        Amount = workSalesCost,
+                        PercentageOfTotal = totalOutflow > 0 ? (workSalesCost / totalOutflow) * 100 : 0,
+                        PercentageOfIncome = incomes > 0 ? (workSalesCost / incomes) * 100 : 0
+                    });
+
+                    expenseBreakdown = expenseBreakdown
+                        .OrderByDescending(x => x.Amount)
+                        .ToList();
+                }
+
                 return Ok(new
                 {
                     Period = new { StartDate = start, EndDate = end },
@@ -415,6 +448,9 @@ namespace backend.Controllers
                         TotalExpenses = expenses,
                         TotalPurchases = purchases,
                         TotalRents = rents,
+                        TotalWorkSalesRevenue = workSalesRevenue,
+                        TotalWorkSalesCost = workSalesCost,
+                        TotalWorkSalesProfit = workSalesProfit,
                         TotalOutflow = totalOutflow,
                         NetIncome = netIncome,
                         ProfitMargin = profitMargin
@@ -709,11 +745,11 @@ namespace backend.Controllers
                 var endExclusive = end.AddDays(1);
 
                 // Get all financial data for the period
-                var expenses = await _context.Expenses
+                var baseExpenses = await _context.Expenses
                     .Where(e => e.Date >= start && e.Date < endExclusive)
                     .SumAsync(e => e.Amount);
 
-                var incomes = await _context.Incomes
+                var baseIncomes = await _context.Incomes
                     .Where(i => i.Date >= start && i.Date < endExclusive)
                     .SumAsync(i => i.Amount);
 
@@ -725,6 +761,24 @@ namespace backend.Controllers
                     .Where(r => r.PaymentDate >= start && r.PaymentDate < endExclusive)
                     .SumAsync(r => r.MonthlyAmount);
 
+                var workSalesRevenue = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .SumAsync(workSale => workSale.TotalRevenue);
+
+                var workSalesCost = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .SumAsync(workSale => workSale.TotalCost);
+
+                var workSalesProfit = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .SumAsync(workSale => workSale.Profit);
+
+                var workSalesCount = await _context.WorkSales
+                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
+                    .CountAsync();
+
+                var incomes = baseIncomes + workSalesRevenue;
+                var expenses = baseExpenses + workSalesCost;
                 var totalOutflow = expenses + purchases + rents;
                 var netIncome = incomes - totalOutflow;
                 var profitMargin = incomes > 0 ? (netIncome / incomes) * 100 : 0;
@@ -750,6 +804,22 @@ namespace backend.Controllers
                     .Take(5)
                     .ToListAsync();
 
+                if (workSalesCount > 0 || workSalesCost > 0)
+                {
+                    topExpenseTypes.Add(new
+                    {
+                        Type = "Work Sales Cost",
+                        Total = workSalesCost,
+                        Count = workSalesCount,
+                        Percentage = totalOutflow > 0 ? (workSalesCost / totalOutflow) * 100 : 0
+                    });
+
+                    topExpenseTypes = topExpenseTypes
+                        .OrderByDescending(x => x.Total)
+                        .Take(5)
+                        .ToList();
+                }
+
                 // Get top income sources
                 var topIncomeSources = await _context.Incomes
                     .Where(i => i.Date >= start && i.Date < endExclusive)
@@ -765,6 +835,22 @@ namespace backend.Controllers
                     .Take(5)
                     .ToListAsync();
 
+                if (workSalesCount > 0 || workSalesRevenue > 0)
+                {
+                    topIncomeSources.Add(new
+                    {
+                        Source = "Work Sales Revenue",
+                        Total = workSalesRevenue,
+                        Count = workSalesCount,
+                        Percentage = incomes > 0 ? (workSalesRevenue / incomes) * 100 : 0
+                    });
+
+                    topIncomeSources = topIncomeSources
+                        .OrderByDescending(x => x.Total)
+                        .Take(5)
+                        .ToList();
+                }
+
                 return Ok(new
                 {
                     Period = new { StartDate = start, EndDate = end, Days = daysInPeriod },
@@ -774,6 +860,9 @@ namespace backend.Controllers
                         TotalExpenses = expenses,
                         TotalPurchases = purchases,
                         TotalRents = rents,
+                        TotalWorkSalesRevenue = workSalesRevenue,
+                        TotalWorkSalesCost = workSalesCost,
+                        TotalWorkSalesProfit = workSalesProfit,
                         TotalOutflow = totalOutflow,
                         NetIncome = netIncome,
                         ProfitMargin = profitMargin
@@ -819,7 +908,14 @@ namespace backend.Controllers
                     expenses = new { total = (decimal)obj.FinancialSummary.TotalExpenses, count = obj.TransactionCounts.Expenses },
                     purchases = new { total = (decimal)obj.FinancialSummary.TotalPurchases, count = obj.TransactionCounts.Purchases },
                     rents = new { total = (decimal)obj.FinancialSummary.TotalRents, count = obj.TransactionCounts.Rents },
-                    incomes = new { total = (decimal)obj.FinancialSummary.TotalIncome, count = obj.TransactionCounts.Incomes }
+                    incomes = new { total = (decimal)obj.FinancialSummary.TotalIncome, count = obj.TransactionCounts.Incomes },
+                    workSales = new
+                    {
+                        revenue = (decimal)obj.FinancialSummary.TotalWorkSalesRevenue,
+                        cost = (decimal)obj.FinancialSummary.TotalWorkSalesCost,
+                        profit = (decimal)obj.FinancialSummary.TotalWorkSalesProfit,
+                        count = obj.TransactionCounts.WorkSales
+                    }
                 };
             }
 

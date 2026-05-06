@@ -81,22 +81,29 @@ function Reports() {
   const fetchFinancialData = async () => {
     setLoading(true);
     try {
-      const [incomesRes, expensesRes, purchasesRes, rentsRes, employeesRes] =
-        await Promise.all([
-          apiClient.get(API_ENDPOINTS.INCOMES),
-          apiClient.get(API_ENDPOINTS.EXPENSES),
-          apiClient.get(API_ENDPOINTS.PURCHASES),
-          apiClient.get(API_ENDPOINTS.RENTS),
-          apiClient.get(API_ENDPOINTS.EMPLOYEES),
-        ]);
-
-      calculateMonthlyTotals(
-        incomesRes.data,
-        expensesRes.data,
-        purchasesRes.data,
-        rentsRes.data,
-        employeesRes.data
+      const [year, month] = selectedMonth.split("-").map(Number);
+      const response = await apiClient.get(
+        API_ENDPOINTS.FINANCIAL_CALCULATIONS.MONTHLY,
+        { params: { year, month } }
       );
+      const summary = response.data?.financialSummary || {};
+      const totalIncome = Number(summary.totalIncome || 0);
+      const totalExpenses = Number(summary.totalExpenses || 0);
+      const totalPurchases = Number(summary.totalPurchases || 0);
+      const totalRents = Number(summary.totalRents || 0);
+      const totalSalaries = Number(summary.totalEmployeePayments || 0);
+      const netProfit = Number(summary.netIncome || 0);
+      const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+
+      setMonthlyTotals({
+        totalIncome,
+        totalExpenses,
+        totalPurchases,
+        totalRents,
+        totalSalaries,
+        netProfit,
+        margin,
+      });
     } catch (error) {
       console.error("Error fetching financial data:", error);
       message.error("DÃƒÂ«shtoi tÃƒÂ« merren tÃƒÂ« dhÃƒÂ«nat financiare");
@@ -105,89 +112,6 @@ function Reports() {
     }
   };
 
-  const calculateMonthlyTotals = (
-    incomes,
-    expenses,
-    purchases,
-    rents,
-    employees
-  ) => {
-    const [year, month] = selectedMonth.split("-").map(Number);
-
-    // Filter data for selected month using string comparison
-    const monthlyIncomes = incomes.filter((income) => {
-      const incomeDateStr = income.date;
-      const isInMonth = incomeDateStr.startsWith(
-        `${year}-${month.toString().padStart(2, "0")}`
-      );
-
-      return isInMonth;
-    });
-    const monthlyExpenses = expenses.filter((expense) => {
-      const expenseDateStr = expense.date;
-      const isInMonth = expenseDateStr.startsWith(
-        `${year}-${month.toString().padStart(2, "0")}`
-      );
-
-      return isInMonth;
-    });
-
-    const monthlyPurchases = purchases.filter((purchase) => {
-      const purchaseDateStr = purchase.purchaseDate;
-      const isInMonth = purchaseDateStr.startsWith(
-        `${year}-${month.toString().padStart(2, "0")}`
-      );
-
-      return isInMonth;
-    });
-
-    const monthlyRents = rents.filter((rent) => {
-      const rentDateStr = rent.paymentDate;
-      const isInMonth = rentDateStr.startsWith(
-        `${year}-${month.toString().padStart(2, "0")}`
-      );
-
-      return isInMonth;
-    });
-
-    // Calculate totals
-    const totalIncome = monthlyIncomes.reduce(
-      (sum, income) => sum + (income.amount || 0),
-      0
-    );
-    const totalExpenses = monthlyExpenses.reduce(
-      (sum, expense) => sum + (expense.amount || 0),
-      0
-    );
-    const totalPurchases = monthlyPurchases.reduce(
-      (sum, purchase) => sum + (purchase.totalPrice || 0),
-      0
-    );
-    const totalRents = monthlyRents.reduce(
-      (sum, rent) => sum + (rent.monthlyAmount || 0),
-      0
-    );
-
-    // Calculate salaries using monthlySalary from backend
-    const totalSalaries = employees.reduce((sum, emp) => {
-      return sum + (emp.monthlySalary || 0);
-    }, 0);
-
-    const totalOutflow =
-      totalExpenses + totalPurchases + totalRents + totalSalaries;
-    const netProfit = totalIncome - totalOutflow;
-    const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
-
-    setMonthlyTotals({
-      totalIncome,
-      totalExpenses,
-      totalPurchases,
-      totalRents,
-      totalSalaries,
-      netProfit,
-      margin,
-    });
-  };
   const selectedMonthDisplay = monthOptions.find(
     (option) => option.value === selectedMonth
   );

@@ -75,10 +75,14 @@ namespace backend.Services
                 }
             }
 
-            var totalExpenses = (decimal)await expenses.SumAsync(e => (double)e.Amount);
+            var workSaleTotals = await GetWorkSaleFinancialTotalsAsync(normalizedStartDate, endExclusive);
+
+            var baseExpenses = (decimal)await expenses.SumAsync(e => (double)e.Amount);
             var totalRent = (decimal)await rents.SumAsync(r => (double)r.MonthlyAmount);
             var totalPurchases = (decimal)await purchases.SumAsync(p => (double)p.TotalPrice);
-            var totalIncome = (decimal)await incomes.SumAsync(i => (double)i.Amount);
+            var baseIncome = (decimal)await incomes.SumAsync(i => (double)i.Amount);
+            var totalExpenses = baseExpenses + workSaleTotals.Cost;
+            var totalIncome = baseIncome + workSaleTotals.Revenue;
             var netBalance = totalIncome - (totalExpenses + totalRent + totalPurchases);
 
             return new FinancialReportDto
@@ -88,6 +92,7 @@ namespace backend.Services
                 TotalPurchases = totalPurchases,
                 TotalRents = totalRent,
                 TotalIncome = totalIncome,
+                NetProfit = netBalance,
                 NetBalance = netBalance,
                 StartDate = normalizedStartDate ?? DateTime.MinValue,
                 EndDate = normalizedEndDate ?? DateTime.MaxValue
@@ -173,11 +178,17 @@ namespace backend.Services
                     .Where(e => e.Date >= currentMonthStart && e.Date < currentMonthEnd)
                     .SumAsync(e => e.Amount);
                     
+                var currentMonthWorkSaleTotals = isAdmin
+                    ? await GetWorkSaleFinancialTotalsAsync(currentMonthStart, currentMonthEnd)
+                    : WorkSaleFinancialTotals.Empty;
+
                 var currentMonthIncome = isAdmin
                     ? await _context.Incomes
                         .Where(i => i.Date >= currentMonthStart && i.Date < currentMonthEnd)
                         .SumAsync(i => i.Amount)
                     : 0m;
+                currentMonthIncome += currentMonthWorkSaleTotals.Revenue;
+                currentMonthExpenses += currentMonthWorkSaleTotals.Cost;
                     
                 var currentMonthPurchases = await purchasesQuery
                     .Where(p => p.PurchaseDate >= currentMonthStart && p.PurchaseDate < currentMonthEnd)
@@ -192,23 +203,35 @@ namespace backend.Services
                 var currentMonthProfit = currentMonthIncome - (currentMonthExpenses + currentMonthPurchases + currentMonthRents + currentMonthSalaries);
                 
                 // Calculate year to date data
+                var yearToDateWorkSaleTotals = isAdmin
+                    ? await GetWorkSaleFinancialTotalsAsync(yearStart, DateTimeUtc.Date(currentDate).AddDays(1))
+                    : WorkSaleFinancialTotals.Empty;
+
                 var yearToDateIncome = isAdmin
                     ? await _context.Incomes
                         .Where(i => i.Date >= yearStart && i.Date <= currentDate)
                         .SumAsync(i => i.Amount)
                     : 0m;
+                yearToDateIncome += yearToDateWorkSaleTotals.Revenue;
                     
                 var yearToDateExpenses = await expensesQuery
                     .Where(e => e.Date >= yearStart && e.Date <= currentDate)
                     .SumAsync(e => e.Amount);
+                yearToDateExpenses += yearToDateWorkSaleTotals.Cost;
                     
                 var yearToDateProfit = yearToDateIncome - yearToDateExpenses;
                 
                 // Calculate total data
+                var allTimeWorkSaleTotals = isAdmin
+                    ? await GetWorkSaleFinancialTotalsAsync(null, null)
+                    : WorkSaleFinancialTotals.Empty;
+
                 var totalExpenses = await expensesQuery.SumAsync(e => e.Amount);
                 var totalIncomes = isAdmin ? await _context.Incomes.SumAsync(i => i.Amount) : 0m;
                 var totalPurchases = await purchasesQuery.SumAsync(p => p.TotalPrice);
                 var totalRents = isAdmin ? await _context.Rents.SumAsync(r => r.MonthlyAmount) : 0m;
+                totalExpenses += allTimeWorkSaleTotals.Cost;
+                totalIncomes += allTimeWorkSaleTotals.Revenue;
                 
                 return new DashboardStatsDto
                 {
@@ -257,24 +280,19 @@ namespace backend.Services
                 .Where(r => r.PaymentDate >= targetDate && r.PaymentDate < nextDate)
                 .ToListAsync();
 
-            var totalExpenses = dailyExpenses.Sum(e => e.Amount);
-            var totalIncome = dailyIncomes.Sum(i => i.Amount);
+            var dailyWorkSales = await _context.WorkSales
+                .Where(workSale => workSale.Date >= targetDate && workSale.Date < nextDate)
+                .ToListAsync();
+            var workSaleTotals = GetWorkSaleFinancialTotals(dailyWorkSales);
+
+            var totalExpenses = dailyExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
+            var totalIncome = dailyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var totalRents = dailyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents;
             var netIncome = totalIncome - totalOutflow;
 
-            var expensesByType = dailyExpenses
-                .GroupBy(e => e.ExpenseType)
-                .Select(g => new
-                {
-                    Type = g.Key,
-                    Total = g.Sum(e => e.Amount),
-                    Count = g.Count(),
-                    Percentage = totalOutflow > 0 ? (g.Sum(e => e.Amount) / totalOutflow) * 100 : 0
-                })
-                .OrderByDescending(x => x.Total)
-                .ToList();
+            var expensesByType = BuildExpenseBreakdown(dailyExpenses, totalOutflow, workSaleTotals);
 
             return new
             {
@@ -285,6 +303,9 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalWorkSalesRevenue = workSaleTotals.Revenue,
+                    TotalWorkSalesCost = workSaleTotals.Cost,
+                    TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     ProfitMargin = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0
@@ -295,16 +316,20 @@ namespace backend.Services
                     Expenses = dailyExpenses.Count,
                     Incomes = dailyIncomes.Count,
                     Purchases = dailyPurchases.Count,
-                    Rents = dailyRents.Count
+                    Rents = dailyRents.Count,
+                    WorkSales = dailyWorkSales.Count
                 },
                 HourlyBreakdown = Enumerable.Range(0, 24)
                     .Select(hour => new
                     {
                         Hour = hour,
-                        Expenses = dailyExpenses.Where(e => e.Date.Hour == hour).Sum(e => e.Amount),
-                        Incomes = dailyIncomes.Where(i => i.Date.Hour == hour).Sum(i => i.Amount),
+                        Expenses = dailyExpenses.Where(e => e.Date.Hour == hour).Sum(e => e.Amount) +
+                                   dailyWorkSales.Where(workSale => workSale.Date.Hour == hour).Sum(workSale => workSale.TotalCost),
+                        Incomes = dailyIncomes.Where(i => i.Date.Hour == hour).Sum(i => i.Amount) +
+                                  dailyWorkSales.Where(workSale => workSale.Date.Hour == hour).Sum(workSale => workSale.TotalRevenue),
                         Count = dailyExpenses.Count(e => e.Date.Hour == hour) + 
-                               dailyIncomes.Count(i => i.Date.Hour == hour)
+                               dailyIncomes.Count(i => i.Date.Hour == hour) +
+                               dailyWorkSales.Count(workSale => workSale.Date.Hour == hour)
                     })
                     .Where(x => x.Count > 0)
                     .ToList()
@@ -333,26 +358,44 @@ namespace backend.Services
                 .Where(r => r.PaymentDate >= startOfWeek && r.PaymentDate < endOfWeek)
                 .ToListAsync();
 
-            var totalExpenses = weeklyExpenses.Sum(e => e.Amount);
-            var totalIncome = weeklyIncomes.Sum(i => i.Amount);
+            var weeklyWorkSales = await _context.WorkSales
+                .Where(workSale => workSale.Date >= startOfWeek && workSale.Date < endOfWeek)
+                .ToListAsync();
+            var workSaleTotals = GetWorkSaleFinancialTotals(weeklyWorkSales);
+
+            var totalExpenses = weeklyExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
+            var totalIncome = weeklyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = weeklyPurchases.Sum(p => p.TotalPrice);
             var totalRents = weeklyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents;
             var netIncome = totalIncome - totalOutflow;
 
             var dailyBreakdown = Enumerable.Range(0, 7)
-                .Select(dayOffset => new
+                .Select(dayOffset =>
                 {
-                    Date = startOfWeek.AddDays(dayOffset),
-                    DayOfWeek = startOfWeek.AddDays(dayOffset).DayOfWeek.ToString(),
-                    Expenses = weeklyExpenses.Where(e => e.Date.Date == startOfWeek.AddDays(dayOffset).Date).Sum(e => e.Amount),
-                    Incomes = weeklyIncomes.Where(i => i.Date.Date == startOfWeek.AddDays(dayOffset).Date).Sum(i => i.Amount),
-                    Purchases = weeklyPurchases.Where(p => p.PurchaseDate.Date == startOfWeek.AddDays(dayOffset).Date).Sum(p => p.TotalPrice),
-                    Rents = weeklyRents.Where(r => r.PaymentDate.Date == startOfWeek.AddDays(dayOffset).Date).Sum(r => r.MonthlyAmount),
-                    NetIncome = weeklyIncomes.Where(i => i.Date.Date == startOfWeek.AddDays(dayOffset).Date).Sum(i => i.Amount) -
-                               weeklyExpenses.Where(e => e.Date.Date == startOfWeek.AddDays(dayOffset).Date).Sum(e => e.Amount) -
-                               weeklyPurchases.Where(p => p.PurchaseDate.Date == startOfWeek.AddDays(dayOffset).Date).Sum(p => p.TotalPrice) -
-                               weeklyRents.Where(r => r.PaymentDate.Date == startOfWeek.AddDays(dayOffset).Date).Sum(r => r.MonthlyAmount)
+                    var day = startOfWeek.AddDays(dayOffset).Date;
+                    var dayExpenses = weeklyExpenses.Where(e => e.Date.Date == day).Sum(e => e.Amount);
+                    var dayIncomes = weeklyIncomes.Where(i => i.Date.Date == day).Sum(i => i.Amount);
+                    var dayPurchases = weeklyPurchases.Where(p => p.PurchaseDate.Date == day).Sum(p => p.TotalPrice);
+                    var dayRents = weeklyRents.Where(r => r.PaymentDate.Date == day).Sum(r => r.MonthlyAmount);
+                    var dayWorkSaleTotals = GetWorkSaleFinancialTotals(weeklyWorkSales.Where(workSale => workSale.Date.Date == day));
+
+                    return new
+                    {
+                        Date = day,
+                        DayOfWeek = day.DayOfWeek.ToString(),
+                        Expenses = dayExpenses + dayWorkSaleTotals.Cost,
+                        Incomes = dayIncomes + dayWorkSaleTotals.Revenue,
+                        Purchases = dayPurchases,
+                        Rents = dayRents,
+                        WorkSalesRevenue = dayWorkSaleTotals.Revenue,
+                        WorkSalesCost = dayWorkSaleTotals.Cost,
+                        WorkSalesProfit = dayWorkSaleTotals.Profit,
+                        NetIncome = (dayIncomes + dayWorkSaleTotals.Revenue) -
+                                    (dayExpenses + dayWorkSaleTotals.Cost) -
+                                    dayPurchases -
+                                    dayRents
+                    };
                 })
                 .ToList();
 
@@ -366,6 +409,9 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalWorkSalesRevenue = workSaleTotals.Revenue,
+                    TotalWorkSalesCost = workSaleTotals.Cost,
+                    TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     ProfitMargin = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0,
@@ -377,19 +423,10 @@ namespace backend.Services
                     Expenses = weeklyExpenses.Count,
                     Incomes = weeklyIncomes.Count,
                     Purchases = weeklyPurchases.Count,
-                    Rents = weeklyRents.Count
+                    Rents = weeklyRents.Count,
+                    WorkSales = weeklyWorkSales.Count
                 },
-                ExpenseBreakdown = weeklyExpenses
-                    .GroupBy(e => e.ExpenseType)
-                    .Select(g => new
-                    {
-                        Type = g.Key,
-                        Total = g.Sum(e => e.Amount),
-                        Count = g.Count(),
-                        Percentage = totalOutflow > 0 ? (g.Sum(e => e.Amount) / totalOutflow) * 100 : 0
-                    })
-                    .OrderByDescending(x => x.Total)
-                    .ToList()
+                ExpenseBreakdown = BuildExpenseBreakdown(weeklyExpenses, totalOutflow, workSaleTotals)
             };
         }
 
@@ -417,6 +454,11 @@ namespace backend.Services
                 .Where(r => r.PaymentDate >= startOfMonth && r.PaymentDate < endOfMonth)
                 .ToListAsync();
 
+            var monthlyWorkSales = await _context.WorkSales
+                .Where(workSale => workSale.Date >= startOfMonth && workSale.Date < endOfMonth)
+                .ToListAsync();
+            var workSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales);
+
             // Calculate employee salaries for the month
             var employees = await _context.Employees.ToListAsync();
             var totalSalaries = employees.Sum(e => e.CalculatedMonthlySalary);
@@ -424,62 +466,73 @@ namespace backend.Services
             var totalPenalties = employees.Sum(e => e.MonthlyPenalties + e.CalculatedDailyPenalties);
             var totalEmployeePayments = totalSalaries;
             
-            var totalExpenses = monthlyExpenses.Sum(e => e.Amount);
-            var totalIncome = monthlyIncomes.Sum(i => i.Amount);
+            var totalExpenses = monthlyExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
+            var totalIncome = monthlyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = monthlyPurchases.Sum(p => p.TotalPrice);
             var totalRents = monthlyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + totalEmployeePayments;
             var netIncome = totalIncome - totalOutflow;
 
             var dailyBreakdown = Enumerable.Range(0, DateTime.DaysInMonth(targetYear, targetMonth))
-                .Select(dayOffset => new
+                .Select(dayOffset =>
                 {
-                    Date = startOfMonth.AddDays(dayOffset),
-                    DayOfMonth = dayOffset + 1,
-                    Expenses = monthlyExpenses.Where(e => e.Date.Date == startOfMonth.AddDays(dayOffset).Date).Sum(e => e.Amount),
-                    Incomes = monthlyIncomes.Where(i => i.Date.Date == startOfMonth.AddDays(dayOffset).Date).Sum(i => i.Amount),
-                    Purchases = monthlyPurchases.Where(p => p.PurchaseDate.Date == startOfMonth.AddDays(dayOffset).Date).Sum(p => p.TotalPrice),
-                    Rents = monthlyRents.Where(r => r.PaymentDate.Date == startOfMonth.AddDays(dayOffset).Date).Sum(r => r.MonthlyAmount),
-                    NetIncome = monthlyIncomes.Where(i => i.Date.Date == startOfMonth.AddDays(dayOffset).Date).Sum(i => i.Amount) -
-                               monthlyExpenses.Where(e => e.Date.Date == startOfMonth.AddDays(dayOffset).Date).Sum(e => e.Amount) -
-                               monthlyPurchases.Where(p => p.PurchaseDate.Date == startOfMonth.AddDays(dayOffset).Date).Sum(p => p.TotalPrice) -
-                               monthlyRents.Where(r => r.PaymentDate.Date == startOfMonth.AddDays(dayOffset).Date).Sum(r => r.MonthlyAmount)
+                    var day = startOfMonth.AddDays(dayOffset).Date;
+                    var dayExpenses = monthlyExpenses.Where(e => e.Date.Date == day).Sum(e => e.Amount);
+                    var dayIncomes = monthlyIncomes.Where(i => i.Date.Date == day).Sum(i => i.Amount);
+                    var dayPurchases = monthlyPurchases.Where(p => p.PurchaseDate.Date == day).Sum(p => p.TotalPrice);
+                    var dayRents = monthlyRents.Where(r => r.PaymentDate.Date == day).Sum(r => r.MonthlyAmount);
+                    var dayWorkSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales.Where(workSale => workSale.Date.Date == day));
+
+                    return new
+                    {
+                        Date = day,
+                        DayOfMonth = dayOffset + 1,
+                        Expenses = dayExpenses + dayWorkSaleTotals.Cost,
+                        Incomes = dayIncomes + dayWorkSaleTotals.Revenue,
+                        Purchases = dayPurchases,
+                        Rents = dayRents,
+                        WorkSalesRevenue = dayWorkSaleTotals.Revenue,
+                        WorkSalesCost = dayWorkSaleTotals.Cost,
+                        WorkSalesProfit = dayWorkSaleTotals.Profit,
+                        NetIncome = (dayIncomes + dayWorkSaleTotals.Revenue) -
+                                    (dayExpenses + dayWorkSaleTotals.Cost) -
+                                    dayPurchases -
+                                    dayRents
+                    };
                 })
-                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0)
+                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0 || x.WorkSalesRevenue > 0 || x.WorkSalesCost > 0)
                 .ToList();
 
             var weeklyBreakdown = Enumerable.Range(0, 6)
-                .Select(weekOffset => new
+                .Select(weekOffset =>
                 {
-                    WeekNumber = weekOffset + 1,
-                    StartDate = startOfMonth.AddDays(weekOffset * 7),
-                    EndDate = startOfMonth.AddDays((weekOffset + 1) * 7 - 1),
-                    Expenses = monthlyExpenses.Where(e => 
-                        e.Date >= startOfMonth.AddDays(weekOffset * 7) && 
-                        e.Date < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(e => e.Amount),
-                    Incomes = monthlyIncomes.Where(i => 
-                        i.Date >= startOfMonth.AddDays(weekOffset * 7) && 
-                        i.Date < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(i => i.Amount),
-                    Purchases = monthlyPurchases.Where(p => 
-                        p.PurchaseDate >= startOfMonth.AddDays(weekOffset * 7) && 
-                        p.PurchaseDate < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(p => p.TotalPrice),
-                    Rents = monthlyRents.Where(r => 
-                        r.PaymentDate >= startOfMonth.AddDays(weekOffset * 7) && 
-                        r.PaymentDate < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(r => r.MonthlyAmount),
-                    NetIncome = monthlyIncomes.Where(i => 
-                        i.Date >= startOfMonth.AddDays(weekOffset * 7) && 
-                        i.Date < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(i => i.Amount) -
-                               monthlyExpenses.Where(e => 
-                        e.Date >= startOfMonth.AddDays(weekOffset * 7) && 
-                        e.Date < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(e => e.Amount) -
-                               monthlyPurchases.Where(p => 
-                        p.PurchaseDate >= startOfMonth.AddDays(weekOffset * 7) && 
-                        p.PurchaseDate < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(p => p.TotalPrice) -
-                               monthlyRents.Where(r => 
-                        r.PaymentDate >= startOfMonth.AddDays(weekOffset * 7) && 
-                        r.PaymentDate < startOfMonth.AddDays((weekOffset + 1) * 7)).Sum(r => r.MonthlyAmount)
+                    var weekStart = startOfMonth.AddDays(weekOffset * 7);
+                    var weekEnd = startOfMonth.AddDays((weekOffset + 1) * 7);
+                    var weekExpenses = monthlyExpenses.Where(e => e.Date >= weekStart && e.Date < weekEnd).Sum(e => e.Amount);
+                    var weekIncomes = monthlyIncomes.Where(i => i.Date >= weekStart && i.Date < weekEnd).Sum(i => i.Amount);
+                    var weekPurchases = monthlyPurchases.Where(p => p.PurchaseDate >= weekStart && p.PurchaseDate < weekEnd).Sum(p => p.TotalPrice);
+                    var weekRents = monthlyRents.Where(r => r.PaymentDate >= weekStart && r.PaymentDate < weekEnd).Sum(r => r.MonthlyAmount);
+                    var weekWorkSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales.Where(workSale => workSale.Date >= weekStart && workSale.Date < weekEnd));
+
+                    return new
+                    {
+                        WeekNumber = weekOffset + 1,
+                        StartDate = weekStart,
+                        EndDate = weekEnd.AddDays(-1),
+                        Expenses = weekExpenses + weekWorkSaleTotals.Cost,
+                        Incomes = weekIncomes + weekWorkSaleTotals.Revenue,
+                        Purchases = weekPurchases,
+                        Rents = weekRents,
+                        WorkSalesRevenue = weekWorkSaleTotals.Revenue,
+                        WorkSalesCost = weekWorkSaleTotals.Cost,
+                        WorkSalesProfit = weekWorkSaleTotals.Profit,
+                        NetIncome = (weekIncomes + weekWorkSaleTotals.Revenue) -
+                                    (weekExpenses + weekWorkSaleTotals.Cost) -
+                                    weekPurchases -
+                                    weekRents
+                    };
                 })
-                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0)
+                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0 || x.WorkSalesRevenue > 0 || x.WorkSalesCost > 0)
                 .ToList();
 
             return new
@@ -494,6 +547,9 @@ namespace backend.Services
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
                     TotalEmployeePayments = totalEmployeePayments,
+                    TotalWorkSalesRevenue = workSaleTotals.Revenue,
+                    TotalWorkSalesCost = workSaleTotals.Cost,
+                    TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     DailyAverage = netIncome / DateTime.DaysInMonth(targetYear, targetMonth),
@@ -506,19 +562,10 @@ namespace backend.Services
                     Expenses = monthlyExpenses.Count,
                     Incomes = monthlyIncomes.Count,
                     Purchases = monthlyPurchases.Count,
-                    Rents = monthlyRents.Count
+                    Rents = monthlyRents.Count,
+                    WorkSales = monthlyWorkSales.Count
                 },
-                ExpenseBreakdown = monthlyExpenses
-                    .GroupBy(e => e.ExpenseType)
-                    .Select(g => new
-                    {
-                        Type = g.Key,
-                        Total = g.Sum(e => e.Amount),
-                        Count = g.Count(),
-                        Percentage = totalOutflow > 0 ? (g.Sum(e => e.Amount) / totalOutflow) * 100 : 0
-                    })
-                    .OrderByDescending(x => x.Total)
-                    .ToList()
+                ExpenseBreakdown = BuildExpenseBreakdown(monthlyExpenses, totalOutflow, workSaleTotals)
             };
         }
 
@@ -544,44 +591,75 @@ namespace backend.Services
                 .Where(r => r.PaymentDate >= startOfYear && r.PaymentDate < endOfYear)
                 .ToListAsync();
 
-            var totalExpenses = annualExpenses.Sum(e => e.Amount);
-            var totalIncome = annualIncomes.Sum(i => i.Amount);
+            var annualWorkSales = await _context.WorkSales
+                .Where(workSale => workSale.Date >= startOfYear && workSale.Date < endOfYear)
+                .ToListAsync();
+            var workSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales);
+
+            var totalExpenses = annualExpenses.Sum(e => e.Amount) + workSaleTotals.Cost;
+            var totalIncome = annualIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue;
             var totalPurchases = annualPurchases.Sum(p => p.TotalPrice);
             var totalRents = annualRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents;
             var netIncome = totalIncome - totalOutflow;
 
             var monthlyBreakdown = Enumerable.Range(1, 12)
-                .Select(month => new
+                .Select(month =>
                 {
-                    Year = targetYear,
-                    Month = month,
-                    MonthName = new DateTime(targetYear, month, 1).ToString("MMMM"),
-                    Expenses = annualExpenses.Where(e => e.Date.Month == month).Sum(e => e.Amount),
-                    Incomes = annualIncomes.Where(i => i.Date.Month == month).Sum(i => i.Amount),
-                    Purchases = annualPurchases.Where(p => p.PurchaseDate.Month == month).Sum(p => p.TotalPrice),
-                    Rents = annualRents.Where(r => r.PaymentDate.Month == month).Sum(r => r.MonthlyAmount),
-                    NetIncome = annualIncomes.Where(i => i.Date.Month == month).Sum(i => i.Amount) -
-                               annualExpenses.Where(e => e.Date.Month == month).Sum(e => e.Amount) -
-                               annualPurchases.Where(p => p.PurchaseDate.Month == month).Sum(p => p.TotalPrice) -
-                               annualRents.Where(r => r.PaymentDate.Month == month).Sum(r => r.MonthlyAmount)
+                    var monthExpenses = annualExpenses.Where(e => e.Date.Month == month).Sum(e => e.Amount);
+                    var monthIncomes = annualIncomes.Where(i => i.Date.Month == month).Sum(i => i.Amount);
+                    var monthPurchases = annualPurchases.Where(p => p.PurchaseDate.Month == month).Sum(p => p.TotalPrice);
+                    var monthRents = annualRents.Where(r => r.PaymentDate.Month == month).Sum(r => r.MonthlyAmount);
+                    var monthWorkSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales.Where(workSale => workSale.Date.Month == month));
+
+                    return new
+                    {
+                        Year = targetYear,
+                        Month = month,
+                        MonthName = new DateTime(targetYear, month, 1).ToString("MMMM"),
+                        Expenses = monthExpenses + monthWorkSaleTotals.Cost,
+                        Incomes = monthIncomes + monthWorkSaleTotals.Revenue,
+                        Purchases = monthPurchases,
+                        Rents = monthRents,
+                        WorkSalesRevenue = monthWorkSaleTotals.Revenue,
+                        WorkSalesCost = monthWorkSaleTotals.Cost,
+                        WorkSalesProfit = monthWorkSaleTotals.Profit,
+                        NetIncome = (monthIncomes + monthWorkSaleTotals.Revenue) -
+                                    (monthExpenses + monthWorkSaleTotals.Cost) -
+                                    monthPurchases -
+                                    monthRents
+                    };
                 })
                 .ToList();
 
             var quarterlyBreakdown = Enumerable.Range(1, 4)
-                .Select(quarter => new
+                .Select(quarter =>
                 {
-                    Quarter = quarter,
-                    StartMonth = (quarter - 1) * 3 + 1,
-                    EndMonth = quarter * 3,
-                    Expenses = annualExpenses.Where(e => e.Date.Month >= (quarter - 1) * 3 + 1 && e.Date.Month <= quarter * 3).Sum(e => e.Amount),
-                    Incomes = annualIncomes.Where(i => i.Date.Month >= (quarter - 1) * 3 + 1 && i.Date.Month <= quarter * 3).Sum(i => i.Amount),
-                    Purchases = annualPurchases.Where(p => p.PurchaseDate.Month >= (quarter - 1) * 3 + 1 && p.PurchaseDate.Month <= quarter * 3).Sum(p => p.TotalPrice),
-                    Rents = annualRents.Where(r => r.PaymentDate.Month >= (quarter - 1) * 3 + 1 && r.PaymentDate.Month <= quarter * 3).Sum(r => r.MonthlyAmount),
-                    NetIncome = annualIncomes.Where(i => i.Date.Month >= (quarter - 1) * 3 + 1 && i.Date.Month <= quarter * 3).Sum(i => i.Amount) -
-                               annualExpenses.Where(e => e.Date.Month >= (quarter - 1) * 3 + 1 && e.Date.Month <= quarter * 3).Sum(e => e.Amount) -
-                               annualPurchases.Where(p => p.PurchaseDate.Month >= (quarter - 1) * 3 + 1 && p.PurchaseDate.Month <= quarter * 3).Sum(p => p.TotalPrice) -
-                               annualRents.Where(r => r.PaymentDate.Month >= (quarter - 1) * 3 + 1 && r.PaymentDate.Month <= quarter * 3).Sum(r => r.MonthlyAmount)
+                    var startMonth = (quarter - 1) * 3 + 1;
+                    var endMonth = quarter * 3;
+                    var quarterExpenses = annualExpenses.Where(e => e.Date.Month >= startMonth && e.Date.Month <= endMonth).Sum(e => e.Amount);
+                    var quarterIncomes = annualIncomes.Where(i => i.Date.Month >= startMonth && i.Date.Month <= endMonth).Sum(i => i.Amount);
+                    var quarterPurchases = annualPurchases.Where(p => p.PurchaseDate.Month >= startMonth && p.PurchaseDate.Month <= endMonth).Sum(p => p.TotalPrice);
+                    var quarterRents = annualRents.Where(r => r.PaymentDate.Month >= startMonth && r.PaymentDate.Month <= endMonth).Sum(r => r.MonthlyAmount);
+                    var quarterWorkSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales.Where(workSale => workSale.Date.Month >= startMonth && workSale.Date.Month <= endMonth));
+
+                    return new
+                    {
+                        Quarter = quarter,
+                        StartMonth = startMonth,
+                        EndMonth = endMonth,
+                        Expenses = quarterExpenses + quarterWorkSaleTotals.Cost,
+                        Incomes = quarterIncomes + quarterWorkSaleTotals.Revenue,
+                        Purchases = quarterPurchases,
+                        Rents = quarterRents,
+                        WorkSalesRevenue = quarterWorkSaleTotals.Revenue,
+                        WorkSalesCost = quarterWorkSaleTotals.Cost,
+                        WorkSalesProfit = quarterWorkSaleTotals.Profit,
+                        NetIncome = (quarterIncomes + quarterWorkSaleTotals.Revenue) -
+                                    (quarterExpenses + quarterWorkSaleTotals.Cost) -
+                                    quarterPurchases -
+                                    quarterRents
+                    };
                 })
                 .ToList();
 
@@ -594,6 +672,9 @@ namespace backend.Services
                     TotalExpenses = totalExpenses,
                     TotalPurchases = totalPurchases,
                     TotalRents = totalRents,
+                    TotalWorkSalesRevenue = workSaleTotals.Revenue,
+                    TotalWorkSalesCost = workSaleTotals.Cost,
+                    TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     ProfitMargin = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0,
@@ -608,19 +689,10 @@ namespace backend.Services
                     Expenses = annualExpenses.Count,
                     Incomes = annualIncomes.Count,
                     Purchases = annualPurchases.Count,
-                    Rents = annualRents.Count
+                    Rents = annualRents.Count,
+                    WorkSales = annualWorkSales.Count
                 },
-                ExpenseBreakdown = annualExpenses
-                    .GroupBy(e => e.ExpenseType)
-                    .Select(g => new
-                    {
-                        Type = g.Key,
-                        Total = g.Sum(e => e.Amount),
-                        Count = g.Count(),
-                        Percentage = totalOutflow > 0 ? (g.Sum(e => e.Amount) / totalOutflow) * 100 : 0
-                    })
-                    .OrderByDescending(x => x.Total)
-                    .ToList()
+                ExpenseBreakdown = BuildExpenseBreakdown(annualExpenses, totalOutflow, workSaleTotals)
             };
         }
 
@@ -1006,6 +1078,99 @@ namespace backend.Services
                 CurrencyCode = "MKD",
                 CurrencySymbol = "MKD"
             };
+        }
+
+        private IQueryable<WorkSale> GetWorkSalesForPeriod(DateTime? startDate, DateTime? endExclusive)
+        {
+            var workSales = _context.WorkSales.AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                workSales = workSales.Where(workSale => workSale.Date >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                workSales = workSales.Where(workSale => workSale.Date < endExclusive.Value);
+            }
+
+            return workSales;
+        }
+
+        private async Task<WorkSaleFinancialTotals> GetWorkSaleFinancialTotalsAsync(DateTime? startDate, DateTime? endExclusive)
+        {
+            var workSales = GetWorkSalesForPeriod(startDate, endExclusive);
+
+            return new WorkSaleFinancialTotals
+            {
+                Revenue = await workSales.SumAsync(workSale => (decimal?)workSale.TotalRevenue) ?? 0m,
+                Cost = await workSales.SumAsync(workSale => (decimal?)workSale.TotalCost) ?? 0m,
+                Profit = await workSales.SumAsync(workSale => (decimal?)workSale.Profit) ?? 0m,
+                Count = await workSales.CountAsync()
+            };
+        }
+
+        private static WorkSaleFinancialTotals GetWorkSaleFinancialTotals(IEnumerable<WorkSale> workSales)
+        {
+            var workSaleList = workSales as ICollection<WorkSale> ?? workSales.ToList();
+
+            return new WorkSaleFinancialTotals
+            {
+                Revenue = workSaleList.Sum(workSale => workSale.TotalRevenue),
+                Cost = workSaleList.Sum(workSale => workSale.TotalCost),
+                Profit = workSaleList.Sum(workSale => workSale.Profit),
+                Count = workSaleList.Count
+            };
+        }
+
+        private static List<ExpenseBreakdownItem> BuildExpenseBreakdown(
+            IEnumerable<Expense> expenses,
+            decimal totalOutflow,
+            WorkSaleFinancialTotals workSaleTotals)
+        {
+            var breakdown = expenses
+                .GroupBy(e => e.ExpenseType)
+                .Select(g => new ExpenseBreakdownItem
+                {
+                    Type = g.Key,
+                    Total = g.Sum(e => e.Amount),
+                    Count = g.Count(),
+                    Percentage = totalOutflow > 0 ? (g.Sum(e => e.Amount) / totalOutflow) * 100 : 0
+                })
+                .ToList();
+
+            if (workSaleTotals.Count > 0 || workSaleTotals.Cost > 0)
+            {
+                breakdown.Add(new ExpenseBreakdownItem
+                {
+                    Type = "Work Sales Cost",
+                    Total = workSaleTotals.Cost,
+                    Count = workSaleTotals.Count,
+                    Percentage = totalOutflow > 0 ? (workSaleTotals.Cost / totalOutflow) * 100 : 0
+                });
+            }
+
+            return breakdown
+                .OrderByDescending(item => item.Total)
+                .ToList();
+        }
+
+        private sealed class WorkSaleFinancialTotals
+        {
+            public static WorkSaleFinancialTotals Empty { get; } = new();
+
+            public decimal Revenue { get; init; }
+            public decimal Cost { get; init; }
+            public decimal Profit { get; init; }
+            public int Count { get; init; }
+        }
+
+        private sealed class ExpenseBreakdownItem
+        {
+            public string Type { get; init; } = string.Empty;
+            public decimal Total { get; init; }
+            public int Count { get; init; }
+            public decimal Percentage { get; init; }
         }
 
         private string GetPeriodName(DateTime startDate, DateTime endDate)
