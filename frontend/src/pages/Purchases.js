@@ -79,7 +79,6 @@ function Purchases() {
 
   const handleSubmit = async (values) => {
     try {
-      console.log("Form values:", values); // Debug log
       
       // Fix timezone issue by using local date format instead of UTC
       const data = {
@@ -87,17 +86,14 @@ function Purchases() {
         purchaseDate: values.purchaseDate.format("YYYY-MM-DD"),
       };
 
-      console.log("Data to send:", data); // Debug log
 
       if (editingPurchase) {
-        console.log("Updating purchase with ID:", editingPurchase.id); // Debug log
         await apiClient.put(
           `${API_ENDPOINTS.PURCHASES}/${editingPurchase.id}`,
           data
         );
         message.success("Blerja u përditësua me sukses");
       } else {
-        console.log("Creating new purchase"); // Debug log
         await apiClient.post(API_ENDPOINTS.PURCHASES, data);
         message.success("Blerja u krijua me sukses");
       }
@@ -106,8 +102,6 @@ function Purchases() {
       fetchPurchases();
       notifyDataChanged();
     } catch (error) {
-      console.error("Error details:", error); // Debug log
-      console.error("Error response:", error.response); // Debug log
       message.error("Dështoi të ruhet blerja");
     }
   };

@@ -99,7 +99,7 @@ function Reports() {
       "Gusht",
       "Shtator",
       "Tetor",
-      "NÃƒÂ«ntor",
+      "Nëntor",
       "Dhjetor",
     ];
     return months[month];
@@ -161,7 +161,7 @@ function Reports() {
       });
     } catch (error) {
       console.error("Error fetching financial data:", error);
-      message.error("DÃƒÂ«shtoi tÃƒÂ« merren tÃƒÂ« dhÃƒÂ«nat financiare");
+      message.error("Dështoi të merren të dhënat financiare");
     } finally {
       setLoading(false);
     }
@@ -215,7 +215,7 @@ function Reports() {
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="TÃƒÂ« Ardhurat"
+                    title="Të Ardhurat"
                     value={monthlyTotals.totalIncome}
                     precision={2}
                     valueStyle={{ color: "#52c41a" }}
@@ -392,12 +392,12 @@ function Reports() {
                 <Row className="mt-6">
                   <Col span={24}>
                     <Alert
-                      message="Nuk ka tÃƒÂ« dhÃƒÂ«na"
-                      description={`Nuk ka tÃƒÂ« dhÃƒÂ«na financiare pÃƒÂ«r ${
+                      message="Nuk ka të dhëna"
+                      description={`Nuk ka të dhëna financiare për ${
                         selectedMonthDisplay?.albanianName
                       } ${
                         selectedMonth.split("-")[0]
-                      }. Provoni tÃƒÂ« zgjidhni njÃƒÂ« muaj tjetÃƒÂ«r ose tÃƒÂ« shtoni tÃƒÂ« dhÃƒÂ«na tÃƒÂ« reja.`}
+                      }. Provoni të zgjidhni një muaj tjetër ose të shtoni të dhëna të reja.`}
                       type="warning"
                       showIcon
                       className="shadow-sm"
@@ -411,7 +411,7 @@ function Reports() {
               <Col span={24}>
                 <Alert
                   message="Informacion i Raportit"
-                  description={`Raporti financiar pÃƒÂ«r ${
+                  description={`Raporti financiar për ${
                     selectedMonthDisplay?.albanianName
                   } ${
                     selectedMonth.split("-")[0]

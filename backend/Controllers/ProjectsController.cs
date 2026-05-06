@@ -199,30 +199,20 @@ namespace backend.Controllers
         [Authorize]
         public async Task<IActionResult> DeleteProject(int id)
         {
-            Console.WriteLine($"DeleteProject called with id: {id}");
-            
             var project = await _context.Projects.FindAsync(id);
             if (project == null)
             {
-                Console.WriteLine($"Project with id {id} not found");
                 return NotFound();
             }
-
-            Console.WriteLine($"Found project: {project.Name}, CreatedById: {project.CreatedById}");
-            Console.WriteLine($"Current user ID: {_currentUserService.GetCurrentUserId()}");
-            Console.WriteLine($"Is admin: {_currentUserService.IsAdmin()}");
 
             // Check if user has access to this project
             if (!_currentUserService.IsAdmin() && project.CreatedById != _currentUserService.GetCurrentUserId())
             {
-                Console.WriteLine($"Access denied: User {_currentUserService.GetCurrentUserId()} cannot delete project {id}");
                 return Forbid();
             }
 
-            Console.WriteLine($"Deleting project {id}...");
             _context.Projects.Remove(project);
-            var result = await _context.SaveChangesAsync();
-            Console.WriteLine($"Delete result: {result} rows affected");
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }

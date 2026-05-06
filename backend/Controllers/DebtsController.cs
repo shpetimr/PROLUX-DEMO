@@ -225,30 +225,20 @@ namespace backend.Controllers
         [Authorize]
         public async Task<IActionResult> DeleteDebt(int id)
         {
-            Console.WriteLine($"DeleteDebt called with id: {id}");
-            
             var debt = await _context.Debts.FindAsync(id);
             if (debt == null)
             {
-                Console.WriteLine($"Debt with id {id} not found");
                 return NotFound();
             }
-
-            Console.WriteLine($"Found debt: {debt.DebtorName}, CreatedById: {debt.CreatedById}");
-            Console.WriteLine($"Current user ID: {_currentUserService.GetCurrentUserId()}");
-            Console.WriteLine($"Is admin: {_currentUserService.IsAdmin()}");
 
             // Check if user has access to this debt
             if (!_currentUserService.IsAdmin() && debt.CreatedById != _currentUserService.GetCurrentUserId())
             {
-                Console.WriteLine($"Access denied: User {_currentUserService.GetCurrentUserId()} cannot delete debt {id}");
                 return Forbid();
             }
 
-            Console.WriteLine($"Deleting debt {id}...");
             _context.Debts.Remove(debt);
-            var result = await _context.SaveChangesAsync();
-            Console.WriteLine($"Delete result: {result} rows affected");
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }

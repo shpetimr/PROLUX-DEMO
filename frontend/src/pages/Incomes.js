@@ -40,12 +40,7 @@ function Incomes() {
   const fetchIncomes = async () => {
     setLoading(true);
     try {
-      console.log(
-        "Incomes page: Fetching incomes from:",
-        API_ENDPOINTS.INCOMES
-      );
       const response = await apiClient.get(API_ENDPOINTS.INCOMES);
-      console.log("Incomes page: Response data:", response.data);
       setIncomes(response.data);
     } catch (error) {
       console.error("Incomes page: Error fetching incomes:", error);
@@ -83,7 +78,6 @@ function Incomes() {
 
   const handleSubmit = async (values) => {
     try {
-      console.log("Form values:", values); // Debug log
       
       // Fix timezone issue by using local date format instead of UTC
       const data = {
@@ -91,7 +85,6 @@ function Incomes() {
         date: values.date.format("YYYY-MM-DD"),
       };
 
-      console.log("Data to send:", data); // Debug log
 
       if (editingIncome) {
         await apiClient.put(

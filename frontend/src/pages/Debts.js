@@ -44,7 +44,7 @@ function Debts() {
   const [activeTab, setActiveTab] = useState("OwedToCompany");
   const [form] = Form.useForm();
   const { notifyDataChanged } = useDataChange();
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
     // Check authentication before fetching data
@@ -54,9 +54,6 @@ function Debts() {
       return;
     }
 
-    console.log("Current user:", user); // Debug log
-    console.log("Is admin:", isAdmin()); // Debug log
-    console.log("Is authenticated:", isAuthenticated()); // Debug log
 
     fetchDebts();
     fetchSummary();
@@ -67,22 +64,13 @@ function Debts() {
   const fetchDebts = async () => {
     setLoading(true);
     try {
-      console.log(
-        "Fetching debts from:",
-        `${API_ENDPOINTS.DEBTS}?type=${activeTab}`
-      ); // Debug log
-      const token = localStorage.getItem("token");
-      console.log("Token available:", !!token); // Debug log
-
       const response = await apiClient.get(
         `${API_ENDPOINTS.DEBTS}?type=${activeTab}`
       );
       const debtsData = response.data || [];
-      console.log("Debts fetched:", debtsData); // Debug log
       setDebts(debtsData);
     } catch (error) {
       console.error("Error fetching debts:", error);
-      console.error("Error response:", error.response); // Debug log
 
       // Handle different error types
       if (error.response?.status === 401) {
@@ -122,7 +110,6 @@ function Debts() {
   // Create or Update debt
   const handleSubmit = async (values) => {
     try {
-      console.log("Form values:", values); // Debug log
 
       // Fix timezone issue by using local date format instead of UTC
       const debtData = {
@@ -135,7 +122,6 @@ function Debts() {
         description: values.description || "",
       };
 
-      console.log("Data to send:", debtData); // Debug log
 
       if (editingDebt) {
         await apiClient.put(
@@ -156,7 +142,6 @@ function Debts() {
       notifyDataChanged();
     } catch (error) {
       console.error("Error saving debt:", error);
-      console.error("Error response:", error.response); // Debug log
 
       // Handle different error types
       if (error.response?.data?.message) {
@@ -188,11 +173,6 @@ function Debts() {
   // Delete debt
   const handleDelete = async (id) => {
     try {
-      console.log("Deleting debt with ID:", id); // Debug log
-      console.log("Delete URL:", `${API_ENDPOINTS.DEBTS}/${id}`); // Debug log
-
-      const token = localStorage.getItem("token");
-      console.log("Token available for delete:", !!token); // Debug log
 
       await apiClient.delete(`${API_ENDPOINTS.DEBTS}/${id}`);
       message.success("Borxhi u fshi me sukses");
@@ -201,8 +181,6 @@ function Debts() {
       notifyDataChanged();
     } catch (error) {
       console.error("Error deleting debt:", error);
-      console.error("Error response:", error.response); // Debug log
-      console.error("Error config:", error.config); // Debug log
 
       // Handle different error types
       if (error.response?.status === 401) {

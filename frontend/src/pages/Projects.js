@@ -48,7 +48,7 @@ const Projects = () => {
   const [form] = Form.useForm();
   const [statusFilter, setStatusFilter] = useState("all");
   const { notifyDataChanged } = useDataChange();
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   // Statistics state
   const [stats, setStats] = useState({
@@ -70,9 +70,6 @@ const Projects = () => {
       return;
     }
 
-    console.log("Current user:", user); // Debug log
-    console.log("Is admin:", isAdmin()); // Debug log
-    console.log("Is authenticated:", isAuthenticated()); // Debug log
 
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,18 +78,12 @@ const Projects = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      console.log("Fetching projects from:", API_ENDPOINTS.PROJECTS); // Debug log
-      const token = localStorage.getItem("token");
-      console.log("Token available:", !!token); // Debug log
-
       const response = await apiClient.get(API_ENDPOINTS.PROJECTS);
       const projectsData = response.data;
-      console.log("Projects fetched:", projectsData); // Debug log
       setProjects(projectsData);
       calculateStats(projectsData);
     } catch (error) {
       console.error("Error fetching projects:", error);
-      console.error("Error response:", error.response); // Debug log
 
       // Handle different error types
       if (error.response?.status === 401) {
@@ -159,11 +150,6 @@ const Projects = () => {
 
   const handleDelete = async (id) => {
     try {
-      console.log("Deleting project with ID:", id); // Debug log
-      console.log("Delete URL:", API_ENDPOINTS.PROJECT_BY_ID(id)); // Debug log
-
-      const token = localStorage.getItem("token");
-      console.log("Token available for delete:", !!token); // Debug log
 
       await apiClient.delete(API_ENDPOINTS.PROJECT_BY_ID(id));
       message.success("Projekti u fshi me sukses");
@@ -171,8 +157,6 @@ const Projects = () => {
       notifyDataChanged();
     } catch (error) {
       console.error("Error deleting project:", error);
-      console.error("Error response:", error.response); // Debug log
-      console.error("Error config:", error.config); // Debug log
 
       // Handle different error types
       if (error.response?.status === 401) {
@@ -191,7 +175,6 @@ const Projects = () => {
 
   const handleSubmit = async (values) => {
     try {
-      console.log("Form values:", values); // Debug log
 
       // Llogarit fitimin automatikisht
       const calculatedProfit = (values.promet || 0) - (values.expenses || 0);
@@ -203,7 +186,6 @@ const Projects = () => {
         profit: calculatedProfit, // Shto fitimin e llogaritur
       };
 
-      console.log("Data to send:", projectData); // Debug log
 
       if (editingProject) {
         await apiClient.put(
@@ -221,7 +203,6 @@ const Projects = () => {
       notifyDataChanged();
     } catch (error) {
       console.error("Error saving project:", error);
-      console.error("Error response:", error.response); // Debug log
 
       // Handle different error types
       if (error.response?.data?.message) {

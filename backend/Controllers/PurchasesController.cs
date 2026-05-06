@@ -97,8 +97,6 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<PurchaseResponseDto>> CreatePurchase(CreatePurchaseDto createDto)
         {
-            Console.WriteLine($"CreatePurchase - Received PurchaseDate: {createDto.PurchaseDate}");
-            
             // Parse the date string to DateTime
             if (!DateTime.TryParse(createDto.PurchaseDate, out DateTime purchaseDate))
             {
@@ -144,7 +142,6 @@ namespace backend.Controllers
         [Authorize]
         public async Task<IActionResult> UpdatePurchase(int id, UpdatePurchaseDto updateDto)
         {
-            Console.WriteLine($"UpdatePurchase - Received PurchaseDate: {updateDto.PurchaseDate}");
             var purchase = await _context.Purchases.FindAsync(id);
 
             if (purchase == null)
@@ -181,7 +178,6 @@ namespace backend.Controllers
                 // Parse the date string to DateTime
                 if (DateTime.TryParse(updateDto.PurchaseDate, out DateTime newPurchaseDate))
                 {
-                    Console.WriteLine($"UpdatePurchase - Setting PurchaseDate to: {newPurchaseDate}");
                     purchase.PurchaseDate = newPurchaseDate;
                 }
                 else

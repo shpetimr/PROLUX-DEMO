@@ -140,10 +140,6 @@ namespace backend.Controllers
                 return Forbid();
             }
             
-            Console.WriteLine("=== EMPLOYEE CREATE ENDPOINT HIT ===");
-            Console.WriteLine($"ModelState.IsValid: {ModelState.IsValid}");
-            Console.WriteLine($"Received DTO: fullName={dto.fullName}, position={dto.position}, hireDate={dto.hireDate}, dailyWage={dto.dailyWage}");
-            
             if (dto == null)
             {
                 return BadRequest(new { message = "Request body is required" });
@@ -151,25 +147,9 @@ namespace backend.Controllers
             
             if (!ModelState.IsValid)
             {
-                Console.WriteLine("=== MODEL STATE ERRORS ===");
-                foreach (var key in ModelState.Keys)
-                {
-                    var errors = ModelState[key]?.Errors;
-                    if (errors == null)
-                    {
-                        continue;
-                    }
-
-                    foreach (var error in errors)
-                    {
-                        Console.WriteLine($"ModelState error for {key}: {error.ErrorMessage}");
-                    }
-                }
                 return BadRequest(ModelState);
             }
 
-            Console.WriteLine("=== CREATING EMPLOYEE ===");
-            
             // Convert string position to enum
             EmployeePosition position;
             switch (dto.position?.ToLower())
@@ -212,8 +192,6 @@ namespace backend.Controllers
 
             _context.Employees.Add(employee);
             await _context.SaveChangesAsync();
-
-            Console.WriteLine($"=== EMPLOYEE CREATED SUCCESSFULLY - ID: {employee.Id} ===");
 
             // Calculate comprehensive monthly salary using the new formula
             decimal monthlySalary = employee.CalculatedMonthlySalary;
@@ -277,10 +255,6 @@ namespace backend.Controllers
                 return NotFound();
             }
 
-            Console.WriteLine($"=== UPDATING EMPLOYEE {id} ===");
-            Console.WriteLine($"Received DTO - dailyWage: {dto.dailyWage}");
-            Console.WriteLine($"Before update - dailyWage: {employee.DailyWage}");
-
             if (dto.fullName != null)
             {
                 employee.FullName = dto.fullName;
@@ -338,11 +312,7 @@ namespace backend.Controllers
 
             employee.UpdatedAt = DateTime.UtcNow;
 
-            Console.WriteLine($"After update - dailyWage: {employee.DailyWage}");
-
             await _context.SaveChangesAsync();
-
-            Console.WriteLine($"=== EMPLOYEE UPDATED SUCCESSFULLY ===");
 
             return NoContent();
         }

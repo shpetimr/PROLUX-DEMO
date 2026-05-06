@@ -61,7 +61,7 @@ function Layout() {
       {
         key: "/offer-print",
         icon: <FileTextOutlined />,
-        label: "OfertÃ«",
+        label: "Ofertë",
         requiredPermission: PERMISSIONS.OFFERS_PRINT,
       },
       {
@@ -73,7 +73,7 @@ function Layout() {
       {
         key: "/employees",
         icon: <TeamOutlined />,
-        label: "PunÃ«torÃ«t",
+        label: "Punëtorët",
         requiredPermission: PERMISSIONS.EMPLOYEES_MANAGE,
       },
       {
@@ -97,7 +97,7 @@ function Layout() {
       {
         key: "/incomes",
         icon: <RiseOutlined />,
-        label: "TÃ« Ardhurat",
+        label: "Të Ardhurat",
         requiredPermission: PERMISSIONS.INCOMES_MANAGE,
       },
       {

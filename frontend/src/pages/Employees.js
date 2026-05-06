@@ -59,7 +59,7 @@ function Employees() {
       const response = await apiClient.get(API_ENDPOINTS.EMPLOYEES);
       setEmployees(response.data);
     } catch (error) {
-      message.error("DÃ«shtoi tÃ« merren punÃ«torÃ«t");
+      message.error("Dështoi të merren punëtorët");
     } finally {
       setLoading(false);
     }
@@ -130,11 +130,11 @@ function Employees() {
   const handleDelete = async (id) => {
     try {
       await apiClient.delete(API_ENDPOINTS.EMPLOYEE_BY_ID(id));
-      message.success("PunÃ«tori u fshi me sukses");
+      message.success("Punëtori u fshi me sukses");
       await refreshEmployeesAndSalary();
       notifyDataChanged();
     } catch (error) {
-      message.error("DÃ«shtoi tÃ« fshihet punÃ«tori");
+      message.error("Dështoi të fshihet punëtori");
     }
   };
 
@@ -143,10 +143,8 @@ function Employees() {
     if (attendanceModalVisible && selectedEmployeeForAttendance) {
       // Only refresh data if there are no local changes to preserve
       if (Object.keys(localChanges).length === 0) {
-        console.log('Modal opened, refreshing attendance data...');
         fetchMonthlyAttendance(selectedEmployeeForAttendance.id, selectedMonth.year(), selectedMonth.month() + 1);
       } else {
-        console.log('Modal opened with local changes, preserving existing data...');
         // Use existing data with local changes applied
         const days = generateCalendarDays(selectedMonth, attendanceRecords);
         setCalendarDays(days);
@@ -158,7 +156,6 @@ function Employees() {
   // Refresh attendance data when month changes
   useEffect(() => {
     if (attendanceModalVisible && selectedEmployeeForAttendance) {
-      console.log('Month changed, refreshing attendance data...');
       fetchMonthlyAttendance(selectedEmployeeForAttendance.id, selectedMonth.year(), selectedMonth.month() + 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,7 +164,6 @@ function Employees() {
   // Update calendar days when attendance records change
   useEffect(() => {
     if (attendanceModalVisible && selectedEmployeeForAttendance && attendanceRecords.length >= 0) {
-      console.log('Attendance records changed, updating calendar days...');
       const days = generateCalendarDays(selectedMonth, attendanceRecords);
       setCalendarDays(days);
     }
@@ -176,8 +172,6 @@ function Employees() {
 
   // Simple attendance functions
   const handleAttendanceClick = async (employee) => {
-    console.log('Opening attendance modal for employee:', employee);
-    console.log('Existing local changes:', localChanges);
     const attendanceMonth = selectedSalaryMonth || dayjs();
     
     setSelectedEmployeeForAttendance(employee);
@@ -187,19 +181,16 @@ function Employees() {
     // Wait a bit for modal to open, then fetch data
     setTimeout(async () => {
       try {
-        console.log('Fetching attendance data for month:', attendanceMonth.format('MMMM YYYY'));
         const response = await apiClient.get(
           API_ENDPOINTS.ATTENDANCE_EMPLOYEE_MONTH(employee.id, attendanceMonth.year(), attendanceMonth.month() + 1)
         );
         
         const fetchedRecords = response.data.dailyRecords || [];
-        console.log('Fetched attendance records:', fetchedRecords);
         
         // Apply local changes to fetched records
         const recordsWithLocalChanges = fetchedRecords.map(record => {
           const dateString = dayjs(record.date).format('YYYY-MM-DD');
           if (localChanges[dateString] !== undefined) {
-            console.log(`Applying local change for ${dateString}: ${localChanges[dateString]}`);
             return { ...record, isPresent: localChanges[dateString] };
           }
           return record;
@@ -210,7 +201,6 @@ function Employees() {
         Object.keys(localChanges).forEach(dateString => {
           const exists = allRecords.some(r => dayjs(r.date).format('YYYY-MM-DD') === dateString);
           if (!exists) {
-            console.log(`Adding missing local change for ${dateString}: ${localChanges[dateString]}`);
             allRecords.push({
               id: Date.now() + Math.random(), // Temporary ID
               employeeId: employee.id,
@@ -227,13 +217,10 @@ function Employees() {
         const days = generateCalendarDays(attendanceMonth, allRecords);
         setCalendarDays(days);
         
-        console.log('Calendar days generated with local changes:', days);
-        console.log('Local changes preserved:', localChanges);
-        console.log('Final records with local changes:', allRecords);
         
       } catch (error) {
         console.error('Error fetching initial attendance data:', error);
-        message.error('Gabim nÃ« marrjen e tÃ« dhÃ«nave tÃ« pranisÃ«');
+        message.error('Gabim në marrjen e të dhënave të pranisë');
         setAttendanceRecords([]);
         setCalendarDays([]);
       }
@@ -243,20 +230,17 @@ function Employees() {
   const fetchMonthlyAttendance = async (employeeId, year, month) => {
     setAttendanceLoading(true);
     try {
-      console.log(`Fetching attendance for employee ${employeeId}, year: ${year}, month: ${month}`);
       
       const response = await apiClient.get(
         API_ENDPOINTS.ATTENDANCE_EMPLOYEE_MONTH(employeeId, year, month)
       );
       
       const fetchedRecords = response.data.dailyRecords || [];
-      console.log('Fetched attendance records from API:', fetchedRecords);
       
       // Apply local changes to fetched records
       const recordsWithLocalChanges = fetchedRecords.map(record => {
         const dateString = dayjs(record.date).format('YYYY-MM-DD');
         if (localChanges[dateString] !== undefined) {
-          console.log(`Applying local change for ${dateString}: ${localChanges[dateString]}`);
           return { ...record, isPresent: localChanges[dateString] };
         }
         return record;
@@ -268,14 +252,12 @@ function Employees() {
       const days = generateCalendarDays(selectedMonth, recordsWithLocalChanges);
       setCalendarDays(days);
       
-      console.log('Attendance records state updated with local changes:', recordsWithLocalChanges);
-      console.log('Calendar days state updated:', days);
       
     } catch (error) {
       console.error("Error fetching attendance:", error);
       setAttendanceRecords([]);
       setCalendarDays([]);
-      message.error('Gabim nÃ« marrjen e tÃ« dhÃ«nave tÃ« pranisÃ«');
+      message.error('Gabim në marrjen e të dhënave të pranisë');
     } finally {
       setAttendanceLoading(false);
     }
@@ -286,7 +268,6 @@ function Employees() {
     setSelectedMonth(nextMonth);
     setSelectedSalaryMonth(nextMonth);
     if (selectedEmployeeForAttendance) {
-      console.log('Month changed to:', nextMonth.format('MMMM YYYY'));
       fetchMonthlyAttendance(selectedEmployeeForAttendance.id, nextMonth.year(), nextMonth.month() + 1);
     }
   };
@@ -296,7 +277,6 @@ function Employees() {
     try {
       // Ensure all attendance data is saved before closing
       if (selectedEmployeeForAttendance && attendanceRecords.length > 0) {
-        console.log('Saving attendance data before closing modal...');
         
         // Calculate and update employee record with latest attendance data
         const daysWorkedThisMonth = calendarDays.filter(d => d.isPresent).length;
@@ -318,8 +298,6 @@ function Employees() {
         await refreshEmployeesAndSalary(selectedMonth);
         notifyDataChanged();
         
-        console.log('Attendance data saved successfully before closing modal');
-        console.log('Local changes preserved for next session:', localChanges);
         
         // Keep local changes for the next attendance session.
       }
@@ -357,7 +335,6 @@ function Employees() {
   // Simple function to toggle attendance for a day
   const toggleAttendance = async (date, isPresent) => {
     const dateString = date.format('YYYY-MM-DD');
-    console.log(`Toggling attendance for ${dateString} to ${isPresent}`);
     
     // Track local change
     setLocalChanges(prev => ({
@@ -396,8 +373,6 @@ function Employees() {
     const updatedCalendarDays = generateCalendarDays(selectedMonth, updatedRecords);
     setCalendarDays(updatedCalendarDays);
 
-    console.log('States updated immediately:', { updatedRecords, updatedCalendarDays });
-    console.log('Local changes tracked:', { ...localChanges, [dateString]: isPresent });
 
     // Now update backend in background
     try {
@@ -407,7 +382,6 @@ function Employees() {
           isPresent: isPresent,
           notes: "Ndryshuar nga kalendari"
         });
-        console.log('Existing record updated in backend');
       } else {
         // Create new record
         const response = await apiClient.post(API_ENDPOINTS.ATTENDANCE, {
@@ -428,18 +402,17 @@ function Employees() {
         const finalCalendarDays = generateCalendarDays(selectedMonth, finalRecords);
         setCalendarDays(finalCalendarDays);
         
-        console.log('New record created in backend with ID:', response.data.id);
       }
 
       // Show success message
-      message.success(`Prania pÃ«r ${dateString} u ${isPresent ? 'shtua' : 'ndryshua'}`);
+      message.success(`Prania për ${dateString} u ${isPresent ? 'shtua' : 'ndryshua'}`);
       
       // Notify that data has changed
       notifyDataChanged();
       
     } catch (error) {
       console.error("Error updating attendance in backend:", error);
-      message.error("Gabim nÃ« pÃ«rditÃ«simin e pranisÃ« nÃ« backend, por ndryshimi u ruajt lokal");
+      message.error("Gabim në përditësimin e pranisë në backend, por ndryshimi u ruajt lokal");
       
       // Don't revert the UI state - keep the user's change
       // The data will be corrected on next modal open
@@ -476,12 +449,6 @@ function Employees() {
       currentDate = currentDate.add(1, 'day');
     }
     
-    console.log('Generated calendar days for month:', month.format('MMMM YYYY'));
-    console.log('Records used:', records);
-    console.log('Local changes applied:', localChanges);
-    console.log('Days generated:', days);
-    console.log('Days with attendance:', days.filter(d => d.isPresent));
-    console.log('Days with local changes:', days.filter(d => d.hasLocalChange));
     
     return days;
   };
@@ -490,12 +457,10 @@ function Employees() {
   const generateSimpleCalendar = () => {
     // Use the stored calendar days if available
     if (calendarDays.length > 0) {
-      console.log('Using stored calendar days:', calendarDays);
       return calendarDays;
     }
     
     // Fallback to generating new ones
-    console.log('No stored calendar days, generating new ones...');
     const days = generateCalendarDays(selectedMonth, attendanceRecords);
     setCalendarDays(days);
     return days;
@@ -514,7 +479,7 @@ function Employees() {
         };
 
         await apiClient.put(API_ENDPOINTS.EMPLOYEE_BY_ID(editingEmployee.id), updateData);
-        message.success("PunÃ«tori u pÃ«rditÃ«sua me sukses!");
+        message.success("Punëtori u përditësua me sukses!");
         setEditingEmployee(null);
         setModalVisible(false);
         form.resetFields();
@@ -533,7 +498,7 @@ function Employees() {
       };
 
       await apiClient.post(API_ENDPOINTS.EMPLOYEES, createData);
-      message.success("PunÃ«tori u shtua me sukses!");
+      message.success("Punëtori u shtua me sukses!");
       setModalVisible(false);
       form.resetFields();
       await refreshEmployeesAndSalary();
@@ -541,9 +506,9 @@ function Employees() {
     } catch (error) {
       console.error("Error in handleSubmit:", error);
       if (error.response) {
-        message.error("Gabim nÃ« backend: " + JSON.stringify(error.response.data));
+        message.error("Gabim në backend: " + JSON.stringify(error.response.data));
       } else {
-        message.error("Gabim nÃ« rrjet. Ju lutemi provoni pÃ«rsÃ«ri.");
+        message.error("Gabim në rrjet. Ju lutemi provoni përsëri.");
       }
     }
   };
@@ -561,7 +526,7 @@ function Employees() {
     `${(Number(n) || 0).toLocaleString("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })} Ð´ÐµÐ½`;
+    })} ден`;
 
   const positionLabel = (position) => {
     const isMagazine =
@@ -653,12 +618,12 @@ function Employees() {
       <table>
         <thead>
           <tr>
-            <th>PunÃ«tori</th>
+            <th>Punëtori</th>
             <th>Pozicioni</th>
-            <th>Data punÃ«simi</th>
+            <th>Data punësimi</th>
             <th>Paga ditore</th>
-            <th>DitÃ«t e punuara (muaji)</th>
-            <th>Paga bazÃ«</th>
+            <th>Ditët e punuara (muaji)</th>
+            <th>Paga bazë</th>
             <th>Bonuset</th>
             <th>Gjobat</th>
             <th>Paga mujore</th>
@@ -676,19 +641,19 @@ function Employees() {
   const printEmployeeReport = (emp) => {
     const html = buildEmployeesReportHtml(
       [emp],
-      `Raport punÃ«tori: ${emp.fullName || ""}`
+      `Raport punëtori: ${emp.fullName || ""}`
     );
     openPrintWindow(html);
   };
 
   const printAllEmployeesReport = () => {
     if (!employees.length) {
-      message.warning("Nuk ka punÃ«torÃ« pÃ«r printim.");
+      message.warning("Nuk ka punëtorë për printim.");
       return;
     }
     const html = buildEmployeesReportHtml(
       employees,
-      "Raporti i tÃ« gjithÃ« punÃ«torÃ«ve"
+      "Raporti i të gjithë punëtorëve"
     );
     openPrintWindow(html);
   };
@@ -739,7 +704,7 @@ function Employees() {
       key: "dailyWage",
       render: (dailyWage, record) => {
         const wage = dailyWage || getDefaultDailyWage(record.position);
-        return `${(wage || 0).toFixed(2)} Ð´ÐµÐ½`;
+        return `${(wage || 0).toFixed(2)} ден`;
       },
       sorter: (a, b) => {
         const wageA = a.dailyWage || getDefaultDailyWage(a.position) || 0;
@@ -748,14 +713,14 @@ function Employees() {
       },
     },
     {
-      title: "Data e PunÃ«simit",
+      title: "Data e Punësimit",
       dataIndex: "hireDate",
       key: "hireDate",
       render: (date) => dayjs(date).format("YYYY-MM-DD"),
       sorter: (a, b) => dayjs(a.hireDate).unix() - dayjs(b.hireDate).unix(),
     },
     {
-      title: "DitÃ«t e Punuara",
+      title: "Ditët e Punuara",
       dataIndex: "daysWorkedThisMonth",
       key: "daysWorkedThisMonth",
       render: (days, record) => {
@@ -765,9 +730,9 @@ function Employees() {
         
         return (
           <div>
-            <div className="font-medium">{daysWorked} ditÃ«</div>
+            <div className="font-medium">{daysWorked} ditë</div>
             <div className="text-xs text-gray-500">
-              {baseSalary.toFixed(2)} Ð´ÐµÐ½
+              {baseSalary.toFixed(2)} ден
             </div>
           </div>
         );
@@ -778,13 +743,13 @@ function Employees() {
       title: "Bonuset Mujore",
       dataIndex: "monthlyBonuses",
       key: "monthlyBonuses",
-      render: (bonuses) => `${(bonuses || 0).toFixed(2)} Ð´ÐµÐ½`,
+      render: (bonuses) => `${(bonuses || 0).toFixed(2)} ден`,
     },
     {
       title: "Gjobat Mujore",
       dataIndex: "monthlyPenalties",
       key: "monthlyPenalties",
-      render: (penalties) => `${(penalties || 0).toFixed(2)} Ð´ÐµÐ½`,
+      render: (penalties) => `${(penalties || 0).toFixed(2)} ден`,
     },
     {
       title: "Paga Mujore",
@@ -852,7 +817,7 @@ function Employees() {
           </Button>
 
           <Popconfirm
-            title="A jeni tÃ« sigurt qÃ« dÃ«shironi ta fshini kÃ«tÃ« punÃ«tor?"
+            title="A jeni të sigurt që dëshironi ta fshini këtë punëtor?"
             onConfirm={() => handleDelete(record.id)}
             okText="Po"
             cancelText="Jo"
@@ -869,7 +834,7 @@ function Employees() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <Title level={2}>Menaxhimi i PunÃ«torÃ«ve</Title>
+        <Title level={2}>Menaxhimi i Punëtorëve</Title>
         <Space wrap>
           <DatePicker
             picker="month"
@@ -883,14 +848,14 @@ function Employees() {
             onClick={printAllEmployeesReport}
             disabled={!employees.length}
           >
-            Printo tÃ« gjithÃ«
+            Printo të gjithë
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleCreate}
           >
-            Shto PunÃ«tor
+            Shto Punëtor
           </Button>
         </Space>
       </div>
@@ -900,23 +865,23 @@ function Employees() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="text-center">
             <h4 className="font-semibold text-blue-800 mb-2">
-              PunÃ«torÃ«t e Terrenit
+              Punëtorët e Terrenit
             </h4>
             <div className="space-y-1 text-sm">
               <div>
-                â€¢ Paga Ditore Default:{" "}
-                <span className="font-medium">2460 Ð´ÐµÐ½/ditÃ«</span>
+                • Paga Ditore Default:{" "}
+                <span className="font-medium">2460 ден/ditë</span>
               </div>
             </div>
           </div>
           <div className="text-center">
             <h4 className="font-semibold text-blue-800 mb-2">
-              PunÃ«torÃ«t e MagazinÃ«s
+              Punëtorët e Magazinës
             </h4>
             <div className="space-y-1 text-sm">
               <div>
-                â€¢ Paga Ditore Default:{" "}
-                <span className="font-medium">1850 Ð´ÐµÐ½/ditÃ«</span>
+                • Paga Ditore Default:{" "}
+                <span className="font-medium">1850 ден/ditë</span>
               </div>
             </div>
           </div>
@@ -927,7 +892,7 @@ function Employees() {
           </h4>
           <div className="text-sm">
             <span className="font-medium">
-              (Paga Ditore Ã— DitÃ«t e Punuara) + Bonuset - Gjobat
+              (Paga Ditore × Ditët e Punuara) + Bonuset - Gjobat
             </span>
           </div>
         </div>
@@ -945,14 +910,14 @@ function Employees() {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} nga ${total} punÃ«torÃ«`,
+              `${range[0]}-${range[1]} nga ${total} punëtorë`,
           }}
         />
       </Card>
 
       {/* Employee Modal */}
       <Modal
-        title={editingEmployee ? "Redakto PunÃ«tor" : "Shto PunÃ«tor"}
+        title={editingEmployee ? "Redakto Punëtor" : "Shto Punëtor"}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={null}
@@ -965,8 +930,8 @@ function Employees() {
         >
           <Form.Item
             name="fullName"
-            label="Emri i PlotÃ«"
-            rules={[{ required: true, message: "Ju lutemi shkruani emrin e plotÃ«" }]}
+            label="Emri i Plotë"
+            rules={[{ required: true, message: "Ju lutemi shkruani emrin e plotë" }]}
           >
             <Input />
           </Form.Item>
@@ -989,8 +954,8 @@ function Employees() {
 
           <Form.Item
             name="hireDate"
-            label="Data e PunÃ«simit"
-            rules={[{ required: true, message: "Ju lutemi zgjidhni datÃ«n e punÃ«simit" }]}
+            label="Data e Punësimit"
+            rules={[{ required: true, message: "Ju lutemi zgjidhni datën e punësimit" }]}
           >
             <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
           </Form.Item>
@@ -999,16 +964,16 @@ function Employees() {
             name="dailyWage"
             label="Paga Ditore"
             rules={[
-              { required: true, message: "Ju lutemi shkruani pagÃ«n ditore" },
-              { type: "number", min: 0, message: "Paga ditore duhet tÃ« jetÃ« mÃ« e madhe se 0" },
+              { required: true, message: "Ju lutemi shkruani pagën ditore" },
+              { type: "number", min: 0, message: "Paga ditore duhet të jetë më e madhe se 0" },
             ]}
           >
             <InputNumber
               style={{ width: "100%" }}
-              formatter={(value) => `${value} Ð´ÐµÐ½`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-              parser={(value) => value.replace(/Ð´ÐµÐ½\s?|,*/g, "")}
+              formatter={(value) => `${value} ден`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              parser={(value) => value.replace(/ден\s?|,*/g, "")}
               min={0}
-              placeholder="Shkruani pagÃ«n ditore tÃ« personalizuar"
+              placeholder="Shkruani pagën ditore të personalizuar"
             />
           </Form.Item>
 
@@ -1019,8 +984,8 @@ function Employees() {
           >
             <InputNumber
               style={{ width: "100%" }}
-              formatter={(value) => `${value} Ð´ÐµÐ½`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-              parser={(value) => value.replace(/Ð´ÐµÐ½\s?|,*/g, "")}
+              formatter={(value) => `${value} ден`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              parser={(value) => value.replace(/ден\s?|,*/g, "")}
               min={0}
             />
           </Form.Item>
@@ -1032,8 +997,8 @@ function Employees() {
           >
             <InputNumber
               style={{ width: "100%" }}
-              formatter={(value) => `${value} Ð´ÐµÐ½`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
-              parser={(value) => value.replace(/Ð´ÐµÐ½\s?|,*/g, "")}
+              formatter={(value) => `${value} ден`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              parser={(value) => value.replace(/ден\s?|,*/g, "")}
               min={0}
             />
           </Form.Item>
@@ -1041,7 +1006,7 @@ function Employees() {
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit">
-                {editingEmployee ? "PÃ«rditÃ«so" : "Shto"}
+                {editingEmployee ? "Përditëso" : "Shto"}
               </Button>
               <Button onClick={() => setModalVisible(false)}>
                 Anulo
@@ -1053,7 +1018,7 @@ function Employees() {
 
       {/* Simple Attendance Modal */}
       <Modal
-        title="Prania e PunÃ«torit"
+        title="Prania e Punëtorit"
         open={attendanceModalVisible}
         onCancel={handleAttendanceModalClose}
         footer={null}
@@ -1078,14 +1043,14 @@ function Employees() {
                 <Col span={8}>
                   <div className="text-center">
                     <Text strong>
-                      PunÃ«tori: {selectedEmployeeForAttendance.fullName}
+                      Punëtori: {selectedEmployeeForAttendance.fullName}
                     </Text>
                   </div>
                 </Col>
                 <Col span={8}>
                   <div className="text-center">
                     <Text strong>
-                      DitÃ«t e Punuara: {calendarDays.filter(d => d.isPresent).length}
+                      Ditët e Punuara: {calendarDays.filter(d => d.isPresent).length}
                     </Text>
                   </div>
                 </Col>
@@ -1093,22 +1058,22 @@ function Employees() {
             </div>
 
             {/* Simple Calendar */}
-            <Card title={`Kalendari i PranisÃ« pÃ«r ${selectedMonth.format('MMMM YYYY')}`}>
+            <Card title={`Kalendari i Pranisë për ${selectedMonth.format('MMMM YYYY')}`}>
               <div className="mb-4">
-                <Text>Klikoni nÃ« checkbox pÃ«r tÃ« shÃ«nuar praninÃ«:</Text>
+                <Text>Klikoni në checkbox për të shënuar praninë:</Text>
               </div>
               
               {/* Loading indicator */}
               {attendanceLoading && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <Text className="text-sm text-blue-700">
-                    ðŸ”„ Duke ngarkuar tÃ« dhÃ«nat e pranisÃ«...
+                    🔄 Duke ngarkuar të dhënat e pranisë...
                   </Text>
                 </div>
               )}
               <div className="grid grid-cols-7 gap-2">
                 {/* Day headers */}
-                {['HÃ«n', 'Mar', 'MÃ«r', 'Enj', 'Pre', 'Sht', 'Die'].map(day => (
+                {['Hën', 'Mar', 'Mër', 'Enj', 'Pre', 'Sht', 'Die'].map(day => (
                   <div key={day} className="text-center font-semibold p-2 bg-gray-100 rounded">
                     {day}
                   </div>
@@ -1121,14 +1086,12 @@ function Employees() {
                     <Checkbox
                       checked={day.isPresent}
                       onChange={(e) => {
-                        console.log(`Checkbox changed for day ${day.dayNumber}:`, e.target.checked);
-                        console.log('Day object:', day);
                         toggleAttendance(day.date, e.target.checked);
                       }}
                       className={day.hasLocalChange ? 'border-yellow-400' : ''}
                     />
                     {day.hasLocalChange && (
-                      <div className="text-xs text-yellow-600 mt-1">â—</div>
+                      <div className="text-xs text-yellow-600 mt-1">●</div>
                     )}
                   </div>
                 ))}
@@ -1138,7 +1101,7 @@ function Employees() {
               <div className="mt-4 text-center">
                 <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <Text className="text-sm text-yellow-800">
-                    ðŸ’¡ <strong>UdhÃ«zues:</strong> TÃ« dhÃ«nat e pranisÃ« ruhen automatikisht Ã§do herÃ« qÃ« ndryshon njÃ« checkbox. Pasi tÃ« shÃ«nosh praninÃ«, kliko butonin "Llogarit RrogÃ«n" pÃ«r tÃ« pÃ«rditÃ«suar tabelÃ«n kryesore me ditÃ«t e punuara dhe rrogÃ«n e llogaritur. TÃ« dhÃ«nat do tÃ« mbeten tÃ« ruajtura edhe pas mbylljes sÃ« tabelÃ«s.
+                    💡 <strong>Udhëzues:</strong> Të dhënat e pranisë ruhen automatikisht çdo herë që ndryshon një checkbox. Pasi të shënosh praninë, kliko butonin "Llogarit Rrogën" për të përditësuar tabelën kryesore me ditët e punuara dhe rrogën e llogaritur. Të dhënat do të mbeten të ruajtura edhe pas mbylljes së tabelës.
                   </Text>
                 </div>
                 
@@ -1147,7 +1110,7 @@ function Employees() {
                   size="large"
                   onClick={async () => {
                     try {
-                      message.loading('Duke llogaritur rrogÃ«n dhe duke pÃ«rditÃ«suar tabelÃ«n kryesore...', 0);
+                      message.loading('Duke llogaritur rrogën dhe duke përditësuar tabelën kryesore...', 0);
                       
                       // Calculate days worked for this month using calendar days with local changes
                       const daysWorkedThisMonth = calendarDays.filter(d => d.isPresent).length;
@@ -1174,26 +1137,26 @@ function Employees() {
                       notifyDataChanged();
                       
                       message.destroy();
-                      message.success(`Rroga u llogarit! ${daysWorkedThisMonth} ditÃ« tÃ« punuara pÃ«r muajin ${selectedMonth.format('MMMM YYYY')}. Rroga mujore: ${salaryInfo.totalSalary.toFixed(2)} Ð´ÐµÐ½`);
+                      message.success(`Rroga u llogarit! ${daysWorkedThisMonth} ditë të punuara për muajin ${selectedMonth.format('MMMM YYYY')}. Rroga mujore: ${salaryInfo.totalSalary.toFixed(2)} ден`);
                       
                     } catch (error) {
                       message.destroy();
                       console.error('Error calculating salary and updating table:', error);
-                      message.error('Gabim nÃ« llogaritjen e rrogÃ«s dhe pÃ«rditÃ«simin e tabelÃ«s');
+                      message.error('Gabim në llogaritjen e rrogës dhe përditësimin e tabelës');
                     }
                   }}
                 >
-                  ðŸ’° Llogarit RrogÃ«n dhe PÃ«rditÃ«so TabelÃ«n
+                  💰 Llogarit Rrogën dhe Përditëso Tabelën
                 </Button>
               </div>
             </Card>
 
             {/* Attendance Summary */}
-            <Card title="PÃ«rmbledhje e PranisÃ«" className="mt-4">
+            <Card title="Përmbledhje e Pranisë" className="mt-4">
               <Row gutter={16}>
                 <Col span={8}>
                   <div className="text-center">
-                    <Text strong>DitÃ«t e Punuara</Text>
+                    <Text strong>Ditët e Punuara</Text>
                     <div className="text-2xl text-green-600">
                       {calendarDays.filter(d => d.isPresent).length}
                     </div>
@@ -1201,7 +1164,7 @@ function Employees() {
                 </Col>
                 <Col span={8}>
                   <div className="text-center">
-                    <Text strong>DitÃ«t e Munguara</Text>
+                    <Text strong>Ditët e Munguara</Text>
                     <div className="text-2xl text-red-600">
                       {calendarDays.filter(d => !d.isPresent).length}
                     </div>
@@ -1209,7 +1172,7 @@ function Employees() {
                 </Col>
                 <Col span={8}>
                   <div className="text-center">
-                    <Text strong>Total DitÃ«</Text>
+                    <Text strong>Total Ditë</Text>
                     <div className="text-2xl text-blue-600">
                       {calendarDays.length}
                     </div>
@@ -1220,7 +1183,7 @@ function Employees() {
               {/* Salary Preview */}
               {selectedEmployeeForAttendance && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <Text strong className="block mb-2 text-center">Parapamje e RrogÃ«s pÃ«r Muajin:</Text>
+                  <Text strong className="block mb-2 text-center">Parapamje e Rrogës për Muajin:</Text>
                   {(() => {
                     const daysWorked = calendarDays.filter(d => d.isPresent).length;
                     const salaryInfo = calculateMonthlySalary(selectedEmployeeForAttendance, daysWorked);
@@ -1230,7 +1193,7 @@ function Employees() {
                         <Row gutter={16}>
                           <Col span={6}>
                             <div className="text-center">
-                              <Text>DitÃ«t e Punuara</Text>
+                              <Text>Ditët e Punuara</Text>
                               <div className="text-lg font-semibold text-green-600">
                                 {salaryInfo.daysWorked}
                               </div>
@@ -1240,15 +1203,15 @@ function Employees() {
                             <div className="text-center">
                               <Text>Paga Ditore</Text>
                               <div className="text-lg font-semibold text-blue-600">
-                                {salaryInfo.dailyWage.toFixed(2)} Ð´ÐµÐ½
+                                {salaryInfo.dailyWage.toFixed(2)} ден
                               </div>
                             </div>
                           </Col>
                           <Col span={6}>
                             <div className="text-center">
-                              <Text>Paga BazÃ«</Text>
+                              <Text>Paga Bazë</Text>
                               <div className="text-lg font-semibold text-purple-600">
-                                {salaryInfo.baseSalary.toFixed(2)} Ð´ÐµÐ½
+                                {salaryInfo.baseSalary.toFixed(2)} ден
                               </div>
                             </div>
                           </Col>
@@ -1256,7 +1219,7 @@ function Employees() {
                             <div className="text-center">
                               <Text strong>Total Rroga</Text>
                               <div className="text-xl font-bold text-green-700">
-                                {salaryInfo.totalSalary.toFixed(2)} Ð´ÐµÐ½
+                                {salaryInfo.totalSalary.toFixed(2)} ден
                               </div>
                             </div>
                           </Col>
@@ -1264,12 +1227,12 @@ function Employees() {
                         <Row gutter={16} className="mt-2">
                           <Col span={12}>
                             <div className="text-center">
-                              <Text>Bonuset: +{salaryInfo.monthlyBonuses.toFixed(2)} Ð´ÐµÐ½</Text>
+                              <Text>Bonuset: +{salaryInfo.monthlyBonuses.toFixed(2)} ден</Text>
                             </div>
                           </Col>
                           <Col span={12}>
                             <div className="text-center">
-                              <Text>Gjobat: -{salaryInfo.monthlyPenalties.toFixed(2)} Ð´ÐµÐ½</Text>
+                              <Text>Gjobat: -{salaryInfo.monthlyPenalties.toFixed(2)} ден</Text>
                             </div>
                           </Col>
                         </Row>
