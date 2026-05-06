@@ -51,7 +51,7 @@ function App() {
                 index
                 element={
                   <ProtectedRoute
-                    requiredPermission={PERMISSIONS.DASHBOARD_VIEW}
+                    requiredPermission={PERMISSIONS.WORKERS_VIEW_OWN_DASHBOARD}
                   >
                     <Dashboard />
                   </ProtectedRoute>
@@ -247,6 +247,7 @@ function App() {
                 path="my-salary"
                 element={
                   <ProtectedRoute
+                    requiredRole={ROLES.USER}
                     requiredPermission={PERMISSIONS.WORKERS_VIEW_OWN_SALARY}
                   >
                     <WorkerSalary />

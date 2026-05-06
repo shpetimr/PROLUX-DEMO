@@ -36,12 +36,6 @@ namespace backend.Services
 
         public int? GetCurrentEmployeeId()
         {
-            var employeeIdClaim = _httpContextAccessor.HttpContext?.User?.FindFirst("employeeId")?.Value;
-            if (int.TryParse(employeeIdClaim, out var employeeId))
-            {
-                return employeeId;
-            }
-
             var userId = GetCurrentUserId();
             if (userId == 0)
             {

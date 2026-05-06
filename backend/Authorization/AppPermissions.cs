@@ -57,11 +57,6 @@ namespace backend.Authorization
                 [UserRole.Admin] = All,
                 [UserRole.User] = new[]
                 {
-                    DashboardView,
-                    TemplatesPrint,
-                    OffersPrint,
-                    ExpensesManage,
-                    PurchasesManage,
                     WorkersViewOwnDashboard,
                     WorkersViewOwnTasks,
                     WorkersUpdateOwnTaskStatus,

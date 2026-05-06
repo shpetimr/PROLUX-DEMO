@@ -50,7 +50,7 @@ function Layout() {
         key: "/",
         icon: <DashboardOutlined />,
         label: "Dashboard",
-        requiredPermission: PERMISSIONS.DASHBOARD_VIEW,
+        requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_DASHBOARD,
       },
       {
         key: "/template-print",
