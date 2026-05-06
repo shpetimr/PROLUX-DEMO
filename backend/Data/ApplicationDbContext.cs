@@ -21,6 +21,7 @@ namespace backend.Data
         public DbSet<Debt> Debts { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Project> Projects { get; set; }
+        public DbSet<InvoiceArchive> InvoiceArchives { get; set; }
         public DbSet<StockItem> StockItems { get; set; }
         public DbSet<StockMovement> StockMovements { get; set; }
         public DbSet<WorkerTask> WorkerTasks { get; set; }
@@ -183,6 +184,27 @@ namespace backend.Data
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<InvoiceArchive>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.InvoiceNumber).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.CustomerName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.CustomerAddress).HasMaxLength(500);
+                entity.Property(e => e.CustomerPhone).HasMaxLength(50);
+                entity.Property(e => e.Language).IsRequired().HasConversion<string>();
+                entity.Property(e => e.ItemsJson).IsRequired();
+                entity.Property(e => e.Subtotal).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Total).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.InvoiceNumber);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.CreatedById);
             });
 
             modelBuilder.Entity<StockItem>(entity =>

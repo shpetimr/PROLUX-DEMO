@@ -306,6 +306,7 @@ namespace backend.Data
                 await CopyTableAsync(source.Incomes, destination.Incomes, "Incomes", dryRun, cancellationToken),
                 await CopyTableAsync(source.Debts, destination.Debts, "Debts", dryRun, cancellationToken),
                 await CopyTableAsync(source.Projects, destination.Projects, "Projects", dryRun, cancellationToken),
+                await CopyTableAsync(source.InvoiceArchives, destination.InvoiceArchives, "InvoiceArchives", dryRun, cancellationToken),
                 await CopyTableAsync(source.StockItems, destination.StockItems, "StockItems", dryRun, cancellationToken),
                 await CopyTableAsync(source.StockMovements, destination.StockMovements, "StockMovements", dryRun, cancellationToken)
             };
@@ -518,6 +519,7 @@ WHERE table_schema = current_schema()
             await ValidateTableIdsAsync(source.Incomes, destination.Incomes, "Incomes", cancellationToken);
             await ValidateTableIdsAsync(source.Debts, destination.Debts, "Debts", cancellationToken);
             await ValidateTableIdsAsync(source.Projects, destination.Projects, "Projects", cancellationToken);
+            await ValidateTableIdsAsync(source.InvoiceArchives, destination.InvoiceArchives, "InvoiceArchives", cancellationToken);
             await ValidateTableIdsAsync(source.StockItems, destination.StockItems, "StockItems", cancellationToken);
             await ValidateTableIdsAsync(source.StockMovements, destination.StockMovements, "StockMovements", cancellationToken);
         }
@@ -590,6 +592,7 @@ SELECT setval(
                 new("Incomes", await destination.Incomes.CountAsync(cancellationToken)),
                 new("Debts", await destination.Debts.CountAsync(cancellationToken)),
                 new("Projects", await destination.Projects.CountAsync(cancellationToken)),
+                new("InvoiceArchives", await destination.InvoiceArchives.CountAsync(cancellationToken)),
                 new("StockItems", await destination.StockItems.CountAsync(cancellationToken)),
                 new("StockMovements", await destination.StockMovements.CountAsync(cancellationToken))
             };
@@ -619,6 +622,7 @@ SELECT setval(
             "Incomes",
             "Debts",
             "Projects",
+            "InvoiceArchives",
             "StockItems",
             "StockMovements"
         };

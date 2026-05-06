@@ -13,9 +13,10 @@ namespace backend.Security
         int Incomes,
         int Rents,
         int Debts,
-        int Projects)
+        int Projects,
+        int InvoiceArchives)
     {
-        public int Total => Employees + Expenses + Purchases + Incomes + Rents + Debts + Projects;
+        public int Total => Employees + Expenses + Purchases + Incomes + Rents + Debts + Projects + InvoiceArchives;
     }
 
     public sealed record AuthUserAuditSummary(
@@ -216,8 +217,9 @@ namespace backend.Security
             var rents = await _context.Rents.CountAsync(entity => entity.CreatedById == userId);
             var debts = await _context.Debts.CountAsync(entity => entity.CreatedById == userId);
             var projects = await _context.Projects.CountAsync(entity => entity.CreatedById == userId);
+            var invoiceArchives = await _context.InvoiceArchives.CountAsync(entity => entity.CreatedById == userId);
 
-            return new UserReferenceSummary(employees, expenses, purchases, incomes, rents, debts, projects);
+            return new UserReferenceSummary(employees, expenses, purchases, incomes, rents, debts, projects, invoiceArchives);
         }
 
         private static string NormalizeUsername(string username)
