@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
+using backend.Utilities;
 
 namespace backend.Services
 {
@@ -16,27 +17,66 @@ namespace backend.Services
 
         public async Task<decimal> CalculateMonthlySalaryAsync(int employeeId, DateTime month)
         {
-            var employee = await _context.Employees.FindAsync(employeeId);
+            var calculation = await GetSalaryCalculationAsync(employeeId, month);
+            return calculation.FinalSalary;
+        }
+
+        public async Task<SalaryCalculationDto> GetSalaryCalculationAsync(int employeeId, DateTime month)
+        {
+            var monthStart = DateTimeUtc.MonthStart(month.Year, month.Month);
+            var monthEnd = monthStart.AddMonths(1);
+
+            var employee = await _context.Employees
+                .AsNoTracking()
+                .Include(e => e.UserAccount)
+                .FirstOrDefaultAsync(e => e.Id == employeeId);
             if (employee == null)
                 throw new ArgumentException("Employee not found");
 
-            decimal totalSalary = SalaryCalculator.CalculateMonthlySalary(employee);
-            
-            // Debug logging
-            Console.WriteLine($"=== SALARY CALCULATION DEBUG ===");
-            Console.WriteLine($"Employee: {employee.FullName}");
-            Console.WriteLine($"Daily Wage: {employee.DailyWage}");
-            Console.WriteLine($"Days Worked: {employee.DaysWorkedThisMonth}");
-            Console.WriteLine($"Half Days: {employee.HalfDaysThisMonth}");
-            Console.WriteLine($"Overtime Hours: {employee.TotalOvertimeHoursThisMonth}");
-            Console.WriteLine($"Daily Bonuses: {employee.CalculatedDailyBonuses}");
-            Console.WriteLine($"Daily Penalties: {employee.CalculatedDailyPenalties}");
-            Console.WriteLine($"Monthly Bonuses: {employee.MonthlyBonuses}");
-            Console.WriteLine($"Monthly Penalties: {employee.MonthlyPenalties}");
-            Console.WriteLine($"Total Salary: {totalSalary}");
-            Console.WriteLine($"=== END SALARY CALCULATION DEBUG ===");
-            
-            return totalSalary;
+            var absentDays = await _context.AttendanceRecords
+                .AsNoTracking()
+                .CountAsync(a =>
+                    a.EmployeeId == employeeId &&
+                    a.Date >= monthStart &&
+                    a.Date < monthEnd &&
+                    !a.IsPresent);
+
+            return BuildSalaryCalculation(employee, absentDays, monthStart);
+        }
+
+        public async Task<List<SalaryCalculationDto>> GetSalaryCalculationsForMonthAsync(DateTime month)
+        {
+            var monthStart = DateTimeUtc.MonthStart(month.Year, month.Month);
+            var monthEnd = monthStart.AddMonths(1);
+
+            var employees = await _context.Employees
+                .AsNoTracking()
+                .Include(e => e.UserAccount)
+                .OrderBy(e => e.FullName)
+                .ToListAsync();
+
+            var employeeIds = employees.Select(e => e.Id).ToList();
+            var absentDaysByEmployee = await _context.AttendanceRecords
+                .AsNoTracking()
+                .Where(a =>
+                    employeeIds.Contains(a.EmployeeId) &&
+                    a.Date >= monthStart &&
+                    a.Date < monthEnd &&
+                    !a.IsPresent)
+                .GroupBy(a => a.EmployeeId)
+                .Select(group => new
+                {
+                    EmployeeId = group.Key,
+                    AbsentDays = group.Count()
+                })
+                .ToDictionaryAsync(group => group.EmployeeId, group => group.AbsentDays);
+
+            return employees
+                .Select(employee => BuildSalaryCalculation(
+                    employee,
+                    absentDaysByEmployee.TryGetValue(employee.Id, out var absentDays) ? absentDays : 0,
+                    monthStart))
+                .ToList();
         }
 
         public decimal GetDailyWageForPosition(EmployeePosition position)
@@ -53,10 +93,6 @@ namespace backend.Services
 
         public async Task<SalaryRecord> CreateSalaryRecordAsync(int employeeId, DateTime month)
         {
-            var employee = await _context.Employees.FindAsync(employeeId);
-            if (employee == null)
-                throw new ArgumentException("Employee not found");
-
             // Check if salary record already exists for this month
             var existingRecord = await _context.SalaryRecords
                 .FirstOrDefaultAsync(sr => sr.EmployeeId == employeeId && 
@@ -66,17 +102,17 @@ namespace backend.Services
             if (existingRecord != null)
                 throw new InvalidOperationException("Salary record already exists for this month");
 
-            decimal totalSalary = await CalculateMonthlySalaryAsync(employeeId, month);
+            var calculation = await GetSalaryCalculationAsync(employeeId, month);
 
             var salaryRecord = new SalaryRecord
             {
                 EmployeeId = employeeId,
                 Month = new DateTime(month.Year, month.Month, 1),
-                BaseSalary = employee.DailyWage, // Store the daily wage as base salary
-                Bonuses = employee.MonthlyBonuses + employee.CalculatedDailyBonuses,
-                Penalties = employee.MonthlyPenalties + employee.CalculatedDailyPenalties,
-                TotalSalary = totalSalary,
-                DaysWorked = employee.DaysWorkedThisMonth,
+                BaseSalary = calculation.MonthlySalary,
+                Bonuses = 0,
+                Penalties = calculation.TotalDeduction,
+                TotalSalary = calculation.FinalSalary,
+                DaysWorked = Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - calculation.AbsentDays),
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -106,6 +142,29 @@ namespace backend.Services
             return await _context.SalaryRecords
                 .Where(sr => sr.Month >= startDate && sr.Month <= endDate)
                 .SumAsync(sr => sr.DaysWorked);
+        }
+
+        private static SalaryCalculationDto BuildSalaryCalculation(Employee employee, int absentDays, DateTime month)
+        {
+            var monthlySalary = SalaryCalculator.GetMonthlySalary(employee);
+            var dailyDeduction = SalaryCalculator.CalculateDailyDeduction(monthlySalary);
+            var totalDeduction = absentDays * dailyDeduction;
+
+            return new SalaryCalculationDto
+            {
+                EmployeeId = employee.Id,
+                EmployeeName = employee.FullName,
+                LinkedUserId = employee.UserAccount?.Id,
+                LinkedUsername = employee.UserAccount?.Username,
+                Year = month.Year,
+                Month = month.Month,
+                MonthlySalary = monthlySalary,
+                AbsentDays = absentDays,
+                DailyDeduction = dailyDeduction,
+                TotalDeduction = totalDeduction,
+                FinalSalary = monthlySalary - totalDeduction,
+                Formula = "Final salary = Monthly salary - absentDays * (Monthly salary / 22)"
+            };
         }
     }
 } 

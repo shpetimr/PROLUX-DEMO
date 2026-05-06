@@ -17,8 +17,9 @@ namespace backend.DTOs
         
         [Required]
         public string hireDate { get; set; } = string.Empty;
-        
 
+        [Range(0, double.MaxValue)]
+        public decimal? baseSalary { get; set; }
 
         [Required]
         [Range(0, double.MaxValue)]
@@ -50,7 +51,8 @@ namespace backend.DTOs
         
         public string? hireDate { get; set; }
         
-
+        [Range(0, double.MaxValue)]
+        public decimal? baseSalary { get; set; }
         
         [Range(0, double.MaxValue)]
         public decimal? dailyWage { get; set; } // Custom daily wage set by admin

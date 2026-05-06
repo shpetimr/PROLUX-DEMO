@@ -190,13 +190,18 @@ namespace backend.Controllers
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
             
+            var configuredMonthlySalary = dto.baseSalary ?? dto.dailyWage * SalaryCalculator.StandardWorkingDaysPerMonth;
+            var dailyWage = dto.dailyWage > 0
+                ? dto.dailyWage
+                : SalaryCalculator.CalculateDailyDeduction(configuredMonthlySalary);
+
             var employee = new Employee
             {
                 FullName = dto.fullName,
                 Position = position,
                 HireDate = hireDate,
-                BaseSalary = 0, // Set to 0 since we're not using base salary anymore
-                DailyWage = dto.dailyWage,
+                BaseSalary = configuredMonthlySalary,
+                DailyWage = dailyWage,
                 DaysWorkedThisMonth = 0, // Will be calculated from attendance records
                 MonthlyBonuses = dto.monthlyBonuses,
                 MonthlyPenalties = dto.monthlyPenalties,
@@ -311,6 +316,9 @@ namespace backend.Controllers
                 }
                 employee.HireDate = hireDate;
             }
+
+            if (dto.baseSalary.HasValue)
+                employee.BaseSalary = dto.baseSalary.Value;
 
             if (dto.dailyWage.HasValue)
                 employee.DailyWage = dto.dailyWage.Value;

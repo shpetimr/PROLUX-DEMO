@@ -317,7 +317,7 @@ namespace backend.Services
                 FullName = fullName.Trim(),
                 Position = position,
                 HireDate = hireDate,
-                BaseSalary = 0,
+                BaseSalary = (dailyWage ?? defaultDailyWage) * SalaryCalculator.StandardWorkingDaysPerMonth,
                 DailyWage = dailyWage ?? defaultDailyWage,
                 DaysWorkedThisMonth = 0,
                 MonthlyBonuses = 0,

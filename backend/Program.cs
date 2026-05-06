@@ -87,6 +87,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<AuthMaintenanceService>();
 builder.Services.AddScoped<SqliteToPostgresMigrator>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ISalaryService, SalaryService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();

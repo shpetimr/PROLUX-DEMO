@@ -4,15 +4,31 @@ namespace backend.Services
 {
     public static class SalaryCalculator
     {
+        public const int StandardWorkingDaysPerMonth = 22;
+
         public static decimal CalculateMonthlySalary(Employee employee)
         {
-            var fullDayPay = employee.DaysWorkedThisMonth * employee.DailyWage;
-            var halfDayPay = employee.HalfDaysThisMonth * employee.DailyWage / 2;
-            var overtimePay = employee.TotalOvertimeHoursThisMonth * employee.OvertimeRate;
-            var bonuses = employee.CalculatedDailyBonuses + employee.MonthlyBonuses;
-            var penalties = employee.CalculatedDailyPenalties + employee.MonthlyPenalties;
+            return CalculateMonthlySalary(employee, employee.AbsentDaysThisMonth);
+        }
 
-            return fullDayPay + halfDayPay + overtimePay + bonuses - penalties;
+        public static decimal CalculateMonthlySalary(Employee employee, int absentDays)
+        {
+            var monthlySalary = GetMonthlySalary(employee);
+            var dailyDeduction = CalculateDailyDeduction(monthlySalary);
+
+            return monthlySalary - absentDays * dailyDeduction;
+        }
+
+        public static decimal CalculateDailyDeduction(decimal monthlySalary)
+        {
+            return monthlySalary / StandardWorkingDaysPerMonth;
+        }
+
+        public static decimal GetMonthlySalary(Employee employee)
+        {
+            return employee.BaseSalary > 0
+                ? employee.BaseSalary
+                : employee.DailyWage * StandardWorkingDaysPerMonth;
         }
     }
 }
