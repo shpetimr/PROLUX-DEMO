@@ -89,6 +89,7 @@ builder.Services.AddScoped<SqliteToPostgresMigrator>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISalaryService, SalaryService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<InvoiceTemplatePdfService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 

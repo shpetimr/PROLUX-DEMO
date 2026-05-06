@@ -17,13 +17,16 @@ namespace backend.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ICurrentUserService _currentUserService;
+        private readonly InvoiceTemplatePdfService _pdfService;
 
         public InvoiceArchiveController(
             ApplicationDbContext context,
-            ICurrentUserService currentUserService)
+            ICurrentUserService currentUserService,
+            InvoiceTemplatePdfService pdfService)
         {
             _context = context;
             _currentUserService = currentUserService;
+            _pdfService = pdfService;
         }
 
         [HttpGet]
@@ -69,6 +72,23 @@ namespace backend.Controllers
             }
 
             return Ok(ToDto(invoice));
+        }
+
+        [HttpGet("{id:int}/pdf")]
+        public async Task<IActionResult> ExportArchivedInvoicePdf(int id)
+        {
+            var invoice = await _context.InvoiceArchives
+                .AsNoTracking()
+                .Include(entity => entity.CreatedBy)
+                .FirstOrDefaultAsync(entity => entity.Id == id);
+
+            if (invoice == null)
+            {
+                return NotFound();
+            }
+
+            var pdfBytes = _pdfService.GenerateArchivedInvoicePdf(invoice);
+            return File(pdfBytes, "application/pdf", $"ArchivedInvoice-{SanitizeFileName(invoice.InvoiceNumber)}.pdf");
         }
 
         [HttpPost]
@@ -183,6 +203,17 @@ namespace backend.Controllers
         private static string? NormalizeOptional(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var cleaned = new string(value
+                .Where(character => !invalidChars.Contains(character))
+                .ToArray())
+                .Trim();
+
+            return string.IsNullOrWhiteSpace(cleaned) ? "invoice" : cleaned;
         }
     }
 }

@@ -1,7 +1,9 @@
+using System.IO;
+using System.Text.Json;
+using backend.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using System.IO;
 
 namespace backend.Services
 {
@@ -20,6 +22,30 @@ namespace backend.Services
                     page.Header().Element(ComposeHeader);
                     page.Content().Element(ComposeContent);
                     page.Footer().Element(ComposeFooter);
+                });
+            });
+
+            using var ms = new MemoryStream();
+            document.GeneratePdf(ms);
+            return ms.ToArray();
+        }
+
+        public byte[] GenerateArchivedInvoicePdf(InvoiceArchive invoice)
+        {
+            var labels = InvoiceArchivePdfLabels.For(invoice.Language);
+            var snapshot = ParseArchivedInvoiceSnapshot(invoice.ItemsJson);
+
+            var document = Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(30);
+                    page.DefaultTextStyle(x => x.FontFamily("Lato").FontSize(10));
+
+                    page.Header().Element(ComposeHeader);
+                    page.Content().Element(content => ComposeArchivedInvoiceContent(content, invoice, snapshot, labels));
+                    page.Footer().Element(footer => ComposeFooter(footer, labels.ContactLine));
                 });
             });
 
@@ -122,17 +148,380 @@ namespace backend.Services
             });
         }
 
+        void ComposeArchivedInvoiceContent(
+            IContainer container,
+            InvoiceArchive invoice,
+            ArchivedInvoiceSnapshot snapshot,
+            InvoiceArchivePdfLabels labels)
+        {
+            container.PaddingTop(16).Column(col =>
+            {
+                col.Item().AlignCenter().Text(labels.Title).Bold().FontSize(18);
+                col.Item().PaddingTop(12).Row(row =>
+                {
+                    row.RelativeItem().Column(customer =>
+                    {
+                        customer.Item().Text(labels.Customer).Bold();
+                        customer.Item().Text(invoice.CustomerName);
+
+                        if (!string.IsNullOrWhiteSpace(invoice.CustomerAddress))
+                        {
+                            customer.Item().PaddingTop(3).Text($"{labels.Address}: {invoice.CustomerAddress}");
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(invoice.CustomerPhone))
+                        {
+                            customer.Item().PaddingTop(3).Text($"{labels.Phone}: {invoice.CustomerPhone}");
+                        }
+                    });
+
+                    row.ConstantItem(190).AlignRight().Column(metadata =>
+                    {
+                        metadata.Item().Text($"{labels.InvoiceNumber}: {invoice.InvoiceNumber}").Bold();
+                        metadata.Item().PaddingTop(3).Text($"{labels.Date}: {snapshot.InvoiceDate ?? FormatArchiveDate(invoice.CreatedAt)}");
+                        metadata.Item().PaddingTop(3).Text($"{labels.ArchivedAt}: {FormatArchiveDate(invoice.CreatedAt)}");
+                        metadata.Item().PaddingTop(3).Text($"{labels.ArchivedBy}: {invoice.CreatedBy.FullName}");
+                    });
+                });
+
+                col.Item().PaddingTop(16).Element(table => ComposeArchivedItemsTable(table, snapshot.Items, labels));
+                col.Item().PaddingTop(14).Row(row =>
+                {
+                    row.RelativeItem().Element(notes => ComposeArchivedNotes(notes, invoice, snapshot, labels));
+                    row.ConstantItem(220).Element(totals => ComposeArchivedTotals(totals, invoice, labels));
+                });
+            });
+        }
+
+        void ComposeArchivedItemsTable(
+            IContainer container,
+            IReadOnlyList<ArchivedInvoiceItem> items,
+            InvoiceArchivePdfLabels labels)
+        {
+            var displayItems = items.Count > 0
+                ? items
+                : new[] { new ArchivedInvoiceItem("", "", "", "", "", "") };
+
+            container.Table(table =>
+            {
+                table.ColumnsDefinition(columns =>
+                {
+                    columns.ConstantColumn(38);
+                    columns.RelativeColumn(2);
+                    columns.RelativeColumn(2);
+                    columns.ConstantColumn(64);
+                    columns.ConstantColumn(68);
+                    columns.ConstantColumn(72);
+                });
+
+                table.Header(header =>
+                {
+                    header.Cell().Element(ArchivedHeaderCellStyle).Text(labels.Item).Bold();
+                    header.Cell().Element(ArchivedHeaderCellStyle).Text(labels.Name).Bold();
+                    header.Cell().Element(ArchivedHeaderCellStyle).Text(labels.Materials).Bold();
+                    header.Cell().Element(ArchivedHeaderCellStyle).Text(labels.Quantity).Bold();
+                    header.Cell().Element(ArchivedHeaderCellStyle).Text(labels.Price).Bold();
+                    header.Cell().Element(ArchivedHeaderCellStyle).Text(labels.LineTotal).Bold();
+                });
+
+                for (var index = 0; index < displayItems.Count; index++)
+                {
+                    var item = displayItems[index];
+                    table.Cell().Element(ArchivedBodyCellStyle).Text(string.IsNullOrWhiteSpace(item.Item) ? (index + 1).ToString() : item.Item);
+                    table.Cell().Element(ArchivedBodyCellStyle).Text(item.Name);
+                    table.Cell().Element(ArchivedBodyCellStyle).Text(item.Materials);
+                    table.Cell().Element(ArchivedBodyCellStyle).Text(item.Quantity);
+                    table.Cell().Element(ArchivedBodyCellStyle).Text(item.Price);
+                    table.Cell().Element(ArchivedBodyCellStyle).Text(item.Total);
+                }
+            });
+
+            static IContainer ArchivedHeaderCellStyle(IContainer container)
+            {
+                return container.Border(1).BorderColor("#333333").Background("#EEEEEE").Padding(4);
+            }
+
+            static IContainer ArchivedBodyCellStyle(IContainer container)
+            {
+                return container.Border(1).BorderColor("#999999").MinHeight(22).Padding(4);
+            }
+        }
+
+        void ComposeArchivedNotes(
+            IContainer container,
+            InvoiceArchive invoice,
+            ArchivedInvoiceSnapshot snapshot,
+            InvoiceArchivePdfLabels labels)
+        {
+            container.PaddingRight(14).Column(col =>
+            {
+                col.Item().Text(labels.Notes).Bold();
+
+                var hasNotes = false;
+                if (!string.IsNullOrWhiteSpace(invoice.Notes))
+                {
+                    hasNotes = true;
+                    col.Item().PaddingTop(4).Text(invoice.Notes);
+                }
+
+                foreach (var line in snapshot.DescriptionLines.Where(line => !string.IsNullOrWhiteSpace(line)))
+                {
+                    hasNotes = true;
+                    col.Item().PaddingTop(3).Text(line);
+                }
+
+                if (!hasNotes)
+                {
+                    col.Item().PaddingTop(4).Text("-");
+                }
+            });
+        }
+
+        void ComposeArchivedTotals(IContainer container, InvoiceArchive invoice, InvoiceArchivePdfLabels labels)
+        {
+            container.BorderTop(1).BorderColor("#CCCCCC").PaddingTop(8).Column(col =>
+            {
+                col.Item().Row(row =>
+                {
+                    row.RelativeItem().Text(labels.Subtotal);
+                    row.ConstantItem(90).AlignRight().Text(FormatMoney(invoice.Subtotal)).Bold();
+                });
+
+                col.Item().PaddingTop(6).Row(row =>
+                {
+                    row.RelativeItem().Text(labels.Total).Bold();
+                    row.ConstantItem(90).AlignRight().Text(FormatMoney(invoice.Total)).Bold().FontSize(12);
+                });
+            });
+        }
+
         void ComposeFooter(IContainer container)
+        {
+            ComposeFooter(container, "For any further information you can contact us:");
+        }
+
+        void ComposeFooter(IContainer container, string contactLine)
         {
             container.PaddingTop(10).Row(row =>
             {
-                row.RelativeItem().Text("For any further information you can contact us:").Italic().FontSize(9);
+                row.RelativeItem().Text(contactLine).Italic().FontSize(9);
             });
             container.Row(row =>
             {
                 row.RelativeItem().Text("Email: proluxceramics01@gmail.com").FontSize(9);
                 row.RelativeItem().AlignRight().Text("Tel: 071/764/334").FontSize(9);
             });
+        }
+
+        static ArchivedInvoiceSnapshot ParseArchivedInvoiceSnapshot(string itemsJson)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(itemsJson);
+                var root = document.RootElement;
+                var invoiceDate = TryReadPropertyAsText(root, "date")
+                    ?? TryReadPropertyAsText(root, "invoiceDate");
+                var descriptionLines = ReadDescriptionLines(root);
+
+                var itemRoot = root.ValueKind == JsonValueKind.Array
+                    ? root
+                    : TryGetProperty(root, "items")
+                        ?? TryGetProperty(root, "rows")
+                        ?? TryGetProperty(root, "lines");
+
+                if (itemRoot is not { ValueKind: JsonValueKind.Array } itemsElement)
+                {
+                    return new ArchivedInvoiceSnapshot(Array.Empty<ArchivedInvoiceItem>(), invoiceDate, descriptionLines);
+                }
+
+                var items = itemsElement.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.Object)
+                    .Select((item, index) => new ArchivedInvoiceItem(
+                        TryReadPropertyAsText(item, "item")
+                            ?? TryReadPropertyAsText(item, "itemNumber")
+                            ?? TryReadPropertyAsText(item, "number")
+                            ?? (index + 1).ToString(),
+                        TryReadPropertyAsText(item, "name")
+                            ?? TryReadPropertyAsText(item, "itemName")
+                            ?? TryReadPropertyAsText(item, "description")
+                            ?? string.Empty,
+                        TryReadPropertyAsText(item, "materials")
+                            ?? TryReadPropertyAsText(item, "material")
+                            ?? string.Empty,
+                        TryReadPropertyAsText(item, "m2pcs")
+                            ?? TryReadPropertyAsText(item, "m2Pcs")
+                            ?? TryReadPropertyAsText(item, "quantity")
+                            ?? TryReadPropertyAsText(item, "qty")
+                            ?? TryReadPropertyAsText(item, "unit")
+                            ?? string.Empty,
+                        TryReadPropertyAsText(item, "price")
+                            ?? TryReadPropertyAsText(item, "unitPrice")
+                            ?? string.Empty,
+                        TryReadPropertyAsText(item, "total")
+                            ?? TryReadPropertyAsText(item, "lineTotal")
+                            ?? string.Empty))
+                    .ToList();
+
+                return new ArchivedInvoiceSnapshot(items, invoiceDate, descriptionLines);
+            }
+            catch (JsonException)
+            {
+                return new ArchivedInvoiceSnapshot(Array.Empty<ArchivedInvoiceItem>(), null, Array.Empty<string>());
+            }
+        }
+
+        static IReadOnlyList<string> ReadDescriptionLines(JsonElement root)
+        {
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return Array.Empty<string>();
+            }
+
+            var description = TryGetProperty(root, "description")
+                ?? TryGetProperty(root, "descriptions")
+                ?? TryGetProperty(root, "notes");
+
+            if (description is not { } value)
+            {
+                return Array.Empty<string>();
+            }
+
+            if (value.ValueKind == JsonValueKind.Array)
+            {
+                return value.EnumerateArray()
+                    .Select(ReadElementText)
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .Select(text => text!)
+                    .ToList();
+            }
+
+            var line = ReadElementText(value);
+            return string.IsNullOrWhiteSpace(line)
+                ? Array.Empty<string>()
+                : new[] { line };
+        }
+
+        static JsonElement? TryGetProperty(JsonElement element, string propertyName)
+        {
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return property.Value;
+                }
+            }
+
+            return null;
+        }
+
+        static string? TryReadPropertyAsText(JsonElement element, string propertyName)
+        {
+            var property = TryGetProperty(element, propertyName);
+            return property.HasValue ? ReadElementText(property.Value) : null;
+        }
+
+        static string? ReadElementText(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.String => element.GetString()?.Trim(),
+                JsonValueKind.Number => element.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => null
+            };
+        }
+
+        static string FormatArchiveDate(DateTime value)
+        {
+            return value.ToString("dd.MM.yyyy");
+        }
+
+        static string FormatMoney(decimal value)
+        {
+            return $"{value:0.00} MKD";
+        }
+
+        sealed record ArchivedInvoiceSnapshot(
+            IReadOnlyList<ArchivedInvoiceItem> Items,
+            string? InvoiceDate,
+            IReadOnlyList<string> DescriptionLines);
+
+        sealed record ArchivedInvoiceItem(
+            string Item,
+            string Name,
+            string Materials,
+            string Quantity,
+            string Price,
+            string Total);
+
+        sealed record InvoiceArchivePdfLabels(
+            string Title,
+            string Customer,
+            string Address,
+            string Phone,
+            string InvoiceNumber,
+            string Date,
+            string ArchivedAt,
+            string ArchivedBy,
+            string Item,
+            string Name,
+            string Materials,
+            string Quantity,
+            string Price,
+            string LineTotal,
+            string Notes,
+            string Subtotal,
+            string Total,
+            string ContactLine)
+        {
+            public static InvoiceArchivePdfLabels For(InvoiceLanguage language)
+            {
+                return language == InvoiceLanguage.Macedonian
+                    ? new InvoiceArchivePdfLabels(
+                        "ФАКТУРА",
+                        "Клиент",
+                        "Адреса",
+                        "Телефон",
+                        "Бр. фактура",
+                        "Датум",
+                        "Архивирано",
+                        "Архивирал",
+                        "Р.Б.",
+                        "Име",
+                        "Материјали",
+                        "m2/парчиња",
+                        "Цена",
+                        "Вкупно",
+                        "Забелешки",
+                        "Меѓузбир",
+                        "Вкупно",
+                        "За повеќе информации контактирајте не:")
+                    : new InvoiceArchivePdfLabels(
+                        "FATURË",
+                        "Klienti",
+                        "Adresa",
+                        "Telefoni",
+                        "Nr. faturës",
+                        "Data",
+                        "Arkivuar më",
+                        "Arkivuar nga",
+                        "Nr.",
+                        "Emri",
+                        "Materialet",
+                        "m2/copë",
+                        "Çmimi",
+                        "Totali",
+                        "Shënime",
+                        "Nëntotali",
+                        "Totali",
+                        "Për çdo informacion shtesë mund të na kontaktoni:");
+            }
         }
     }
 } 

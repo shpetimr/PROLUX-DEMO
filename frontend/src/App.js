@@ -25,6 +25,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { DataChangeProvider } from "./contexts/DataChangeContext";
 import TemplatePrint from "./pages/TemplatePrint";
 import OfferPrint from "./pages/OfferPrint";
+import InvoiceArchive from "./pages/InvoiceArchive";
 import Stock from "./pages/Stock";
 import { PERMISSIONS } from "./config/permissions";
 
@@ -161,6 +162,16 @@ function App() {
                     requiredPermission={PERMISSIONS.OFFERS_PRINT}
                   >
                     <OfferPrint />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="invoice-archive"
+                element={
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.INVOICE_ARCHIVE_MANAGE}
+                  >
+                    <InvoiceArchive />
                   </ProtectedRoute>
                 }
               />

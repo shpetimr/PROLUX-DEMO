@@ -65,6 +65,12 @@ function Layout() {
         requiredPermission: PERMISSIONS.OFFERS_PRINT,
       },
       {
+        key: "/invoice-archive",
+        icon: <FileTextOutlined />,
+        label: "Archived Invoices",
+        requiredPermission: PERMISSIONS.INVOICE_ARCHIVE_MANAGE,
+      },
+      {
         key: "/employees",
         icon: <TeamOutlined />,
         label: "PunÃ«torÃ«t",

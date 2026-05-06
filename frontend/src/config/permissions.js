@@ -7,6 +7,7 @@ export const PERMISSIONS = {
   DASHBOARD_VIEW: "dashboard.view",
   TEMPLATES_PRINT: "templates.print",
   OFFERS_PRINT: "offers.print",
+  INVOICE_ARCHIVE_MANAGE: "invoiceArchive.manage",
   EXPENSES_MANAGE: "expenses.manage",
   PURCHASES_MANAGE: "purchases.manage",
   EMPLOYEES_MANAGE: "employees.manage",

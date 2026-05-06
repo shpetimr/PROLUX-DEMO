@@ -246,6 +246,10 @@ export const API_ENDPOINTS = {
   WORKER_TASKS: "/worker-tasks",
   WORKER_TASK_BY_ID: (id) => `/worker-tasks/${id}`,
   WORKER_TASK_STATUS: (id) => `/worker-tasks/${id}/status`,
+
+  INVOICE_ARCHIVE: "/invoice-archive",
+  INVOICE_ARCHIVE_BY_ID: (id) => `/invoice-archive/${id}`,
+  INVOICE_ARCHIVE_PDF: (id) => `/invoice-archive/${id}/pdf`,
 };
 
 export default apiClient;
