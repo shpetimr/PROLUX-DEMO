@@ -183,6 +183,8 @@ export const API_ENDPOINTS = {
   EMPLOYEES: "/employees",
   EMPLOYEE_BY_ID: (id) => `/employees/${id}`,
 
+  SALARY_MONTH: (year, month) => `/salary/month/${year}/${month}`,
+
   ATTENDANCE: "/attendance",
   ATTENDANCE_BY_ID: (id) => `/attendance/${id}`,
   ATTENDANCE_EMPLOYEE_MONTH: (employeeId, year, month) => `/attendance/employee/${employeeId}/month/${year}/${month}`,

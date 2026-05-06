@@ -31,6 +31,7 @@ import { useDataChange } from "../contexts/DataChangeContext";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+const STANDARD_WORKING_DAYS_PER_MONTH = 22;
 
 function Employees() {
   const [employees, setEmployees] = useState([]);
@@ -39,6 +40,9 @@ function Employees() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [form] = Form.useForm();
   const { notifyDataChanged } = useDataChange();
+  const [selectedSalaryMonth, setSelectedSalaryMonth] = useState(dayjs());
+  const [salaryCalculations, setSalaryCalculations] = useState({});
+  const [salaryLoading, setSalaryLoading] = useState(false);
   
   // Simple attendance states
   const [attendanceModalVisible, setAttendanceModalVisible] = useState(false);
@@ -48,10 +52,6 @@ function Employees() {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [calendarDays, setCalendarDays] = useState([]); // New state for calendar days
   const [localChanges, setLocalChanges] = useState({}); // Track local changes
-
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -64,6 +64,39 @@ function Employees() {
       setLoading(false);
     }
   };
+
+  const fetchSalaryCalculations = async (month = selectedSalaryMonth) => {
+    setSalaryLoading(true);
+    try {
+      const response = await apiClient.get(
+        API_ENDPOINTS.SALARY_MONTH(month.year(), month.month() + 1)
+      );
+      const salaryByEmployeeId = (response.data || []).reduce((acc, item) => {
+        acc[item.employeeId] = item;
+        return acc;
+      }, {});
+      setSalaryCalculations(salaryByEmployeeId);
+    } catch (error) {
+      console.error("Error fetching salary calculations:", error);
+      setSalaryCalculations({});
+      message.error("Deshtoi te merren kalkulimet e pagave");
+    } finally {
+      setSalaryLoading(false);
+    }
+  };
+
+  const refreshEmployeesAndSalary = async (month = selectedSalaryMonth) => {
+    await Promise.all([fetchEmployees(), fetchSalaryCalculations(month)]);
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  useEffect(() => {
+    fetchSalaryCalculations(selectedSalaryMonth);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSalaryMonth]);
 
   const handleCreate = () => {
     setEditingEmployee(null);
@@ -98,7 +131,7 @@ function Employees() {
     try {
       await apiClient.delete(API_ENDPOINTS.EMPLOYEE_BY_ID(id));
       message.success("PunÃ«tori u fshi me sukses");
-      fetchEmployees();
+      await refreshEmployeesAndSalary();
       notifyDataChanged();
     } catch (error) {
       message.error("DÃ«shtoi tÃ« fshihet punÃ«tori");
@@ -145,17 +178,18 @@ function Employees() {
   const handleAttendanceClick = async (employee) => {
     console.log('Opening attendance modal for employee:', employee);
     console.log('Existing local changes:', localChanges);
+    const attendanceMonth = selectedSalaryMonth || dayjs();
     
     setSelectedEmployeeForAttendance(employee);
-    setSelectedMonth(dayjs());
+    setSelectedMonth(attendanceMonth);
     setAttendanceModalVisible(true);
     
     // Wait a bit for modal to open, then fetch data
     setTimeout(async () => {
       try {
-        console.log('Fetching attendance data for month:', dayjs().format('MMMM YYYY'));
+        console.log('Fetching attendance data for month:', attendanceMonth.format('MMMM YYYY'));
         const response = await apiClient.get(
-          API_ENDPOINTS.ATTENDANCE_EMPLOYEE_MONTH(employee.id, dayjs().year(), dayjs().month() + 1)
+          API_ENDPOINTS.ATTENDANCE_EMPLOYEE_MONTH(employee.id, attendanceMonth.year(), attendanceMonth.month() + 1)
         );
         
         const fetchedRecords = response.data.dailyRecords || [];
@@ -190,7 +224,7 @@ function Employees() {
         setAttendanceRecords(allRecords);
         
         // Generate calendar days with local changes applied
-        const days = generateCalendarDays(dayjs(), allRecords);
+        const days = generateCalendarDays(attendanceMonth, allRecords);
         setCalendarDays(days);
         
         console.log('Calendar days generated with local changes:', days);
@@ -248,10 +282,12 @@ function Employees() {
   };
 
   const handleMonthChange = (date) => {
-    setSelectedMonth(date);
+    const nextMonth = date || dayjs();
+    setSelectedMonth(nextMonth);
+    setSelectedSalaryMonth(nextMonth);
     if (selectedEmployeeForAttendance) {
-      console.log('Month changed to:', date.format('MMMM YYYY'));
-      fetchMonthlyAttendance(selectedEmployeeForAttendance.id, date.year(), date.month() + 1);
+      console.log('Month changed to:', nextMonth.format('MMMM YYYY'));
+      fetchMonthlyAttendance(selectedEmployeeForAttendance.id, nextMonth.year(), nextMonth.month() + 1);
     }
   };
 
@@ -278,8 +314,8 @@ function Employees() {
           monthlySalary: salaryInfo.totalSalary
         });
         
-        // Refresh employee data
-        await fetchEmployees();
+        // Refresh employee and salary data
+        await refreshEmployeesAndSalary(selectedMonth);
         notifyDataChanged();
         
         console.log('Attendance data saved successfully before closing modal');
@@ -482,7 +518,7 @@ function Employees() {
         setEditingEmployee(null);
         setModalVisible(false);
         form.resetFields();
-        fetchEmployees();
+        await refreshEmployeesAndSalary();
         notifyDataChanged();
         return;
       }
@@ -500,7 +536,7 @@ function Employees() {
       message.success("PunÃ«tori u shtua me sukses!");
       setModalVisible(false);
       form.resetFields();
-      fetchEmployees();
+      await refreshEmployeesAndSalary();
       notifyDataChanged();
     } catch (error) {
       console.error("Error in handleSubmit:", error);
@@ -535,6 +571,35 @@ function Employees() {
     return isMagazine ? "Magazine" : "Terren";
   };
 
+  const getSalarySnapshot = (employee) => {
+    const salaryCalculation = salaryCalculations[employee.id] || {};
+    const dailyWage = employee.dailyWage || getDefaultDailyWage(employee.position) || 0;
+    const fallbackMonthlySalary =
+      Number(employee.baseSalary) > 0
+        ? Number(employee.baseSalary)
+        : dailyWage * STANDARD_WORKING_DAYS_PER_MONTH;
+    const monthlySalary = Number(
+      salaryCalculation.monthlySalary ?? fallbackMonthlySalary
+    );
+    const dailyDeduction = Number(
+      salaryCalculation.dailyDeduction ??
+        monthlySalary / STANDARD_WORKING_DAYS_PER_MONTH
+    );
+    const absentDays = Number(
+      salaryCalculation.absentDays ?? employee.absentDaysThisMonth ?? 0
+    );
+    const finalSalary = Number(
+      salaryCalculation.finalSalary ?? monthlySalary - absentDays * dailyDeduction
+    );
+
+    return {
+      monthlySalary,
+      dailyDeduction,
+      absentDays,
+      finalSalary,
+    };
+  };
+
   const openPrintWindow = (html) => {
     const win = window.open("", "", "height=900,width=1100");
     win.document.write(
@@ -564,8 +629,7 @@ function Employees() {
         const baseSalary = days * dailyWage;
         const bonuses = emp.monthlyBonuses ?? 0;
         const penalties = emp.monthlyPenalties ?? 0;
-        const monthly =
-          emp.monthlySalary ?? baseSalary + bonuses - penalties;
+        const salary = getSalarySnapshot(emp);
         return `<tr>
           <td>${(emp.fullName || "").replace(/</g, "&lt;")}</td>
           <td>${positionLabel(emp.position)}</td>
@@ -575,14 +639,17 @@ function Employees() {
           <td>${formatMoney(baseSalary)}</td>
           <td>${formatMoney(bonuses)}</td>
           <td>${formatMoney(penalties)}</td>
-          <td><strong>${formatMoney(monthly)}</strong></td>
+          <td>${formatMoney(salary.monthlySalary)}</td>
+          <td>${formatMoney(salary.dailyDeduction)}</td>
+          <td>${salary.absentDays}</td>
+          <td><strong>${formatMoney(salary.finalSalary)}</strong></td>
         </tr>`;
       })
       .join("");
 
     return `
       <h1>${title.replace(/</g, "&lt;")}</h1>
-      <h2>PROLUX Group â€” ${dayjs().format("YYYY-MM-DD HH:mm")}</h2>
+      <h2>PROLUX Group - ${dayjs().format("YYYY-MM-DD HH:mm")} | Muaji: ${selectedSalaryMonth.format("MMMM YYYY")}</h2>
       <table>
         <thead>
           <tr>
@@ -595,11 +662,14 @@ function Employees() {
             <th>Bonuset</th>
             <th>Gjobat</th>
             <th>Paga mujore</th>
+            <th>Zbritja ditore</th>
+            <th>Ditet e munguara</th>
+            <th>Paga finale</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="margin-top:16px;font-size:11px;color:#666;">Paga bazÃ« = ditÃ«t e punuara Ã— paga ditore. Paga mujore sipas tÃ« dhÃ«nave nÃ« sistem (pÃ«rfshin bonuset dhe gjobat).</p>
+      <p style="margin-top:16px;font-size:11px;color:#666;">Paga finale = paga mujore - ditet e munguara * zbritja ditore.</p>
     `;
   };
 
@@ -720,8 +790,32 @@ function Employees() {
       title: "Paga Mujore",
       dataIndex: "monthlySalary",
       key: "monthlySalary",
-      render: (salary) => `${(salary || 0).toFixed(2)} Ð´ÐµÐ½`,
-      sorter: (a, b) => (a.monthlySalary || 0) - (b.monthlySalary || 0),
+      render: (_, record) => formatMoney(getSalarySnapshot(record).monthlySalary),
+      sorter: (a, b) =>
+        getSalarySnapshot(a).monthlySalary - getSalarySnapshot(b).monthlySalary,
+    },
+    {
+      title: "Zbritja Ditore",
+      key: "dailyDeduction",
+      render: (_, record) => formatMoney(getSalarySnapshot(record).dailyDeduction),
+      sorter: (a, b) =>
+        getSalarySnapshot(a).dailyDeduction - getSalarySnapshot(b).dailyDeduction,
+    },
+    {
+      title: "Ditet e Munguara",
+      key: "absentDays",
+      render: (_, record) => `${getSalarySnapshot(record).absentDays} dite`,
+      sorter: (a, b) =>
+        getSalarySnapshot(a).absentDays - getSalarySnapshot(b).absentDays,
+    },
+    {
+      title: "Paga Finale",
+      key: "finalSalary",
+      render: (_, record) => (
+        <Text strong>{formatMoney(getSalarySnapshot(record).finalSalary)}</Text>
+      ),
+      sorter: (a, b) =>
+        getSalarySnapshot(a).finalSalary - getSalarySnapshot(b).finalSalary,
     },
     {
       title: "Prania",
@@ -777,6 +871,13 @@ function Employees() {
       <div className="flex justify-between items-center mb-6">
         <Title level={2}>Menaxhimi i PunÃ«torÃ«ve</Title>
         <Space wrap>
+          <DatePicker
+            picker="month"
+            value={selectedSalaryMonth}
+            onChange={(date) => setSelectedSalaryMonth(date || dayjs())}
+            allowClear={false}
+            format="MMMM YYYY"
+          />
           <Button
             icon={<PrinterOutlined />}
             onClick={printAllEmployeesReport}
@@ -837,7 +938,8 @@ function Employees() {
           columns={columns}
           dataSource={employees}
           rowKey="id"
-          loading={loading}
+          loading={loading || salaryLoading}
+          scroll={{ x: "max-content" }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,
@@ -968,6 +1070,7 @@ function Employees() {
                       value={selectedMonth}
                       onChange={handleMonthChange}
                       style={{ width: "100%" }}
+                      allowClear={false}
                       format="MMMM YYYY"
                     />
                   </Form.Item>
@@ -1065,7 +1168,7 @@ function Employees() {
                       });
                       
                       // Refresh employee data to update the main table
-                      await fetchEmployees();
+                      await refreshEmployeesAndSalary(selectedMonth);
                       
                       // Notify that data has changed
                       notifyDataChanged();
