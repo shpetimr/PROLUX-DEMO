@@ -119,9 +119,9 @@ function Layout() {
         requiredPermission: PERMISSIONS.REPORTS_VIEW,
       },
       {
-        key: "/work-sales",
+        key: "/pune",
         icon: <DollarOutlined />,
-        label: "Work Sales",
+        label: "Pune",
         adminOnly: true,
         requiredPermission: PERMISSIONS.WORK_SALES_MANAGE,
       },

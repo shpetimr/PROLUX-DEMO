@@ -20,6 +20,7 @@ import WorkerSalary from "./pages/WorkerSalary";
 import Reports from "./pages/Reports";
 import Projects from "./pages/Projects";
 import ProjectDetails from "./pages/ProjectDetails";
+import Pune from "./pages/Pune";
 import WorkSales from "./pages/WorkSales";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -144,6 +145,17 @@ function App() {
                     requiredPermission={PERMISSIONS.PROJECTS_MANAGE}
                   >
                     <ProjectDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="pune"
+                element={
+                  <ProtectedRoute
+                    requiredRole={ROLES.ADMIN}
+                    requiredPermission={PERMISSIONS.WORK_SALES_MANAGE}
+                  >
+                    <Pune />
                   </ProtectedRoute>
                 }
               />

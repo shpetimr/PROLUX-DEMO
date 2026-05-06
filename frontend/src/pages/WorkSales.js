@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
@@ -36,7 +36,14 @@ const formatInputMoney = (value) => {
 };
 const parseInputMoney = (value) => (value || "").replace(/MKD\s?|,/g, "");
 
-function WorkSales() {
+function WorkSales({
+  title = "Work Sales",
+  addButtonLabel = "Add Work Sale",
+  itemLabel = "work sale",
+  itemLabelPlural = "work sales",
+  deleteConfirmTitle = "Delete this work sale?",
+  worksStatTitle = "Works",
+}) {
   const [workSales, setWorkSales] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -44,21 +51,21 @@ function WorkSales() {
   const [form] = Form.useForm();
   const { notifyDataChanged } = useDataChange();
 
-  useEffect(() => {
-    fetchWorkSales();
-  }, []);
-
-  const fetchWorkSales = async () => {
+  const fetchWorkSales = useCallback(async () => {
     setLoading(true);
     try {
       const response = await apiClient.get(API_ENDPOINTS.WORK_SALES);
       setWorkSales(response.data);
     } catch (error) {
-      message.error("Failed to fetch work sales");
+      message.error(`Failed to fetch ${itemLabelPlural}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemLabelPlural]);
+
+  useEffect(() => {
+    fetchWorkSales();
+  }, [fetchWorkSales]);
 
   const handleCreate = () => {
     setEditingWorkSale(null);
@@ -83,11 +90,11 @@ function WorkSales() {
   const handleDelete = async (id) => {
     try {
       await apiClient.delete(API_ENDPOINTS.WORK_SALE_BY_ID(id));
-      message.success("Work sale deleted successfully");
+      message.success(`${capitalizeLabel(itemLabel)} deleted successfully`);
       fetchWorkSales();
       notifyDataChanged();
     } catch (error) {
-      message.error("Failed to delete work sale");
+      message.error(`Failed to delete ${itemLabel}`);
     }
   };
 
@@ -104,17 +111,17 @@ function WorkSales() {
 
       if (editingWorkSale) {
         await apiClient.put(API_ENDPOINTS.WORK_SALE_BY_ID(editingWorkSale.id), data);
-        message.success("Work sale updated successfully");
+        message.success(`${capitalizeLabel(itemLabel)} updated successfully`);
       } else {
         await apiClient.post(API_ENDPOINTS.WORK_SALES, data);
-        message.success("Work sale created successfully");
+        message.success(`${capitalizeLabel(itemLabel)} created successfully`);
       }
 
       setModalVisible(false);
       fetchWorkSales();
       notifyDataChanged();
     } catch (error) {
-      message.error("Failed to save work sale");
+      message.error(`Failed to save ${itemLabel}`);
     }
   };
 
@@ -222,7 +229,7 @@ function WorkSales() {
             Edit
           </Button>
           <Popconfirm
-            title="Delete this work sale?"
+            title={deleteConfirmTitle}
             onConfirm={() => handleDelete(record.id)}
             okText="Yes"
             cancelText="No"
@@ -239,9 +246,9 @@ function WorkSales() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <Title level={2}>Work Sales</Title>
+        <Title level={2}>{title}</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Add Work Sale
+          {addButtonLabel}
         </Button>
       </div>
 
@@ -279,7 +286,7 @@ function WorkSales() {
         </Col>
         <Col xs={24} sm={12} md={8} lg={6}>
           <Card className="bg-white border-0 shadow-lg">
-            <Statistic title="Works" value={workSales.length} />
+            <Statistic title={worksStatTitle} value={workSales.length} />
           </Card>
         </Col>
       </Row>
@@ -296,13 +303,13 @@ function WorkSales() {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} work sales`,
+              `${range[0]}-${range[1]} of ${total} ${itemLabelPlural}`,
           }}
         />
       </Card>
 
       <Modal
-        title={editingWorkSale ? "Edit Work Sale" : "Add Work Sale"}
+        title={editingWorkSale ? `Edit ${capitalizeLabel(itemLabel)}` : addButtonLabel}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={null}
@@ -401,3 +408,6 @@ function WorkSales() {
 }
 
 export default WorkSales;
+
+const capitalizeLabel = (value) =>
+  value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
