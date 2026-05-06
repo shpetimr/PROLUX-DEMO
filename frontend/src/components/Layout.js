@@ -124,6 +124,16 @@ function Layout() {
         label: isAdmin() ? "Worker Tasks" : "My Tasks",
         requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_TASKS,
       },
+      ...(!isAdmin()
+        ? [
+            {
+              key: "/my-salary",
+              icon: <DollarOutlined />,
+              label: "My Salary",
+              requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_SALARY,
+            },
+          ]
+        : []),
       {
         key: "/users",
         icon: <UserAddOutlined />,

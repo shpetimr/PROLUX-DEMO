@@ -26,6 +26,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { PERMISSIONS } from "../config/permissions";
 import WorkerTasks from "./WorkerTasks";
+import { WorkerSalarySummary } from "./WorkerSalary";
 
 const { Title, Text } = Typography;
 
@@ -160,19 +161,7 @@ function WorkerDashboard() {
         </div>
       </div>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={8}>
-          <Card className="bg-white border-0 shadow-md">
-            <DollarOutlined className="text-2xl text-green-600 mb-2" />
-            <div>
-              <Text type="secondary">Salary</Text>
-              <Title level={4} className="m-0">
-                Not available yet
-              </Title>
-            </div>
-          </Card>
-        </Col>
-      </Row>
+      <WorkerSalarySummary compact />
 
       <div className="mt-8">
         <WorkerTasks />

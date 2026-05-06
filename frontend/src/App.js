@@ -14,6 +14,7 @@ import Incomes from "./pages/Incomes";
 import Debts from "./pages/Debts";
 import Users from "./pages/Users";
 import WorkerTasks from "./pages/WorkerTasks";
+import WorkerSalary from "./pages/WorkerSalary";
 
 import Reports from "./pages/Reports";
 import Projects from "./pages/Projects";
@@ -180,6 +181,16 @@ function App() {
                     requiredPermission={PERMISSIONS.WORKERS_VIEW_OWN_TASKS}
                   >
                     <WorkerTasks />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="my-salary"
+                element={
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.WORKERS_VIEW_OWN_SALARY}
+                  >
+                    <WorkerSalary />
                   </ProtectedRoute>
                 }
               />
