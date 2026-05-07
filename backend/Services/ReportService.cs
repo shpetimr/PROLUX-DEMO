@@ -1094,26 +1094,7 @@ namespace backend.Services
                     .Include(i => i.CreatedBy)
                     .ToListAsync();
 
-                // Calculate employee salaries using the new system
-                var employees = await _context.Employees.ToListAsync();
-                var totalSalaries = employees.Sum(e => e.CalculatedMonthlySalary);
-                var totalBonuses = employees.Sum(e => e.MonthlyBonuses + e.CalculatedDailyBonuses);
-                var totalPenalties = employees.Sum(e => e.MonthlyPenalties + e.CalculatedDailyPenalties);
-                var netPayments = totalSalaries;
-                
-                var employeePayments = employees.Select(e => new EmployeePaymentDto
-                {
-                    EmployeeId = e.Id,
-                    EmployeeName = e.FullName,
-                    Position = e.Position.ToString(),
-                    DaysWorked = e.DaysWorkedThisMonth,
-                    DailyRate = e.DailyRate,
-                    BaseSalary = e.BaseSalary,
-                    Bonuses = e.MonthlyBonuses + e.CalculatedDailyBonuses,
-                    Penalties = e.MonthlyPenalties + e.CalculatedDailyPenalties,
-                    NetSalary = e.CalculatedMonthlySalary,
-                    HireDate = e.HireDate
-                }).ToList();
+                var employeePayments = await GetEmployeePaymentsForPeriodAsync(startDate, endExclusive);
 
                 // Build the response
                 var monthlyTracking = new MonthlyTrackingDto
@@ -1188,15 +1169,14 @@ namespace backend.Services
                     },
                     EmployeePayments = new MonthlyEmployeePaymentsDto
                     {
-                        TotalSalaries = totalSalaries,
-                        TotalBonuses = totalBonuses,
-                        TotalPenalties = totalPenalties,
-                        NetPayments = netPayments,
-                        TotalEmployees = employees.Count,
-                        TotalDaysWorked = employees.Sum(e => e.DaysWorkedThisMonth),
-                        EmployeePayments = employeePayments,
-                        ByPosition = employees.GroupBy(e => e.Position.ToString())
-                            .ToDictionary(g => g.Key, g => g.Sum(e => e.CalculatedMonthlySalary))
+                        TotalSalaries = employeePayments.TotalSalaries,
+                        TotalBonuses = employeePayments.TotalBonuses,
+                        TotalPenalties = employeePayments.TotalPenalties,
+                        NetPayments = employeePayments.NetPayments,
+                        TotalEmployees = employeePayments.TotalEmployees,
+                        TotalDaysWorked = employeePayments.TotalDaysWorked,
+                        EmployeePayments = employeePayments.EmployeePayments,
+                        ByPosition = employeePayments.ByPosition
                     }
                 };
 
@@ -1303,13 +1283,12 @@ namespace backend.Services
             }
 
             var records = await salaryRecords.ToListAsync();
-            if (records.Count == 0)
-            {
-                return await EstimateSalaryFinancialTotalsAsync(normalizedStartDate, normalizedEndExclusive);
-            }
-
             var totalSalaries = 0m;
             var totalDaysWorked = 0m;
+            var employeeIds = records
+                .Select(record => record.EmployeeId)
+                .Distinct()
+                .ToHashSet();
 
             foreach (var record in records)
             {
@@ -1318,33 +1297,95 @@ namespace backend.Services
                 totalDaysWorked += record.DaysWorked * coverageFactor;
             }
 
+            var currentMonthEstimate = await EstimateCurrentMonthSalaryFinancialTotalsAsync(
+                normalizedStartDate,
+                normalizedEndExclusive,
+                records);
+
+            totalSalaries += currentMonthEstimate.TotalSalaries;
+            totalDaysWorked += currentMonthEstimate.TotalDaysWorked;
+            foreach (var employeeId in currentMonthEstimate.EmployeeIds)
+            {
+                employeeIds.Add(employeeId);
+            }
+
             return new SalaryFinancialTotals
             {
                 TotalSalaries = RoundMoney(totalSalaries),
                 TotalDaysWorked = RoundCount(totalDaysWorked),
-                EmployeeCount = records.Select(record => record.EmployeeId).Distinct().Count()
+                EmployeeCount = employeeIds.Count,
+                EmployeeIds = employeeIds
             };
         }
 
-        private async Task<SalaryFinancialTotals> EstimateSalaryFinancialTotalsAsync(DateTime? startDate, DateTime? endExclusive)
+        private async Task<SalaryFinancialTotals> EstimateCurrentMonthSalaryFinancialTotalsAsync(
+            DateTime? startDate,
+            DateTime? endExclusive,
+            IReadOnlyCollection<SalaryRecord> records)
         {
-            var employees = await _context.Employees.AsNoTracking().ToListAsync();
+            var today = DateTimeUtc.Today();
+            var currentMonthStart = DateTimeUtc.MonthStart(today.Year, today.Month);
+            var currentMonthEnd = currentMonthStart.AddMonths(1);
+            var recordedCurrentMonthEmployeeIds = records
+                .Where(record => DateTimeUtc.MonthStart(record.Month.Year, record.Month.Month) == currentMonthStart)
+                .Select(record => record.EmployeeId)
+                .Distinct()
+                .ToList();
+
+            if (endExclusive.HasValue && endExclusive.Value <= currentMonthStart)
+            {
+                return SalaryFinancialTotals.Empty;
+            }
+
+            if (startDate.HasValue && startDate.Value >= currentMonthEnd)
+            {
+                return SalaryFinancialTotals.Empty;
+            }
+
+            var effectiveStart = startDate.HasValue && startDate.Value > currentMonthStart
+                ? startDate.Value
+                : currentMonthStart;
+            var requestedEndExclusive = endExclusive ?? today.AddDays(1);
+            var effectiveEndExclusive = requestedEndExclusive < currentMonthEnd
+                ? requestedEndExclusive
+                : currentMonthEnd;
+
+            if (effectiveEndExclusive <= effectiveStart)
+            {
+                return SalaryFinancialTotals.Empty;
+            }
+
+            return await EstimateSalaryFinancialTotalsAsync(
+                effectiveStart,
+                effectiveEndExclusive,
+                recordedCurrentMonthEmployeeIds);
+        }
+
+        private async Task<SalaryFinancialTotals> EstimateSalaryFinancialTotalsAsync(
+            DateTime startDate,
+            DateTime endExclusive,
+            IReadOnlyCollection<int>? excludedEmployeeIds = null)
+        {
+            var excludedIds = excludedEmployeeIds?.ToList() ?? new List<int>();
+            var employeesQuery = _context.Employees.AsNoTracking();
+            if (excludedIds.Count > 0)
+            {
+                employeesQuery = employeesQuery.Where(employee => !excludedIds.Contains(employee.Id));
+            }
+
+            var employees = await employeesQuery.ToListAsync();
             if (employees.Count == 0)
             {
                 return SalaryFinancialTotals.Empty;
             }
 
-            var today = DateTimeUtc.Today();
-            var effectiveStart = startDate ?? DateTimeUtc.MonthStart(today.Year, today.Month);
-            var effectiveEndExclusive = endExclusive ?? today.AddDays(1);
-
-            if (effectiveEndExclusive <= effectiveStart)
+            if (endExclusive <= startDate)
             {
                 return new SalaryFinancialTotals { EmployeeCount = employees.Count };
             }
 
-            var monthCoverageFactor = GetCoveredMonthStarts(effectiveStart, effectiveEndExclusive)
-                .Sum(monthStart => GetMonthCoverageFactor(monthStart, effectiveStart, effectiveEndExclusive));
+            var monthCoverageFactor = GetCoveredMonthStarts(startDate, endExclusive)
+                .Sum(monthStart => GetMonthCoverageFactor(monthStart, startDate, endExclusive));
 
             var monthlySalaries = employees.Sum(employee => employee.CalculatedMonthlySalary);
             var monthlyDaysWorked = employees.Sum(employee => employee.DaysWorkedThisMonth);
@@ -1353,7 +1394,138 @@ namespace backend.Services
             {
                 TotalSalaries = RoundMoney(monthlySalaries * monthCoverageFactor),
                 TotalDaysWorked = RoundCount(monthlyDaysWorked * monthCoverageFactor),
-                EmployeeCount = employees.Count
+                EmployeeCount = employees.Count,
+                EmployeeIds = employees.Select(employee => employee.Id).ToList()
+            };
+        }
+
+        private async Task<MonthlyEmployeePaymentsDto> GetEmployeePaymentsForPeriodAsync(DateTime startDate, DateTime endExclusive)
+        {
+            if (!_currentUserService.IsAdmin() || endExclusive <= startDate)
+            {
+                return new MonthlyEmployeePaymentsDto();
+            }
+
+            var firstMonth = DateTimeUtc.MonthStart(startDate.Year, startDate.Month);
+            var monthEndExclusive = GetMonthAfterLastCoveredDate(endExclusive);
+            var records = await _context.SalaryRecords
+                .AsNoTracking()
+                .Include(record => record.Employee)
+                .Where(record => record.Month >= firstMonth && record.Month < monthEndExclusive)
+                .ToListAsync();
+
+            var payments = records
+                .Select(record => BuildEmployeePayment(record, startDate, endExclusive))
+                .Where(payment =>
+                    payment.BaseSalary != 0 ||
+                    payment.Bonuses != 0 ||
+                    payment.Penalties != 0 ||
+                    payment.NetSalary != 0 ||
+                    payment.DaysWorked != 0)
+                .ToList();
+
+            payments.AddRange(await EstimateCurrentMonthEmployeePaymentsAsync(startDate, endExclusive, records));
+
+            return BuildMonthlyEmployeePayments(payments);
+        }
+
+        private async Task<List<EmployeePaymentDto>> EstimateCurrentMonthEmployeePaymentsAsync(
+            DateTime startDate,
+            DateTime endExclusive,
+            IReadOnlyCollection<SalaryRecord> records)
+        {
+            var today = DateTimeUtc.Today();
+            var currentMonthStart = DateTimeUtc.MonthStart(today.Year, today.Month);
+            var currentMonthEnd = currentMonthStart.AddMonths(1);
+            var recordedCurrentMonthEmployeeIds = records
+                .Where(record => DateTimeUtc.MonthStart(record.Month.Year, record.Month.Month) == currentMonthStart)
+                .Select(record => record.EmployeeId)
+                .Distinct()
+                .ToList();
+
+            if (endExclusive <= currentMonthStart ||
+                startDate >= currentMonthEnd)
+            {
+                return new List<EmployeePaymentDto>();
+            }
+
+            var effectiveStart = startDate > currentMonthStart ? startDate : currentMonthStart;
+            var effectiveEndExclusive = endExclusive < currentMonthEnd ? endExclusive : currentMonthEnd;
+            var coverageFactor = GetMonthCoverageFactor(currentMonthStart, effectiveStart, effectiveEndExclusive);
+
+            if (coverageFactor <= 0)
+            {
+                return new List<EmployeePaymentDto>();
+            }
+
+            var employeesQuery = _context.Employees.AsNoTracking();
+            if (recordedCurrentMonthEmployeeIds.Count > 0)
+            {
+                employeesQuery = employeesQuery.Where(employee => !recordedCurrentMonthEmployeeIds.Contains(employee.Id));
+            }
+
+            var employees = await employeesQuery.ToListAsync();
+            return employees.Select(employee =>
+            {
+                var monthlySalary = SalaryCalculator.GetMonthlySalary(employee);
+                var totalSalary = employee.CalculatedMonthlySalary;
+                var penalties = Math.Max(0m, monthlySalary - totalSalary);
+
+                return new EmployeePaymentDto
+                {
+                    EmployeeId = employee.Id,
+                    EmployeeName = employee.FullName,
+                    Position = employee.Position.ToString(),
+                    DaysWorked = RoundCount(employee.DaysWorkedThisMonth * coverageFactor),
+                    DailyRate = SalaryCalculator.CalculateDailyDeduction(monthlySalary),
+                    BaseSalary = RoundMoney(monthlySalary * coverageFactor),
+                    Bonuses = 0,
+                    Penalties = RoundMoney(penalties * coverageFactor),
+                    NetSalary = RoundMoney(totalSalary * coverageFactor),
+                    HireDate = employee.HireDate
+                };
+            }).ToList();
+        }
+
+        private static EmployeePaymentDto BuildEmployeePayment(
+            SalaryRecord record,
+            DateTime startDate,
+            DateTime endExclusive)
+        {
+            var coverageFactor = GetMonthCoverageFactor(record.Month, startDate, endExclusive);
+            var dailyRate = record.BaseSalary > 0
+                ? SalaryCalculator.CalculateDailyDeduction(record.BaseSalary)
+                : 0;
+
+            return new EmployeePaymentDto
+            {
+                EmployeeId = record.EmployeeId,
+                EmployeeName = record.Employee?.FullName ?? string.Empty,
+                Position = record.Employee?.Position.ToString() ?? string.Empty,
+                DaysWorked = RoundCount(record.DaysWorked * coverageFactor),
+                DailyRate = dailyRate,
+                BaseSalary = RoundMoney(record.BaseSalary * coverageFactor),
+                Bonuses = RoundMoney(record.Bonuses * coverageFactor),
+                Penalties = RoundMoney(record.Penalties * coverageFactor),
+                NetSalary = RoundMoney(record.TotalSalary * coverageFactor),
+                HireDate = record.Employee?.HireDate ?? DateTime.MinValue
+            };
+        }
+
+        private static MonthlyEmployeePaymentsDto BuildMonthlyEmployeePayments(List<EmployeePaymentDto> payments)
+        {
+            return new MonthlyEmployeePaymentsDto
+            {
+                TotalSalaries = payments.Sum(payment => payment.NetSalary),
+                TotalBonuses = payments.Sum(payment => payment.Bonuses),
+                TotalPenalties = payments.Sum(payment => payment.Penalties),
+                NetPayments = payments.Sum(payment => payment.NetSalary),
+                TotalEmployees = payments.Select(payment => payment.EmployeeId).Distinct().Count(),
+                TotalDaysWorked = payments.Sum(payment => payment.DaysWorked),
+                EmployeePayments = payments,
+                ByPosition = payments
+                    .GroupBy(payment => payment.Position)
+                    .ToDictionary(group => group.Key, group => group.Sum(payment => payment.NetSalary))
             };
         }
 
@@ -1738,6 +1910,7 @@ namespace backend.Services
             public decimal TotalSalaries { get; init; }
             public int TotalDaysWorked { get; init; }
             public int EmployeeCount { get; init; }
+            public IReadOnlyCollection<int> EmployeeIds { get; init; } = Array.Empty<int>();
         }
 
         private sealed class WorkSaleFinancialTotals

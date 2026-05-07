@@ -26,6 +26,20 @@ namespace backend.Services
             var monthStart = DateTimeUtc.MonthStart(month.Year, month.Month);
             var monthEnd = monthStart.AddMonths(1);
 
+            var existingRecord = await _context.SalaryRecords
+                .AsNoTracking()
+                .Include(record => record.Employee)
+                .ThenInclude(employee => employee.UserAccount)
+                .FirstOrDefaultAsync(record =>
+                    record.EmployeeId == employeeId &&
+                    record.Month >= monthStart &&
+                    record.Month < monthEnd);
+
+            if (existingRecord != null)
+            {
+                return BuildSalaryCalculation(existingRecord, monthStart);
+            }
+
             var employee = await _context.Employees
                 .AsNoTracking()
                 .Include(e => e.UserAccount)
@@ -55,6 +69,16 @@ namespace backend.Services
                 .OrderBy(e => e.FullName)
                 .ToListAsync();
 
+            var salaryRecords = await _context.SalaryRecords
+                .AsNoTracking()
+                .Where(record => record.Month >= monthStart && record.Month < monthEnd)
+                .ToListAsync();
+            var salaryRecordsByEmployeeId = salaryRecords
+                .GroupBy(record => record.EmployeeId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.OrderByDescending(record => record.CreatedAt).First());
+
             var employeeIds = employees.Select(e => e.Id).ToList();
             var absentDaysByEmployee = await _context.AttendanceRecords
                 .AsNoTracking()
@@ -72,10 +96,13 @@ namespace backend.Services
                 .ToDictionaryAsync(group => group.EmployeeId, group => group.AbsentDays);
 
             return employees
-                .Select(employee => BuildSalaryCalculation(
-                    employee,
-                    absentDaysByEmployee.TryGetValue(employee.Id, out var absentDays) ? absentDays : 0,
-                    monthStart))
+                .Select(employee =>
+                    salaryRecordsByEmployeeId.TryGetValue(employee.Id, out var salaryRecord)
+                        ? BuildSalaryCalculation(salaryRecord, monthStart, employee)
+                        : BuildSalaryCalculation(
+                            employee,
+                            absentDaysByEmployee.TryGetValue(employee.Id, out var absentDays) ? absentDays : 0,
+                            monthStart))
                 .ToList();
         }
 
@@ -164,6 +191,31 @@ namespace backend.Services
                 TotalDeduction = totalDeduction,
                 FinalSalary = monthlySalary - totalDeduction,
                 Formula = "Final salary = Monthly salary - absentDays * (Monthly salary / 22)"
+            };
+        }
+
+        private static SalaryCalculationDto BuildSalaryCalculation(
+            SalaryRecord record,
+            DateTime month,
+            Employee? employee = null)
+        {
+            var recordEmployee = employee ?? record.Employee;
+            var absentDays = Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - record.DaysWorked);
+
+            return new SalaryCalculationDto
+            {
+                EmployeeId = record.EmployeeId,
+                EmployeeName = recordEmployee?.FullName ?? string.Empty,
+                LinkedUserId = recordEmployee?.UserAccount?.Id,
+                LinkedUsername = recordEmployee?.UserAccount?.Username,
+                Year = month.Year,
+                Month = month.Month,
+                MonthlySalary = record.BaseSalary,
+                AbsentDays = absentDays,
+                DailyDeduction = SalaryCalculator.CalculateDailyDeduction(record.BaseSalary),
+                TotalDeduction = record.Penalties,
+                FinalSalary = record.TotalSalary,
+                Formula = "Final salary = historical salary record total"
             };
         }
     }
