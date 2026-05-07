@@ -1243,7 +1243,9 @@ namespace backend.Services
                     {
                         TotalSalaries = employeePayments.TotalSalaries,
                         TotalBonuses = employeePayments.TotalBonuses,
+                        TotalAttendanceDeductions = employeePayments.TotalAttendanceDeductions,
                         TotalPenalties = employeePayments.TotalPenalties,
+                        TotalDeductions = employeePayments.TotalDeductions,
                         NetPayments = employeePayments.NetPayments,
                         TotalEmployees = employeePayments.TotalEmployees,
                         TotalDaysWorked = employeePayments.TotalDaysWorked,
@@ -1492,7 +1494,9 @@ namespace backend.Services
                 .Where(payment =>
                     payment.BaseSalary != 0 ||
                     payment.Bonuses != 0 ||
+                    payment.AttendanceDeduction != 0 ||
                     payment.Penalties != 0 ||
+                    payment.TotalDeductions != 0 ||
                     payment.NetSalary != 0 ||
                     payment.DaysWorked != 0)
                 .ToList();
@@ -1544,9 +1548,9 @@ namespace backend.Services
                 var totalSalary = employee.CalculatedMonthlySalary;
                 var dailyRate = SalaryCalculator.GetDailySalary(employee);
                 var bonuses = SalaryCalculator.GetTotalBonuses(employee);
-                var penalties =
-                    employee.AbsentDaysThisMonth * dailyRate +
-                    SalaryCalculator.GetTotalPenalties(employee);
+                var attendanceDeduction = employee.AbsentDaysThisMonth * dailyRate;
+                var penalties = SalaryCalculator.GetTotalPenalties(employee);
+                var totalDeductions = attendanceDeduction + penalties;
 
                 return new EmployeePaymentDto
                 {
@@ -1559,7 +1563,9 @@ namespace backend.Services
                     DailyRate = dailyRate,
                     BaseSalary = RoundMoney(monthlySalary * coverageFactor),
                     Bonuses = RoundMoney(bonuses * coverageFactor),
+                    AttendanceDeduction = RoundMoney(attendanceDeduction * coverageFactor),
                     Penalties = RoundMoney(penalties * coverageFactor),
+                    TotalDeductions = RoundMoney(totalDeductions * coverageFactor),
                     NetSalary = RoundMoney(totalSalary * coverageFactor),
                     HireDate = employee.HireDate
                 };
@@ -1575,6 +1581,7 @@ namespace backend.Services
             var dailyRate = record.Employee != null
                 ? SalaryCalculator.GetDailySalary(record.Employee)
                 : 0;
+            var deductions = SalaryCalculator.GetSalaryRecordDeductionBreakdown(record, record.Employee);
 
             return new EmployeePaymentDto
             {
@@ -1585,7 +1592,9 @@ namespace backend.Services
                 DailyRate = dailyRate,
                 BaseSalary = RoundMoney(record.BaseSalary * coverageFactor),
                 Bonuses = RoundMoney(record.Bonuses * coverageFactor),
-                Penalties = RoundMoney(record.Penalties * coverageFactor),
+                AttendanceDeduction = RoundMoney(deductions.AttendanceDeduction * coverageFactor),
+                Penalties = RoundMoney(deductions.Penalties * coverageFactor),
+                TotalDeductions = RoundMoney(deductions.TotalDeduction * coverageFactor),
                 NetSalary = RoundMoney(record.TotalSalary * coverageFactor),
                 HireDate = record.Employee?.HireDate ?? DateTime.MinValue
             };
@@ -1597,7 +1606,9 @@ namespace backend.Services
             {
                 TotalSalaries = payments.Sum(payment => payment.NetSalary),
                 TotalBonuses = payments.Sum(payment => payment.Bonuses),
+                TotalAttendanceDeductions = payments.Sum(payment => payment.AttendanceDeduction),
                 TotalPenalties = payments.Sum(payment => payment.Penalties),
+                TotalDeductions = payments.Sum(payment => payment.TotalDeductions),
                 NetPayments = payments.Sum(payment => payment.NetSalary),
                 TotalEmployees = payments.Select(payment => payment.EmployeeId).Distinct().Count(),
                 TotalDaysWorked = payments.Sum(payment => payment.DaysWorked),

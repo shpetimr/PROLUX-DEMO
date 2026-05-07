@@ -59,6 +59,7 @@ namespace backend.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.BaseSalary).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Bonuses).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.AttendanceDeduction).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Penalties).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.TotalSalary).HasColumnType("decimal(18,2)");
                 entity.HasOne(e => e.Employee)

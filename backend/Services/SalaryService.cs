@@ -148,7 +148,8 @@ namespace backend.Services
                 Month = new DateTime(month.Year, month.Month, 1),
                 BaseSalary = calculation.MonthlySalary,
                 Bonuses = calculation.Bonuses,
-                Penalties = calculation.TotalDeduction,
+                AttendanceDeduction = calculation.AttendanceDeduction,
+                Penalties = calculation.Penalties,
                 TotalSalary = calculation.FinalSalary,
                 DaysWorked = Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - calculation.AbsentDays),
                 CreatedAt = DateTime.UtcNow
@@ -224,6 +225,7 @@ namespace backend.Services
             var dailyDeduction = recordEmployee != null
                 ? SalaryCalculator.CalculateDailyDeduction(recordEmployee)
                 : 0;
+            var deductions = SalaryCalculator.GetSalaryRecordDeductionBreakdown(record, recordEmployee);
 
             return new SalaryCalculationDto
             {
@@ -236,10 +238,10 @@ namespace backend.Services
                 MonthlySalary = record.BaseSalary,
                 AbsentDays = absentDays,
                 DailyDeduction = dailyDeduction,
-                AttendanceDeduction = 0,
+                AttendanceDeduction = deductions.AttendanceDeduction,
                 Bonuses = record.Bonuses,
-                Penalties = record.Penalties,
-                TotalDeduction = record.Penalties,
+                Penalties = deductions.Penalties,
+                TotalDeduction = deductions.TotalDeduction,
                 FinalSalary = record.TotalSalary,
                 Formula = "Final salary = historical salary record total"
             };

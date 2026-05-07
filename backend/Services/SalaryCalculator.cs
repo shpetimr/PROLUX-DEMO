@@ -52,5 +52,34 @@ namespace backend.Services
         {
             return employee.MonthlyPenalties + employee.CalculatedDailyPenalties;
         }
+
+        public static SalaryRecordDeductionBreakdown GetSalaryRecordDeductionBreakdown(
+            SalaryRecord record,
+            Employee? employee = null)
+        {
+            if (record.AttendanceDeduction.HasValue)
+            {
+                return new SalaryRecordDeductionBreakdown(
+                    Math.Max(0, record.AttendanceDeduction.Value),
+                    Math.Max(0, record.Penalties));
+            }
+
+            var absentDays = Math.Max(0, StandardWorkingDaysPerMonth - record.DaysWorked);
+            var dailyDeduction = employee != null ? CalculateDailyDeduction(employee) : 0;
+            var inferredAttendanceDeduction = Math.Min(
+                Math.Max(0, record.Penalties),
+                absentDays * dailyDeduction);
+
+            return new SalaryRecordDeductionBreakdown(
+                inferredAttendanceDeduction,
+                Math.Max(0, record.Penalties - inferredAttendanceDeduction));
+        }
+    }
+
+    public readonly record struct SalaryRecordDeductionBreakdown(
+        decimal AttendanceDeduction,
+        decimal Penalties)
+    {
+        public decimal TotalDeduction => AttendanceDeduction + Penalties;
     }
 }

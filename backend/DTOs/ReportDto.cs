@@ -206,7 +206,9 @@ namespace backend.DTOs
     {
         public decimal TotalSalaries { get; set; }
         public decimal TotalBonuses { get; set; }
+        public decimal TotalAttendanceDeductions { get; set; }
         public decimal TotalPenalties { get; set; }
+        public decimal TotalDeductions { get; set; }
         public decimal NetPayments { get; set; }
         public int TotalEmployees { get; set; }
         public int TotalDaysWorked { get; set; }
@@ -263,7 +265,9 @@ namespace backend.DTOs
         public string Position { get; set; } = "";
         public decimal BaseSalary { get; set; }
         public decimal Bonuses { get; set; }
+        public decimal AttendanceDeduction { get; set; }
         public decimal Penalties { get; set; }
+        public decimal TotalDeductions { get; set; }
         public decimal NetSalary { get; set; }
         public int DaysWorked { get; set; }
         public decimal DailyRate { get; set; }

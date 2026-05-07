@@ -457,6 +457,9 @@ namespace backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal?>("AttendanceDeduction")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("BaseSalary")
                         .HasColumnType("decimal(18,2)");
 

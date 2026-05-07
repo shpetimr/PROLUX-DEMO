@@ -17,6 +17,9 @@ namespace backend.Models
         
         [Range(0, double.MaxValue)]
         public decimal Bonuses { get; set; }
+
+        [Range(0, double.MaxValue)]
+        public decimal? AttendanceDeduction { get; set; }
         
         [Range(0, double.MaxValue)]
         public decimal Penalties { get; set; }
@@ -32,4 +35,4 @@ namespace backend.Models
         // Navigation property
         public virtual Employee Employee { get; set; } = null!;
     }
-} 
+}
