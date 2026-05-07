@@ -11,6 +11,9 @@ namespace backend.DTOs
         public decimal MonthlySalary { get; set; }
         public int AbsentDays { get; set; }
         public decimal DailyDeduction { get; set; }
+        public decimal AttendanceDeduction { get; set; }
+        public decimal Bonuses { get; set; }
+        public decimal Penalties { get; set; }
         public decimal TotalDeduction { get; set; }
         public decimal FinalSalary { get; set; }
         public string Formula { get; set; } = string.Empty;

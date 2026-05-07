@@ -1388,7 +1388,8 @@ namespace backend.Services
                 .Sum(monthStart => GetMonthCoverageFactor(monthStart, startDate, endExclusive));
 
             var monthlySalaries = employees.Sum(employee => employee.CalculatedMonthlySalary);
-            var monthlyDaysWorked = employees.Sum(employee => employee.DaysWorkedThisMonth);
+            var monthlyDaysWorked = employees.Sum(employee =>
+                Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - employee.AbsentDaysThisMonth));
 
             return new SalaryFinancialTotals
             {
@@ -1469,17 +1470,23 @@ namespace backend.Services
             {
                 var monthlySalary = SalaryCalculator.GetMonthlySalary(employee);
                 var totalSalary = employee.CalculatedMonthlySalary;
-                var penalties = Math.Max(0m, monthlySalary - totalSalary);
+                var dailyRate = SalaryCalculator.GetDailySalary(employee);
+                var bonuses = SalaryCalculator.GetTotalBonuses(employee);
+                var penalties =
+                    employee.AbsentDaysThisMonth * dailyRate +
+                    SalaryCalculator.GetTotalPenalties(employee);
 
                 return new EmployeePaymentDto
                 {
                     EmployeeId = employee.Id,
                     EmployeeName = employee.FullName,
                     Position = employee.Position.ToString(),
-                    DaysWorked = RoundCount(employee.DaysWorkedThisMonth * coverageFactor),
-                    DailyRate = SalaryCalculator.CalculateDailyDeduction(monthlySalary),
+                    DaysWorked = RoundCount(
+                        Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - employee.AbsentDaysThisMonth) *
+                        coverageFactor),
+                    DailyRate = dailyRate,
                     BaseSalary = RoundMoney(monthlySalary * coverageFactor),
-                    Bonuses = 0,
+                    Bonuses = RoundMoney(bonuses * coverageFactor),
                     Penalties = RoundMoney(penalties * coverageFactor),
                     NetSalary = RoundMoney(totalSalary * coverageFactor),
                     HireDate = employee.HireDate
@@ -1493,8 +1500,8 @@ namespace backend.Services
             DateTime endExclusive)
         {
             var coverageFactor = GetMonthCoverageFactor(record.Month, startDate, endExclusive);
-            var dailyRate = record.BaseSalary > 0
-                ? SalaryCalculator.CalculateDailyDeduction(record.BaseSalary)
+            var dailyRate = record.Employee != null
+                ? SalaryCalculator.GetDailySalary(record.Employee)
                 : 0;
 
             return new EmployeePaymentDto

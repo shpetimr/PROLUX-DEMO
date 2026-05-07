@@ -170,10 +170,10 @@ namespace backend.Controllers
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
             
-            var configuredMonthlySalary = dto.baseSalary ?? dto.dailyWage * SalaryCalculator.StandardWorkingDaysPerMonth;
-            var dailyWage = dto.dailyWage > 0
-                ? dto.dailyWage
-                : SalaryCalculator.CalculateDailyDeduction(configuredMonthlySalary);
+            var configuredDailySalary = dto.dailyWage > 0 ? dto.dailyWage : dto.dailyRate;
+            var configuredMonthlySalary = dto.baseSalary ??
+                configuredDailySalary * SalaryCalculator.StandardWorkingDaysPerMonth;
+            var dailyWage = configuredDailySalary;
 
             var employee = new Employee
             {

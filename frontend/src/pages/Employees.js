@@ -31,7 +31,7 @@ import { useDataChange } from "../contexts/DataChangeContext";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-const STANDARD_WORKING_DAYS_PER_MONTH = 22;
+const STANDARD_WORKING_DAYS_PER_MONTH = 26;
 
 function Employees() {
   const [employees, setEmployees] = useState([]);
@@ -140,6 +140,7 @@ function Employees() {
     form.resetFields();
     form.setFieldsValue({
       daysWorkedThisMonth: 0,
+      baseSalary: 0,
       monthlyBonuses: 0,
       monthlyPenalties: 0,
       dailyWage: 0,
@@ -278,7 +279,12 @@ function Employees() {
         
         // Calculate and update employee record with latest attendance data
         const daysWorkedThisMonth = calendarDays.filter(d => d.isPresent).length;
-        const salaryInfo = calculateMonthlySalary(selectedEmployeeForAttendance, daysWorkedThisMonth);
+        const absentDaysThisMonth = calendarDays.filter(d => !d.isPresent).length;
+        const salaryInfo = calculateMonthlySalary(
+          selectedEmployeeForAttendance,
+          daysWorkedThisMonth,
+          absentDaysThisMonth
+        );
         
         // Update employee record
         await apiClient.put(API_ENDPOINTS.EMPLOYEE_BY_ID(selectedEmployeeForAttendance.id), {
@@ -310,17 +316,26 @@ function Employees() {
   };
 
   // Function to calculate monthly salary based on attendance
-  const calculateMonthlySalary = (employee, daysWorked) => {
+  const calculateMonthlySalary = (employee, daysWorked, absentDaysOverride) => {
     const dailyWage = employee.dailyWage || getDefaultDailyWage(employee.position);
-    const baseSalary = daysWorked * dailyWage;
+    const monthlySalary =
+      Number(employee.baseSalary) > 0
+        ? Number(employee.baseSalary)
+        : dailyWage * STANDARD_WORKING_DAYS_PER_MONTH;
+    const absentDays =
+      absentDaysOverride ?? Math.max(0, STANDARD_WORKING_DAYS_PER_MONTH - daysWorked);
+    const attendanceDeduction = absentDays * dailyWage;
     const monthlyBonuses = employee.monthlyBonuses || 0;
     const monthlyPenalties = employee.monthlyPenalties || 0;
-    const totalSalary = baseSalary + monthlyBonuses - monthlyPenalties;
+    const totalSalary = monthlySalary - attendanceDeduction + monthlyBonuses - monthlyPenalties;
     
     return {
       daysWorked,
+      absentDays,
       dailyWage,
-      baseSalary,
+      baseSalary: monthlySalary,
+      monthlySalary,
+      attendanceDeduction,
       monthlyBonuses,
       monthlyPenalties,
       totalSalary
@@ -466,7 +481,7 @@ function Employees() {
       
       // Check if there's a local change for this date
       const hasLocalChange = Object.prototype.hasOwnProperty.call(changesForMonth, dateString);
-      const isPresent = hasLocalChange ? changesForMonth[dateString] : (attendanceRecord?.isPresent || false);
+      const isPresent = hasLocalChange ? changesForMonth[dateString] : (attendanceRecord?.isPresent ?? true);
       
       days.push({
         date: currentDate,
@@ -504,6 +519,7 @@ function Employees() {
           fullName: values.fullName,
           position: values.position,
           hireDate: values.hireDate ? values.hireDate.format("YYYY-MM-DD") : null,
+          baseSalary: values.baseSalary,
           dailyWage: values.dailyWage,
           monthlyBonuses: values.monthlyBonuses || 0,
           monthlyPenalties: values.monthlyPenalties || 0,
@@ -523,6 +539,7 @@ function Employees() {
         fullName: values.fullName,
         position: values.position,
         hireDate: values.hireDate ? values.hireDate.format("YYYY-MM-DD") : null,
+        baseSalary: values.baseSalary,
         dailyWage: values.dailyWage,
         monthlyBonuses: values.monthlyBonuses || 0,
         monthlyPenalties: values.monthlyPenalties || 0,
@@ -578,20 +595,32 @@ function Employees() {
       salaryCalculation.monthlySalary ?? fallbackMonthlySalary
     );
     const dailyDeduction = Number(
-      salaryCalculation.dailyDeduction ??
-        monthlySalary / STANDARD_WORKING_DAYS_PER_MONTH
+      salaryCalculation.dailyDeduction ?? dailyWage
     );
     const absentDays = Number(
       salaryCalculation.absentDays ?? employee.absentDaysThisMonth ?? 0
     );
+    const bonuses = Number(
+      salaryCalculation.bonuses ??
+        (Number(employee.monthlyBonuses) || 0) +
+          (Number(employee.calculatedDailyBonuses) || 0)
+    );
+    const penalties = Number(
+      salaryCalculation.penalties ??
+        (Number(employee.monthlyPenalties) || 0) +
+          (Number(employee.calculatedDailyPenalties) || 0)
+    );
     const finalSalary = Number(
-      salaryCalculation.finalSalary ?? monthlySalary - absentDays * dailyDeduction
+      salaryCalculation.finalSalary ??
+        monthlySalary - absentDays * dailyDeduction + bonuses - penalties
     );
 
     return {
       monthlySalary,
       dailyDeduction,
       absentDays,
+      bonuses,
+      penalties,
       finalSalary,
     };
   };
@@ -621,11 +650,11 @@ function Employees() {
       .map((emp) => {
         const dailyWage =
           emp.dailyWage || getDefaultDailyWage(emp.position);
-        const days = emp.daysWorkedThisMonth ?? 0;
-        const baseSalary = days * dailyWage;
-        const bonuses = emp.monthlyBonuses ?? 0;
-        const penalties = emp.monthlyPenalties ?? 0;
         const salary = getSalarySnapshot(emp);
+        const days = Math.max(0, STANDARD_WORKING_DAYS_PER_MONTH - salary.absentDays);
+        const baseSalary = salary.monthlySalary;
+        const bonuses = salary.bonuses;
+        const penalties = salary.penalties;
         return `<tr>
           <td>${(emp.fullName || "").replace(/</g, "&lt;")}</td>
           <td>${positionLabel(emp.position)}</td>
@@ -665,7 +694,7 @@ function Employees() {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="margin-top:16px;font-size:11px;color:#666;">Paga finale = paga mujore - ditet e munguara * zbritja ditore.</p>
+      <p style="margin-top:16px;font-size:11px;color:#666;">Paga finale = paga mujore - ditet e munguara * zbritja ditore + bonuset - gjobat.</p>
     `;
   };
 
@@ -923,7 +952,7 @@ function Employees() {
           </h4>
           <div className="text-sm">
             <span className="font-medium">
-              (Paga Ditore × Ditët e Punuara) + Bonuset - Gjobat
+              Paga Mujore - (Ditet e Munguara x Paga Ditore) + Bonuset - Gjobat
             </span>
           </div>
         </div>
@@ -975,7 +1004,11 @@ function Employees() {
             <Select
               onChange={(value) => {
                 const defaultWage = getDefaultDailyWage(value);
-                form.setFieldsValue({ dailyWage: defaultWage });
+                const currentMonthlySalary = form.getFieldValue("baseSalary");
+                form.setFieldsValue({
+                  dailyWage: defaultWage,
+                  baseSalary: currentMonthlySalary || defaultWage * STANDARD_WORKING_DAYS_PER_MONTH,
+                });
               }}
             >
               <Option value="magazine">Magazine</Option>
@@ -989,6 +1022,23 @@ function Employees() {
             rules={[{ required: true, message: "Ju lutemi zgjidhni datën e punësimit" }]}
           >
             <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+          </Form.Item>
+
+          <Form.Item
+            name="baseSalary"
+            label="Paga Mujore"
+            rules={[
+              { required: true, message: "Ju lutemi shkruani pagen mujore" },
+              { type: "number", min: 0, message: "Paga mujore duhet te jete 0 ose me e madhe" },
+            ]}
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              formatter={(value) => `${value} Ð´ÐµÐ½`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+              parser={(value) => value.replace(/Ð´ÐµÐ½\s?|,*/g, "")}
+              min={0}
+              placeholder="Shkruani pagen mujore"
+            />
           </Form.Item>
 
           <Form.Item
@@ -1145,9 +1195,14 @@ function Employees() {
                       
                       // Calculate days worked for this month using calendar days with local changes
                       const daysWorkedThisMonth = calendarDays.filter(d => d.isPresent).length;
+                      const absentDaysThisMonth = calendarDays.filter(d => !d.isPresent).length;
                       
                       // Calculate monthly salary
-                      const salaryInfo = calculateMonthlySalary(selectedEmployeeForAttendance, daysWorkedThisMonth);
+                      const salaryInfo = calculateMonthlySalary(
+                        selectedEmployeeForAttendance,
+                        daysWorkedThisMonth,
+                        absentDaysThisMonth
+                      );
                       
                       // Update the employee's record with calculated salary data
                       await apiClient.put(API_ENDPOINTS.EMPLOYEE_BY_ID(selectedEmployeeForAttendance.id), {
@@ -1217,7 +1272,12 @@ function Employees() {
                   <Text strong className="block mb-2 text-center">Parapamje e Rrogës për Muajin:</Text>
                   {(() => {
                     const daysWorked = calendarDays.filter(d => d.isPresent).length;
-                    const salaryInfo = calculateMonthlySalary(selectedEmployeeForAttendance, daysWorked);
+                    const absentDays = calendarDays.filter(d => !d.isPresent).length;
+                    const salaryInfo = calculateMonthlySalary(
+                      selectedEmployeeForAttendance,
+                      daysWorked,
+                      absentDays
+                    );
                     
                     return (
                       <>

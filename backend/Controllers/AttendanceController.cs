@@ -5,6 +5,7 @@ using backend.Authorization;
 using backend.Data;
 using backend.Models;
 using backend.DTOs;
+using backend.Services;
 using backend.Utilities;
 
 namespace backend.Controllers
@@ -37,9 +38,9 @@ namespace backend.Controllers
                 .OrderBy(a => a.Date)
                 .ToListAsync();
 
-            var daysWorked = attendanceRecords.Count(a => a.IsPresent && !a.IsHalfDay);
             var halfDays = attendanceRecords.Count(a => a.IsPresent && a.IsHalfDay);
             var absentDays = attendanceRecords.Count(a => !a.IsPresent);
+            var daysWorked = Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - absentDays);
             var totalOvertimeHours = attendanceRecords.Sum(a => a.OvertimeHours ?? 0);
             var totalDailyBonuses = attendanceRecords.Sum(a => a.DailyBonus ?? 0);
             var totalDailyPenalties = attendanceRecords.Sum(a => a.DailyPenalty ?? 0);
@@ -96,7 +97,8 @@ namespace backend.Controllers
                     .OrderBy(a => a.Date)
                     .ToListAsync();
 
-                var daysWorked = attendanceRecords.Count(a => a.IsPresent);
+                var absentDays = attendanceRecords.Count(a => !a.IsPresent);
+                var daysWorked = Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - absentDays);
                 var totalDaysInMonth = DateTime.DaysInMonth(year, month);
 
                 var dailyRecords = attendanceRecords.Select(a => new AttendanceDto
@@ -118,6 +120,7 @@ namespace backend.Controllers
                     Year = year,
                     Month = month,
                     DaysWorked = daysWorked,
+                    AbsentDays = absentDays,
                     TotalDaysInMonth = totalDaysInMonth,
                     DailyRecords = dailyRecords
                 });
@@ -299,9 +302,9 @@ namespace backend.Controllers
                 .Where(a => a.EmployeeId == employeeId && a.Date >= startDate && a.Date < endDate)
                 .ToListAsync();
 
-            var daysWorked = attendanceRecords.Count(a => a.IsPresent && !a.IsHalfDay);
             var halfDays = attendanceRecords.Count(a => a.IsPresent && a.IsHalfDay);
             var absentDays = attendanceRecords.Count(a => !a.IsPresent);
+            var daysWorked = Math.Max(0, SalaryCalculator.StandardWorkingDaysPerMonth - absentDays);
             var totalOvertimeHours = attendanceRecords.Sum(a => a.OvertimeHours ?? 0);
             var totalDailyBonuses = attendanceRecords.Sum(a => a.DailyBonus ?? 0);
             var totalDailyPenalties = attendanceRecords.Sum(a => a.DailyPenalty ?? 0);

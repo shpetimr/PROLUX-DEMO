@@ -4,7 +4,7 @@ namespace backend.Services
 {
     public static class SalaryCalculator
     {
-        public const int StandardWorkingDaysPerMonth = 22;
+        public const int StandardWorkingDaysPerMonth = 26;
 
         public static decimal CalculateMonthlySalary(Employee employee)
         {
@@ -14,21 +14,43 @@ namespace backend.Services
         public static decimal CalculateMonthlySalary(Employee employee, int absentDays)
         {
             var monthlySalary = GetMonthlySalary(employee);
-            var dailyDeduction = CalculateDailyDeduction(monthlySalary);
+            var dailyDeduction = CalculateDailyDeduction(employee);
+            var totalBonuses = GetTotalBonuses(employee);
+            var totalPenalties = GetTotalPenalties(employee);
 
-            return monthlySalary - absentDays * dailyDeduction;
+            return monthlySalary - absentDays * dailyDeduction + totalBonuses - totalPenalties;
         }
 
-        public static decimal CalculateDailyDeduction(decimal monthlySalary)
+        public static decimal CalculateDailyDeduction(Employee employee)
         {
-            return monthlySalary / StandardWorkingDaysPerMonth;
+            return GetDailySalary(employee);
         }
 
         public static decimal GetMonthlySalary(Employee employee)
         {
             return employee.BaseSalary > 0
                 ? employee.BaseSalary
-                : employee.DailyWage * StandardWorkingDaysPerMonth;
+                : GetDailySalary(employee) * StandardWorkingDaysPerMonth;
+        }
+
+        public static decimal GetDailySalary(Employee employee)
+        {
+            if (employee.DailyWage > 0)
+            {
+                return employee.DailyWage;
+            }
+
+            return employee.DailyRate > 0 ? employee.DailyRate : 0;
+        }
+
+        public static decimal GetTotalBonuses(Employee employee)
+        {
+            return employee.MonthlyBonuses + employee.CalculatedDailyBonuses;
+        }
+
+        public static decimal GetTotalPenalties(Employee employee)
+        {
+            return employee.MonthlyPenalties + employee.CalculatedDailyPenalties;
         }
     }
 }
