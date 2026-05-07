@@ -27,8 +27,7 @@ const { Title, Text } = Typography;
 
 const movementKindOptions = [
   { value: "In", label: "Hyrje (stok +)" },
-  { value: "Out", label: "Dalje (stok −)" },
-  { value: "Adjustment", label: "Korrigjim" },
+  { value: "Adjustment", label: "Korrigjim / humbje / dëmtim (+/-)" },
 ];
 
 
@@ -231,8 +230,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
       return;
     }
 
-    if (values.movementKind === "Out") q = -Math.abs(q);
-    else if (values.movementKind === "In") q = Math.abs(q);
+    if (values.movementKind === "In") q = Math.abs(q);
 
     setSavingMovement(true);
     try {
@@ -358,7 +356,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
             icon={<SwapOutlined />}
             onClick={() => openMovement(record)}
           >
-            Lëvizje
+            Rregullo
           </Button>
           <Button
             size="small"
@@ -403,9 +401,9 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
         </Space>
       </div>
       <Text type="secondary">
-        Sasia llogaritet nga shuma e të gjitha lëvizjeve (hyrje +, dalje −).
-        Për dalje përdorni vlera negative ose zgjidhni llojin dhe shkruani
-        sasinë me shenjë.
+        Sasia llogaritet nga hyrjet, korrigjimet dhe faturat e arkivuara.
+        Artikujt e shitur zbriten automatikisht nga fatura; rregullimi manual
+        mbetet për hyrje, korrigjime, humbje ose dëmtime.
       </Text>
       <Table
         style={{ marginTop: 16 }}
@@ -522,7 +520,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
       </Modal>
 
       <Modal
-        title={selectedItem ? `Lëvizje: ${selectedItem.name}` : "Lëvizje"}
+        title={selectedItem ? `Rregullim stoku: ${selectedItem.name}` : "Rregullim stoku"}
         open={moveModalOpen}
         onCancel={() => setMoveModalOpen(false)}
         destroyOnClose={false}
@@ -544,7 +542,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
           </Form.Item>
           <Form.Item
             name="quantityChange"
-            label="Sasia (numër pozitiv për Hyrje/Dalje; Korrigjim lejon + ose −)"
+            label="Sasia"
             rules={[{ required: true, message: "Shkruani sasinë" }]}
           >
             <InputNumber style={{ width: "100%" }} step={0.01} />
