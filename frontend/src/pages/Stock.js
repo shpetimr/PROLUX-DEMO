@@ -112,12 +112,17 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
   const openCreateItem = () => {
     setEditingItem(null);
     itemForm.resetFields();
-    itemForm.setFieldsValue({ unit: "pcs", stockType: activeStockType });
+    itemForm.setFieldsValue({
+      unit: "pcs",
+      stockType: activeStockType,
+      initialQuantity: 0,
+    });
     setItemModalOpen(true);
   };
 
   const openEditItem = (record) => {
     setEditingItem(record);
+    itemForm.resetFields();
     itemForm.setFieldsValue({
       name: record.name,
       sku: record.sku,
@@ -125,6 +130,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
       stockType: activeStockType,
       description: record.description,
       reorderLevel: record.reorderLevel,
+      initialQuantity: undefined,
     });
     setItemModalOpen(true);
   };
@@ -136,13 +142,17 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
 
   const onItemFormFinish = async (values) => {
     setSavingItem(true);
-    const payload = { ...values, stockType: activeStockType };
+    const { initialQuantity, ...itemValues } = values;
+    const payload = { ...itemValues, stockType: activeStockType };
     try {
       if (editingItem) {
         await apiClient.put(API_ENDPOINTS.STOCK_ITEM_BY_ID(editingItem.id), payload);
         message.success("Artikulli u përditësua.");
       } else {
-        const res = await apiClient.post(API_ENDPOINTS.STOCK_ITEMS, payload);
+        const res = await apiClient.post(API_ENDPOINTS.STOCK_ITEMS, {
+          ...payload,
+          initialQuantity: initialQuantity == null ? 0 : initialQuantity,
+        });
         message.success("Artikulli u shtua.");
         const row = res.data;
         if (row && row.id != null) {
@@ -401,6 +411,21 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
           <Form.Item name="description" label="Përshkrimi">
             <Input.TextArea rows={2} />
           </Form.Item>
+          {!editingItem && (
+            <Form.Item
+              name="initialQuantity"
+              label="Sasia fillestare"
+              rules={[
+                {
+                  type: "number",
+                  min: 0,
+                  message: "Sasia fillestare nuk mund te jete negative.",
+                },
+              ]}
+            >
+              <InputNumber min={0} step={0.01} style={{ width: "100%" }} />
+            </Form.Item>
+          )}
           <Form.Item name="reorderLevel" label="Nivel alarmi (sasi minimale)">
             <InputNumber min={0} style={{ width: "100%" }} />
           </Form.Item>

@@ -34,6 +34,8 @@ namespace backend.DTOs
         public string? Description { get; set; }
 
         public decimal? ReorderLevel { get; set; }
+
+        public decimal InitialQuantity { get; set; } = 0m;
     }
 
     public class UpdateStockItemDto

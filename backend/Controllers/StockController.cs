@@ -97,6 +97,10 @@ namespace backend.Controllers
             if (!IsValidStockType(dto.StockType))
                 return BadRequest(new { message = "StockType must be Material or Product." });
 
+            if (dto.InitialQuantity < 0)
+                return BadRequest(new { message = "InitialQuantity cannot be negative." });
+
+            var now = DateTime.UtcNow;
             var entity = new StockItem
             {
                 Name = dto.Name.Trim(),
@@ -105,9 +109,22 @@ namespace backend.Controllers
                 StockType = dto.StockType,
                 Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
                 ReorderLevel = dto.ReorderLevel,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = now
             };
             _context.StockItems.Add(entity);
+
+            if (dto.InitialQuantity > 0)
+            {
+                _context.StockMovements.Add(new StockMovement
+                {
+                    StockItem = entity,
+                    QuantityChange = dto.InitialQuantity,
+                    MovementKind = "Initial",
+                    Note = "Initial quantity",
+                    OccurredAt = now
+                });
+            }
+
             await _context.SaveChangesAsync();
 
             var created = new StockItemResponseDto
@@ -120,7 +137,7 @@ namespace backend.Controllers
                 Description = entity.Description,
                 ReorderLevel = entity.ReorderLevel,
                 CreatedAt = entity.CreatedAt,
-                CurrentQuantity = 0
+                CurrentQuantity = dto.InitialQuantity
             };
             return Ok(created);
         }
