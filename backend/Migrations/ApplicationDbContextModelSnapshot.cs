@@ -528,6 +528,9 @@ namespace backend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("BuyPrice")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -538,6 +541,9 @@ namespace backend.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("ReorderLevel")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("SellPrice")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Sku")
@@ -565,6 +571,9 @@ namespace backend.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal?>("CostAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("MovementKind")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
@@ -581,6 +590,9 @@ namespace backend.Migrations
 
                     b.Property<int>("StockItemId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 

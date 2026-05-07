@@ -115,6 +115,8 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
     itemForm.setFieldsValue({
       unit: "pcs",
       stockType: activeStockType,
+      buyPrice: 0,
+      sellPrice: 0,
       initialQuantity: 0,
     });
     setItemModalOpen(true);
@@ -128,6 +130,8 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
       sku: record.sku,
       unit: record.unit || "pcs",
       stockType: activeStockType,
+      buyPrice: Number(record.buyPrice || 0),
+      sellPrice: Number(record.sellPrice || 0),
       description: record.description,
       reorderLevel: record.reorderLevel,
       initialQuantity: undefined,
@@ -270,6 +274,28 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
     }
   };
 
+  const priceColumns =
+    activeStockType === STOCK_TYPES.Material
+      ? [
+          {
+            title: "Cmimi i blerjes",
+            dataIndex: "buyPrice",
+            key: "buyPrice",
+            width: 140,
+            align: "right",
+            render: (value) => `${Number(value || 0).toFixed(2)} DEN`,
+          },
+          {
+            title: "Cmimi i shitjes",
+            dataIndex: "sellPrice",
+            key: "sellPrice",
+            width: 140,
+            align: "right",
+            render: (value) => `${Number(value || 0).toFixed(2)} DEN`,
+          },
+        ]
+      : [];
+
   const columns = [
     { title: "Emri", dataIndex: "name", key: "name" },
     { title: "SKU", dataIndex: "sku", key: "sku", render: (t) => t || "—" },
@@ -288,6 +314,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
       },
     },
     { title: "Njësia", dataIndex: "unit", key: "unit", width: 90 },
+    ...priceColumns,
     {
       title: "Sasia",
       dataIndex: "currentQuantity",
@@ -405,6 +432,46 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
           <Form.Item name="unit" label="Njësia">
             <Input placeholder="pcs, m2, kg..." />
           </Form.Item>
+          {activeStockType === STOCK_TYPES.Material && (
+            <>
+              <Form.Item
+                name="buyPrice"
+                label="Cmimi i blerjes"
+                rules={[
+                  {
+                    type: "number",
+                    min: 0,
+                    message: "Cmimi i blerjes nuk mund te jete negativ.",
+                  },
+                ]}
+              >
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  style={{ width: "100%" }}
+                  addonAfter="DEN"
+                />
+              </Form.Item>
+              <Form.Item
+                name="sellPrice"
+                label="Cmimi i shitjes"
+                rules={[
+                  {
+                    type: "number",
+                    min: 0,
+                    message: "Cmimi i shitjes nuk mund te jete negativ.",
+                  },
+                ]}
+              >
+                <InputNumber
+                  min={0}
+                  step={0.01}
+                  style={{ width: "100%" }}
+                  addonAfter="DEN"
+                />
+              </Form.Item>
+            </>
+          )}
           <Form.Item name="stockType" hidden>
             <Input />
           </Form.Item>

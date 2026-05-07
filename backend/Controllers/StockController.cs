@@ -57,6 +57,8 @@ namespace backend.Controllers
                 Sku = item.Sku,
                 Unit = item.Unit,
                 StockType = item.StockType,
+                BuyPrice = item.BuyPrice,
+                SellPrice = item.SellPrice,
                 Description = item.Description,
                 ReorderLevel = item.ReorderLevel,
                 CreatedAt = item.CreatedAt,
@@ -84,6 +86,8 @@ namespace backend.Controllers
                 Sku = item.Sku,
                 Unit = item.Unit,
                 StockType = item.StockType,
+                BuyPrice = item.BuyPrice,
+                SellPrice = item.SellPrice,
                 Description = item.Description,
                 ReorderLevel = item.ReorderLevel,
                 CreatedAt = item.CreatedAt,
@@ -100,6 +104,9 @@ namespace backend.Controllers
             if (dto.InitialQuantity < 0)
                 return BadRequest(new { message = "InitialQuantity cannot be negative." });
 
+            if (dto.BuyPrice < 0 || dto.SellPrice < 0)
+                return BadRequest(new { message = "BuyPrice and SellPrice cannot be negative." });
+
             var now = DateTime.UtcNow;
             var entity = new StockItem
             {
@@ -107,6 +114,8 @@ namespace backend.Controllers
                 Sku = string.IsNullOrWhiteSpace(dto.Sku) ? null : dto.Sku.Trim(),
                 Unit = string.IsNullOrWhiteSpace(dto.Unit) ? "pcs" : dto.Unit.Trim(),
                 StockType = dto.StockType,
+                BuyPrice = dto.BuyPrice,
+                SellPrice = dto.SellPrice,
                 Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
                 ReorderLevel = dto.ReorderLevel,
                 CreatedAt = now
@@ -134,6 +143,8 @@ namespace backend.Controllers
                 Sku = entity.Sku,
                 Unit = entity.Unit,
                 StockType = entity.StockType,
+                BuyPrice = entity.BuyPrice,
+                SellPrice = entity.SellPrice,
                 Description = entity.Description,
                 ReorderLevel = entity.ReorderLevel,
                 CreatedAt = entity.CreatedAt,
@@ -151,10 +162,15 @@ namespace backend.Controllers
             if (entity == null)
                 return NotFound();
 
+            if (dto.BuyPrice < 0 || dto.SellPrice < 0)
+                return BadRequest(new { message = "BuyPrice and SellPrice cannot be negative." });
+
             entity.Name = dto.Name.Trim();
             entity.Sku = string.IsNullOrWhiteSpace(dto.Sku) ? null : dto.Sku.Trim();
             entity.Unit = string.IsNullOrWhiteSpace(dto.Unit) ? "pcs" : dto.Unit.Trim();
             entity.StockType = dto.StockType;
+            entity.BuyPrice = dto.BuyPrice;
+            entity.SellPrice = dto.SellPrice;
             entity.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
             entity.ReorderLevel = dto.ReorderLevel;
 

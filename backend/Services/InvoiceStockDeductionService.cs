@@ -143,10 +143,15 @@ namespace backend.Services
             var noteBase = string.Join(" - ", noteParts);
             foreach (var item in aggregated.Values)
             {
+                var unitCost = item.Item.BuyPrice;
+                var costAmount = Math.Round(item.Quantity * unitCost, 2, MidpointRounding.AwayFromZero);
+
                 _context.StockMovements.Add(new StockMovement
                 {
                     StockItemId = item.Item.Id,
                     QuantityChange = -item.Quantity,
+                    UnitCost = unitCost,
+                    CostAmount = costAmount,
                     MovementKind = InvoiceMovementKind,
                     Note = $"Invoice: {noteBase}",
                     OccurredAt = now
@@ -156,7 +161,9 @@ namespace backend.Services
                 {
                     StockItemId = item.Item.Id,
                     StockItemName = item.Item.Name,
-                    QuantityDeducted = item.Quantity
+                    QuantityDeducted = item.Quantity,
+                    UnitCost = unitCost,
+                    CostAmount = costAmount
                 });
             }
 

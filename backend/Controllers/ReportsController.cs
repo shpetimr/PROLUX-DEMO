@@ -407,8 +407,10 @@ namespace backend.Controllers
 
                 var archivedInvoiceRevenue = periodReport.TotalArchivedInvoices;
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
+                var invoiceStockCost = periodReport.TotalInvoiceStockCost;
+                var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
                 var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
-                var expenses = baseExpenses + workSalesCost;
+                var expenses = baseExpenses + workSalesCost + invoiceStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
@@ -437,11 +439,22 @@ namespace backend.Controllers
                         PercentageOfTotal = totalOutflow > 0 ? (workSalesCost / totalOutflow) * 100 : 0,
                         PercentageOfIncome = incomes > 0 ? (workSalesCost / incomes) * 100 : 0
                     });
-
-                    expenseBreakdown = expenseBreakdown
-                        .OrderByDescending(x => x.Amount)
-                        .ToList();
                 }
+
+                if (invoiceStockCostCount > 0 || invoiceStockCost > 0)
+                {
+                    expenseBreakdown.Add(new
+                    {
+                        Type = "Invoice Stock Cost",
+                        Amount = invoiceStockCost,
+                        PercentageOfTotal = totalOutflow > 0 ? (invoiceStockCost / totalOutflow) * 100 : 0,
+                        PercentageOfIncome = incomes > 0 ? (invoiceStockCost / incomes) * 100 : 0
+                    });
+                }
+
+                expenseBreakdown = expenseBreakdown
+                    .OrderByDescending(x => x.Amount)
+                    .ToList();
 
                 return Ok(new
                 {
@@ -459,6 +472,8 @@ namespace backend.Controllers
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
+                        TotalInvoiceStockCost = invoiceStockCost,
+                        InvoiceStockCostCount = invoiceStockCostCount,
                         TotalOutflow = totalOutflow,
                         NetIncome = netIncome,
                         ProfitMargin = profitMargin
@@ -808,8 +823,10 @@ namespace backend.Controllers
 
                 var archivedInvoiceRevenue = periodReport.TotalArchivedInvoices;
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
+                var invoiceStockCost = periodReport.TotalInvoiceStockCost;
+                var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
                 var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
-                var expenses = baseExpenses + workSalesCost;
+                var expenses = baseExpenses + workSalesCost + invoiceStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
@@ -845,12 +862,23 @@ namespace backend.Controllers
                         Count = workSalesCount,
                         Percentage = totalOutflow > 0 ? (workSalesCost / totalOutflow) * 100 : 0
                     });
-
-                    topExpenseTypes = topExpenseTypes
-                        .OrderByDescending(x => x.Total)
-                        .Take(5)
-                        .ToList();
                 }
+
+                if (invoiceStockCostCount > 0 || invoiceStockCost > 0)
+                {
+                    topExpenseTypes.Add(new
+                    {
+                        Type = "Invoice Stock Cost",
+                        Total = invoiceStockCost,
+                        Count = invoiceStockCostCount,
+                        Percentage = totalOutflow > 0 ? (invoiceStockCost / totalOutflow) * 100 : 0
+                    });
+                }
+
+                topExpenseTypes = topExpenseTypes
+                    .OrderByDescending(x => x.Total)
+                    .Take(5)
+                    .ToList();
 
                 // Get top income sources
                 var topIncomeSources = await _context.Incomes
@@ -915,6 +943,8 @@ namespace backend.Controllers
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
+                        TotalInvoiceStockCost = invoiceStockCost,
+                        InvoiceStockCostCount = invoiceStockCostCount,
                         TotalOutflow = totalOutflow,
                         NetIncome = netIncome,
                         ProfitMargin = profitMargin

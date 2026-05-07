@@ -9,6 +9,8 @@ namespace backend.Models
         public int StockItemId { get; set; }
         public StockItem StockItem { get; set; } = null!;
         public decimal QuantityChange { get; set; }
+        public decimal? UnitCost { get; set; }
+        public decimal? CostAmount { get; set; }
         public string? MovementKind { get; set; }
         public string? Note { get; set; }
         public DateTime OccurredAt { get; set; } = DateTime.UtcNow;

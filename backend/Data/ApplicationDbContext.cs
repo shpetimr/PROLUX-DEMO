@@ -216,6 +216,8 @@ namespace backend.Data
                 entity.Property(e => e.Sku).HasMaxLength(100);
                 entity.Property(e => e.Unit).IsRequired().HasMaxLength(20);
                 entity.Property(e => e.StockType).HasConversion<string>().HasMaxLength(20);
+                entity.Property(e => e.BuyPrice).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.SellPrice).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.ReorderLevel).HasColumnType("decimal(18,2)");
                 entity.HasMany(e => e.Movements)
@@ -228,6 +230,8 @@ namespace backend.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.QuantityChange).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.UnitCost).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.CostAmount).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.MovementKind).HasMaxLength(50);
                 entity.Property(e => e.Note).HasMaxLength(500);
                 entity.HasIndex(e => e.StockItemId);

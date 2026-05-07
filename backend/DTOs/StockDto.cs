@@ -10,6 +10,8 @@ namespace backend.DTOs
         public string? Sku { get; set; }
         public string Unit { get; set; } = "";
         public StockType StockType { get; set; } = StockType.Material;
+        public decimal BuyPrice { get; set; }
+        public decimal SellPrice { get; set; }
         public string? Description { get; set; }
         public decimal? ReorderLevel { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -29,6 +31,10 @@ namespace backend.DTOs
         public string Unit { get; set; } = "pcs";
 
         public StockType StockType { get; set; } = StockType.Material;
+
+        public decimal BuyPrice { get; set; }
+
+        public decimal SellPrice { get; set; }
 
         [StringLength(500)]
         public string? Description { get; set; }
@@ -51,6 +57,10 @@ namespace backend.DTOs
         public string Unit { get; set; } = "pcs";
 
         public StockType StockType { get; set; } = StockType.Material;
+
+        public decimal BuyPrice { get; set; }
+
+        public decimal SellPrice { get; set; }
 
         [StringLength(500)]
         public string? Description { get; set; }
@@ -102,6 +112,8 @@ namespace backend.DTOs
         public int StockItemId { get; set; }
         public string StockItemName { get; set; } = "";
         public decimal QuantityDeducted { get; set; }
+        public decimal UnitCost { get; set; }
+        public decimal CostAmount { get; set; }
     }
 
     public class InvoiceStockDeductionResultDto
