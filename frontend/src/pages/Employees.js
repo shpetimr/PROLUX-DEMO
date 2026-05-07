@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Table,
   Button,
@@ -51,7 +51,44 @@ function Employees() {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [calendarDays, setCalendarDays] = useState([]); // New state for calendar days
-  const [localChanges, setLocalChanges] = useState({}); // Track local changes
+  const [localChanges, setLocalChanges] = useState({}); // Track local changes by employee/month
+  const activeAttendanceContextRef = useRef(null);
+
+  const getAttendanceContextKey = (employeeId, month) => {
+    if (!employeeId || !month) {
+      return "";
+    }
+
+    return `${employeeId}-${month.format("YYYY-MM")}`;
+  };
+
+  const getAttendanceLocalChanges = (contextKey) => localChanges[contextKey] || {};
+
+  const clearAttendanceLocalChange = (contextKey, dateString) => {
+    setLocalChanges((prev) => {
+      const contextChanges = prev[contextKey];
+      if (!contextChanges || !Object.prototype.hasOwnProperty.call(contextChanges, dateString)) {
+        return prev;
+      }
+
+      const { [dateString]: _removed, ...remainingChanges } = contextChanges;
+      if (Object.keys(remainingChanges).length === 0) {
+        const { [contextKey]: _removedContext, ...remainingContexts } = prev;
+        return remainingContexts;
+      }
+
+      return {
+        ...prev,
+        [contextKey]: remainingChanges,
+      };
+    });
+  };
+
+  const createTemporaryAttendanceId = (employeeId, dateString) =>
+    `temp-${employeeId}-${dateString}-${Date.now()}`;
+
+  const isTemporaryAttendanceId = (id) =>
+    typeof id === "string" && id.startsWith("temp-");
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -138,25 +175,18 @@ function Employees() {
     }
   };
 
-  // Reset attendance form when modal opens/closes
   useEffect(() => {
     if (attendanceModalVisible && selectedEmployeeForAttendance) {
-      // Only refresh data if there are no local changes to preserve
-      if (Object.keys(localChanges).length === 0) {
-        fetchMonthlyAttendance(selectedEmployeeForAttendance.id, selectedMonth.year(), selectedMonth.month() + 1);
-      } else {
-        // Use existing data with local changes applied
-        const days = generateCalendarDays(selectedMonth, attendanceRecords);
-        setCalendarDays(days);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendanceModalVisible, selectedEmployeeForAttendance]);
-
-  // Refresh attendance data when month changes
-  useEffect(() => {
-    if (attendanceModalVisible && selectedEmployeeForAttendance) {
-      fetchMonthlyAttendance(selectedEmployeeForAttendance.id, selectedMonth.year(), selectedMonth.month() + 1);
+      const contextKey = getAttendanceContextKey(selectedEmployeeForAttendance.id, selectedMonth);
+      activeAttendanceContextRef.current = contextKey;
+      setAttendanceRecords([]);
+      setCalendarDays([]);
+      fetchMonthlyAttendance(
+        selectedEmployeeForAttendance.id,
+        selectedMonth.year(),
+        selectedMonth.month() + 1,
+        selectedMonth
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, attendanceModalVisible, selectedEmployeeForAttendance]);
@@ -173,75 +203,37 @@ function Employees() {
   // Simple attendance functions
   const handleAttendanceClick = async (employee) => {
     const attendanceMonth = selectedSalaryMonth || dayjs();
-    
+    const contextKey = getAttendanceContextKey(employee.id, attendanceMonth);
+
+    activeAttendanceContextRef.current = contextKey;
     setSelectedEmployeeForAttendance(employee);
     setSelectedMonth(attendanceMonth);
+    setAttendanceRecords([]);
+    setCalendarDays([]);
     setAttendanceModalVisible(true);
-    
-    // Wait a bit for modal to open, then fetch data
-    setTimeout(async () => {
-      try {
-        const response = await apiClient.get(
-          API_ENDPOINTS.ATTENDANCE_EMPLOYEE_MONTH(employee.id, attendanceMonth.year(), attendanceMonth.month() + 1)
-        );
-        
-        const fetchedRecords = response.data.dailyRecords || [];
-        
-        // Apply local changes to fetched records
-        const recordsWithLocalChanges = fetchedRecords.map(record => {
-          const dateString = dayjs(record.date).format('YYYY-MM-DD');
-          if (localChanges[dateString] !== undefined) {
-            return { ...record, isPresent: localChanges[dateString] };
-          }
-          return record;
-        });
-        
-        // Also add any local changes that don't exist in fetched records
-        const allRecords = [...recordsWithLocalChanges];
-        Object.keys(localChanges).forEach(dateString => {
-          const exists = allRecords.some(r => dayjs(r.date).format('YYYY-MM-DD') === dateString);
-          if (!exists) {
-            allRecords.push({
-              id: Date.now() + Math.random(), // Temporary ID
-              employeeId: employee.id,
-              date: dateString,
-              isPresent: localChanges[dateString],
-              notes: "Regjistruar nga kalendari"
-            });
-          }
-        });
-        
-        setAttendanceRecords(allRecords);
-        
-        // Generate calendar days with local changes applied
-        const days = generateCalendarDays(attendanceMonth, allRecords);
-        setCalendarDays(days);
-        
-        
-      } catch (error) {
-        console.error('Error fetching initial attendance data:', error);
-        message.error('Gabim në marrjen e të dhënave të pranisë');
-        setAttendanceRecords([]);
-        setCalendarDays([]);
-      }
-    }, 100);
   };
 
-  const fetchMonthlyAttendance = async (employeeId, year, month) => {
+  const fetchMonthlyAttendance = async (employeeId, year, month, attendanceMonth = selectedMonth) => {
+    const contextKey = getAttendanceContextKey(employeeId, attendanceMonth);
+    const contextChanges = getAttendanceLocalChanges(contextKey);
     setAttendanceLoading(true);
     try {
       
       const response = await apiClient.get(
         API_ENDPOINTS.ATTENDANCE_EMPLOYEE_MONTH(employeeId, year, month)
       );
+
+      if (activeAttendanceContextRef.current !== contextKey) {
+        return;
+      }
       
       const fetchedRecords = response.data.dailyRecords || [];
       
       // Apply local changes to fetched records
       const recordsWithLocalChanges = fetchedRecords.map(record => {
         const dateString = dayjs(record.date).format('YYYY-MM-DD');
-        if (localChanges[dateString] !== undefined) {
-          return { ...record, isPresent: localChanges[dateString] };
+        if (Object.prototype.hasOwnProperty.call(contextChanges, dateString)) {
+          return { ...record, isPresent: contextChanges[dateString] };
         }
         return record;
       });
@@ -249,17 +241,23 @@ function Employees() {
       setAttendanceRecords(recordsWithLocalChanges);
       
       // Generate and set calendar days immediately after setting records
-      const days = generateCalendarDays(selectedMonth, recordsWithLocalChanges);
+      const days = generateCalendarDays(attendanceMonth, recordsWithLocalChanges, contextChanges);
       setCalendarDays(days);
       
       
     } catch (error) {
+      if (activeAttendanceContextRef.current !== contextKey) {
+        return;
+      }
+
       console.error("Error fetching attendance:", error);
       setAttendanceRecords([]);
       setCalendarDays([]);
       message.error('Gabim në marrjen e të dhënave të pranisë');
     } finally {
-      setAttendanceLoading(false);
+      if (activeAttendanceContextRef.current === contextKey) {
+        setAttendanceLoading(false);
+      }
     }
   };
 
@@ -268,7 +266,7 @@ function Employees() {
     setSelectedMonth(nextMonth);
     setSelectedSalaryMonth(nextMonth);
     if (selectedEmployeeForAttendance) {
-      fetchMonthlyAttendance(selectedEmployeeForAttendance.id, nextMonth.year(), nextMonth.month() + 1);
+      activeAttendanceContextRef.current = getAttendanceContextKey(selectedEmployeeForAttendance.id, nextMonth);
     }
   };
 
@@ -298,19 +296,16 @@ function Employees() {
         await refreshEmployeesAndSalary(selectedMonth);
         notifyDataChanged();
         
-        
-        // Keep local changes for the next attendance session.
       }
     } catch (error) {
       console.error('Error saving attendance data before closing modal:', error);
       // Don't clear local changes if save failed
     } finally {
-      // Close the modal but keep local changes in memory
+      activeAttendanceContextRef.current = null;
       setAttendanceModalVisible(false);
       setSelectedEmployeeForAttendance(null);
       setAttendanceRecords([]);
       setCalendarDays([]);
-      // Note: localChanges state is NOT cleared here
     }
   };
 
@@ -334,12 +329,26 @@ function Employees() {
 
   // Simple function to toggle attendance for a day
   const toggleAttendance = async (date, isPresent) => {
+    if (!selectedEmployeeForAttendance) {
+      return;
+    }
+
     const dateString = date.format('YYYY-MM-DD');
+    const employeeId = selectedEmployeeForAttendance.id;
+    const contextKey = getAttendanceContextKey(employeeId, selectedMonth);
+    const previousContextChanges = getAttendanceLocalChanges(contextKey);
+    const nextContextChanges = {
+      ...previousContextChanges,
+      [dateString]: isPresent,
+    };
     
     // Track local change
     setLocalChanges(prev => ({
       ...prev,
-      [dateString]: isPresent
+      [contextKey]: {
+        ...(prev[contextKey] || {}),
+        [dateString]: isPresent
+      }
     }));
     
     // Find existing record
@@ -349,6 +358,7 @@ function Employees() {
 
     // Create updated records array
     let updatedRecords;
+    let temporaryId = existingRecord?.id;
     if (existingRecord) {
       // Update existing record
       updatedRecords = attendanceRecords.map(r => 
@@ -358,9 +368,10 @@ function Employees() {
       );
     } else {
       // Add new record
+      temporaryId = createTemporaryAttendanceId(employeeId, dateString);
       const newRecord = {
-        id: Date.now(), // Temporary ID
-        employeeId: selectedEmployeeForAttendance.id,
+        id: temporaryId,
+        employeeId,
         date: dateString,
         isPresent: isPresent,
         notes: "Regjistruar nga kalendari"
@@ -370,38 +381,53 @@ function Employees() {
 
     // Update both states immediately for instant UI feedback
     setAttendanceRecords(updatedRecords);
-    const updatedCalendarDays = generateCalendarDays(selectedMonth, updatedRecords);
+    const updatedCalendarDays = generateCalendarDays(selectedMonth, updatedRecords, nextContextChanges);
     setCalendarDays(updatedCalendarDays);
 
 
     // Now update backend in background
     try {
-      if (existingRecord) {
+      let finalRecords = updatedRecords;
+
+      if (existingRecord && !isTemporaryAttendanceId(existingRecord.id)) {
         // Update existing record
-        await apiClient.put(API_ENDPOINTS.ATTENDANCE_BY_ID(existingRecord.id), {
+        const response = await apiClient.put(API_ENDPOINTS.ATTENDANCE_BY_ID(existingRecord.id), {
           isPresent: isPresent,
           notes: "Ndryshuar nga kalendari"
         });
+
+        const savedRecord = response.data || {};
+        finalRecords = updatedRecords.map(r =>
+          r.id === existingRecord.id
+            ? { ...r, ...savedRecord, isPresent: savedRecord.isPresent ?? isPresent }
+            : r
+        );
       } else {
         // Create new record
         const response = await apiClient.post(API_ENDPOINTS.ATTENDANCE, {
-          employeeId: selectedEmployeeForAttendance.id,
+          employeeId,
           date: dateString,
           isPresent: isPresent,
           notes: "Regjistruar nga kalendari"
         });
         
         // Update the temporary ID with the real one from backend
-        const finalRecords = updatedRecords.map(r => 
-          r.id === Date.now() 
-            ? { ...r, id: response.data.id }
+        const savedRecord = response.data || {};
+        finalRecords = updatedRecords.map(r =>
+          r.id === temporaryId
+            ? { ...r, ...savedRecord, id: savedRecord.id ?? r.id, isPresent: savedRecord.isPresent ?? isPresent }
             : r
         );
-        
+      }
+
+      clearAttendanceLocalChange(contextKey, dateString);
+
+      if (activeAttendanceContextRef.current === contextKey) {
         setAttendanceRecords(finalRecords);
-        const finalCalendarDays = generateCalendarDays(selectedMonth, finalRecords);
+        const finalContextChanges = { ...nextContextChanges };
+        delete finalContextChanges[dateString];
+        const finalCalendarDays = generateCalendarDays(selectedMonth, finalRecords, finalContextChanges);
         setCalendarDays(finalCalendarDays);
-        
       }
 
       // Show success message
@@ -420,7 +446,12 @@ function Employees() {
   };
 
   // Function to generate calendar days independently
-  const generateCalendarDays = (month, records) => {
+  const generateCalendarDays = (month, records, contextChanges) => {
+    const changesForMonth =
+      contextChanges ||
+      getAttendanceLocalChanges(
+        getAttendanceContextKey(selectedEmployeeForAttendance?.id, month)
+      );
     const days = [];
     const startOfMonth = month.startOf('month');
     const endOfMonth = month.endOf('month');
@@ -434,8 +465,8 @@ function Employees() {
       );
       
       // Check if there's a local change for this date
-      const hasLocalChange = localChanges[dateString] !== undefined;
-      const isPresent = hasLocalChange ? localChanges[dateString] : (attendanceRecord?.isPresent || false);
+      const hasLocalChange = Object.prototype.hasOwnProperty.call(changesForMonth, dateString);
+      const isPresent = hasLocalChange ? changesForMonth[dateString] : (attendanceRecord?.isPresent || false);
       
       days.push({
         date: currentDate,
