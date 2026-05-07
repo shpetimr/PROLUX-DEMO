@@ -13,6 +13,7 @@ namespace backend.Data
         {
             if (db.Database.IsNpgsql())
             {
+                await EnsureCoreTablesExistAsync(db);
                 await EnsurePostgresColumnAsync(db);
                 await BackfillWorkerEmployeesAsync(db);
                 await EnsurePostgresConstraintsAsync(db);
@@ -21,11 +22,36 @@ namespace backend.Data
 
             if (db.Database.IsSqlite())
             {
+                await EnsureCoreTablesExistAsync(db);
                 await EnsureSqliteColumnAsync(db);
                 await BackfillWorkerEmployeesAsync(db);
                 await db.Database.ExecuteSqlRawAsync(
                     @"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_Users_EmployeeId"" ON ""Users"" (""EmployeeId"") WHERE ""EmployeeId"" IS NOT NULL;");
             }
+        }
+
+        private static async Task EnsureCoreTablesExistAsync(ApplicationDbContext db)
+        {
+            var missingTables = new List<string>();
+            if (!await SchemaTableInspector.TableExistsAsync(db, "Users"))
+            {
+                missingTables.Add("Users");
+            }
+
+            if (!await SchemaTableInspector.TableExistsAsync(db, "Employees"))
+            {
+                missingTables.Add("Employees");
+            }
+
+            if (missingTables.Count == 0)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "Cannot bootstrap user/employee links before the core schema exists. " +
+                $"Missing table(s): {string.Join(", ", missingTables)}. " +
+                "Run EF Core migrations before compatibility schema bootstrappers.");
         }
 
         private static async Task EnsurePostgresColumnAsync(ApplicationDbContext db)

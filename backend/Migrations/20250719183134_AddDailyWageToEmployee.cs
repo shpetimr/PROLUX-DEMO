@@ -18,8 +18,8 @@ namespace backend.Migrations
                 defaultValue: 1850m); // Default to Magazine wage
 
             // Update existing employees with appropriate default daily wages based on their position
-            migrationBuilder.Sql("UPDATE Employees SET DailyWage = 1850 WHERE Position = 'Magazine'");
-            migrationBuilder.Sql("UPDATE Employees SET DailyWage = 2460 WHERE Position = 'Terren'");
+            migrationBuilder.Sql("""UPDATE "Employees" SET "DailyWage" = 1850 WHERE "Position" = 'Magazine'""");
+            migrationBuilder.Sql("""UPDATE "Employees" SET "DailyWage" = 2460 WHERE "Position" = 'Terren'""");
         }
 
         /// <inheritdoc />

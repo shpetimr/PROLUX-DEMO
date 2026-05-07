@@ -10,6 +10,10 @@ namespace backend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            var booleanColumnType = migrationBuilder.ActiveProvider == "Npgsql.EntityFrameworkCore.PostgreSQL"
+                ? "boolean"
+                : "INTEGER";
+
             migrationBuilder.RenameColumn(
                 name: "Penalties",
                 table: "Employees",
@@ -84,7 +88,7 @@ namespace backend.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsHalfDay",
                 table: "AttendanceRecords",
-                type: "INTEGER",
+                type: booleanColumnType,
                 nullable: false,
                 defaultValue: false);
 

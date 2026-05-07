@@ -141,7 +141,7 @@ using (var scope = app.Services.CreateScope())
     {
         if (isProductionEnvironment)
         {
-            Console.WriteLine("[Database] Production startup: skipping EnsureCreatedAsync().");
+            await ProductionDatabaseSchemaInitializer.ApplyMigrationsAsync(context);
         }
         else
         {
