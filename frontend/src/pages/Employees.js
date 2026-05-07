@@ -445,8 +445,9 @@ function Employees() {
         setCalendarDays(finalCalendarDays);
       }
 
-      // Show success message
-      message.success(`Prania për ${dateString} u ${isPresent ? 'shtua' : 'ndryshua'}`);
+      message.success(
+        `${dateString} u shënua si ${isPresent ? "ditë pune" : "ditë mungese"}`
+      );
       
       // Notify that data has changed
       notifyDataChanged();
@@ -617,6 +618,7 @@ function Employees() {
 
     return {
       monthlySalary,
+      dailySalary: dailyDeduction,
       dailyDeduction,
       absentDays,
       bonuses,
@@ -648,25 +650,22 @@ function Employees() {
   const buildEmployeesReportHtml = (list, title) => {
     const rows = list
       .map((emp) => {
-        const dailyWage =
-          emp.dailyWage || getDefaultDailyWage(emp.position);
         const salary = getSalarySnapshot(emp);
         const days = Math.max(0, STANDARD_WORKING_DAYS_PER_MONTH - salary.absentDays);
-        const baseSalary = salary.monthlySalary;
+        const dailySalary = salary.dailySalary;
+        const monthlySalary = salary.monthlySalary;
         const bonuses = salary.bonuses;
         const penalties = salary.penalties;
         return `<tr>
           <td>${(emp.fullName || "").replace(/</g, "&lt;")}</td>
           <td>${positionLabel(emp.position)}</td>
           <td>${dayjs(emp.hireDate).format("YYYY-MM-DD")}</td>
-          <td>${formatMoney(dailyWage)}</td>
+          <td>${formatMoney(dailySalary)}</td>
           <td>${days}</td>
-          <td>${formatMoney(baseSalary)}</td>
+          <td>${salary.absentDays}</td>
+          <td>${formatMoney(monthlySalary)}</td>
           <td>${formatMoney(bonuses)}</td>
           <td>${formatMoney(penalties)}</td>
-          <td>${formatMoney(salary.monthlySalary)}</td>
-          <td>${formatMoney(salary.dailyDeduction)}</td>
-          <td>${salary.absentDays}</td>
           <td><strong>${formatMoney(salary.finalSalary)}</strong></td>
         </tr>`;
       })
@@ -683,18 +682,16 @@ function Employees() {
             <th>Data punësimi</th>
             <th>Paga ditore</th>
             <th>Ditët e punuara (muaji)</th>
-            <th>Paga bazë</th>
+            <th>Ditet e munguara</th>
+            <th>Paga mujore</th>
             <th>Bonuset</th>
             <th>Gjobat</th>
-            <th>Paga mujore</th>
-            <th>Zbritja ditore</th>
-            <th>Ditet e munguara</th>
             <th>Paga finale</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p style="margin-top:16px;font-size:11px;color:#666;">Paga finale = paga mujore - ditet e munguara * zbritja ditore + bonuset - gjobat.</p>
+      <p style="margin-top:16px;font-size:11px;color:#666;">Paga finale = paga mujore - ditet e munguara * paga ditore + bonuset - gjobat.</p>
     `;
   };
 
@@ -762,14 +759,9 @@ function Employees() {
       title: "Paga Ditore",
       dataIndex: "dailyWage",
       key: "dailyWage",
-      render: (dailyWage, record) => {
-        const wage = dailyWage || getDefaultDailyWage(record.position);
-        return `${(wage || 0).toFixed(2)} ден`;
-      },
+      render: (_, record) => formatMoney(getSalarySnapshot(record).dailySalary),
       sorter: (a, b) => {
-        const wageA = a.dailyWage || getDefaultDailyWage(a.position) || 0;
-        const wageB = b.dailyWage || getDefaultDailyWage(b.position) || 0;
-        return wageA - wageB;
+        return getSalarySnapshot(a).dailySalary - getSalarySnapshot(b).dailySalary;
       },
     },
     {
@@ -783,33 +775,39 @@ function Employees() {
       title: "Ditët e Punuara",
       dataIndex: "daysWorkedThisMonth",
       key: "daysWorkedThisMonth",
-      render: (days, record) => {
-        const daysWorked = days || 0;
-        const dailyWage = record.dailyWage || getDefaultDailyWage(record.position) || 0;
-        const baseSalary = daysWorked * dailyWage;
+      render: (_, record) => {
+        const salary = getSalarySnapshot(record);
+        const daysWorked = Math.max(
+          0,
+          STANDARD_WORKING_DAYS_PER_MONTH - salary.absentDays
+        );
         
         return (
           <div>
             <div className="font-medium">{daysWorked} ditë</div>
             <div className="text-xs text-gray-500">
-              {baseSalary.toFixed(2)} ден
+              {STANDARD_WORKING_DAYS_PER_MONTH} - {salary.absentDays} mungesa
             </div>
           </div>
         );
       },
-      sorter: (a, b) => (a.daysWorkedThisMonth || 0) - (b.daysWorkedThisMonth || 0),
+      sorter: (a, b) =>
+        (STANDARD_WORKING_DAYS_PER_MONTH - getSalarySnapshot(a).absentDays) -
+        (STANDARD_WORKING_DAYS_PER_MONTH - getSalarySnapshot(b).absentDays),
     },
     {
-      title: "Bonuset Mujore",
-      dataIndex: "monthlyBonuses",
-      key: "monthlyBonuses",
-      render: (bonuses) => `${(bonuses || 0).toFixed(2)} ден`,
+      title: "Bonuset",
+      key: "bonuses",
+      render: (_, record) => formatMoney(getSalarySnapshot(record).bonuses),
+      sorter: (a, b) =>
+        getSalarySnapshot(a).bonuses - getSalarySnapshot(b).bonuses,
     },
     {
-      title: "Gjobat Mujore",
-      dataIndex: "monthlyPenalties",
-      key: "monthlyPenalties",
-      render: (penalties) => `${(penalties || 0).toFixed(2)} ден`,
+      title: "Gjobat",
+      key: "penalties",
+      render: (_, record) => formatMoney(getSalarySnapshot(record).penalties),
+      sorter: (a, b) =>
+        getSalarySnapshot(a).penalties - getSalarySnapshot(b).penalties,
     },
     {
       title: "Paga Mujore",
@@ -1109,7 +1107,7 @@ function Employees() {
           <div>
             <div className="mb-4">
               <Row gutter={16} align="middle">
-                <Col span={8}>
+                <Col span={6}>
                   <Form.Item label="Muaji">
                     <DatePicker
                       picker="month"
@@ -1121,14 +1119,21 @@ function Employees() {
                     />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col span={6}>
                   <div className="text-center">
                     <Text strong>
                       Punëtori: {selectedEmployeeForAttendance.fullName}
                     </Text>
                   </div>
                 </Col>
-                <Col span={8}>
+                <Col span={6}>
+                  <div className="text-center">
+                    <Text strong>
+                      Ditët e Munguara: {calendarDays.filter(d => !d.isPresent).length}
+                    </Text>
+                  </div>
+                </Col>
+                <Col span={6}>
                   <div className="text-center">
                     <Text strong>
                       Ditët e Punuara: {calendarDays.filter(d => d.isPresent).length}
@@ -1141,7 +1146,7 @@ function Employees() {
             {/* Simple Calendar */}
             <Card title={`Kalendari i Pranisë për ${selectedMonth.format('MMMM YYYY')}`}>
               <div className="mb-4">
-                <Text>Klikoni në checkbox për të shënuar praninë:</Text>
+                <Text>Zgjidhni checkbox për ditët e munguara:</Text>
               </div>
               
               {/* Loading indicator */}
@@ -1165,12 +1170,15 @@ function Employees() {
                   <div key={`${day.date.format('YYYY-MM-DD')}-${day.isPresent}`} className="text-center p-2 border rounded">
                     <div className="text-sm mb-1">{day.dayNumber}</div>
                     <Checkbox
-                      checked={day.isPresent}
+                      checked={!day.isPresent}
                       onChange={(e) => {
-                        toggleAttendance(day.date, e.target.checked);
+                        toggleAttendance(day.date, !e.target.checked);
                       }}
                       className={day.hasLocalChange ? 'border-yellow-400' : ''}
                     />
+                    <div className={day.isPresent ? "text-xs text-gray-500 mt-1" : "text-xs text-red-600 mt-1 font-medium"}>
+                      {day.isPresent ? "Prez." : "Mung."}
+                    </div>
                     {day.hasLocalChange && (
                       <div className="text-xs text-yellow-600 mt-1">●</div>
                     )}
@@ -1182,7 +1190,7 @@ function Employees() {
               <div className="mt-4 text-center">
                 <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <Text className="text-sm text-yellow-800">
-                    💡 <strong>Udhëzues:</strong> Të dhënat e pranisë ruhen automatikisht çdo herë që ndryshon një checkbox. Pasi të shënosh praninë, kliko butonin "Llogarit Rrogën" për të përditësuar tabelën kryesore me ditët e punuara dhe rrogën e llogaritur. Të dhënat do të mbeten të ruajtura edhe pas mbylljes së tabelës.
+                    <strong>Udhëzues:</strong> Ditët e munguara ruhen automatikisht sa herë që ndryshon një checkbox. Kliko "Llogarit Rrogën" për të rifreskuar tabelën kryesore me totalet e muajit.
                   </Text>
                 </div>
                 
@@ -1223,7 +1231,7 @@ function Employees() {
                       notifyDataChanged();
                       
                       message.destroy();
-                      message.success(`Rroga u llogarit! ${daysWorkedThisMonth} ditë të punuara për muajin ${selectedMonth.format('MMMM YYYY')}. Rroga mujore: ${salaryInfo.totalSalary.toFixed(2)} ден`);
+                      message.success(`Rroga u llogarit! ${absentDaysThisMonth} ditë të munguara për muajin ${selectedMonth.format('MMMM YYYY')}. Paga finale: ${salaryInfo.totalSalary.toFixed(2)} ден`);
                       
                     } catch (error) {
                       message.destroy();
@@ -1232,7 +1240,7 @@ function Employees() {
                     }
                   }}
                 >
-                  💰 Llogarit Rrogën dhe Përditëso Tabelën
+                  Llogarit Rrogën dhe Përditëso Tabelën
                 </Button>
               </div>
             </Card>
@@ -1281,49 +1289,53 @@ function Employees() {
                     
                     return (
                       <>
-                        <Row gutter={16}>
-                          <Col span={6}>
+                        <Row gutter={[16, 16]}>
+                          <Col span={8}>
                             <div className="text-center">
-                              <Text>Ditët e Punuara</Text>
-                              <div className="text-lg font-semibold text-green-600">
-                                {salaryInfo.daysWorked}
+                              <Text>Ditët e Munguara</Text>
+                              <div className="text-lg font-semibold text-red-600">
+                                {salaryInfo.absentDays}
                               </div>
                             </div>
                           </Col>
-                          <Col span={6}>
+                          <Col span={8}>
                             <div className="text-center">
                               <Text>Paga Ditore</Text>
                               <div className="text-lg font-semibold text-blue-600">
-                                {salaryInfo.dailyWage.toFixed(2)} ден
+                                {formatMoney(salaryInfo.dailyWage)}
                               </div>
                             </div>
                           </Col>
-                          <Col span={6}>
+                          <Col span={8}>
                             <div className="text-center">
-                              <Text>Paga Bazë</Text>
+                              <Text>Paga Mujore</Text>
                               <div className="text-lg font-semibold text-purple-600">
-                                {salaryInfo.baseSalary.toFixed(2)} ден
+                                {formatMoney(salaryInfo.monthlySalary)}
                               </div>
                             </div>
                           </Col>
-                          <Col span={6}>
+                          <Col span={8}>
                             <div className="text-center">
-                              <Text strong>Total Rroga</Text>
+                              <Text>Bonuset</Text>
+                              <div className="text-lg font-semibold text-green-600">
+                                +{formatMoney(salaryInfo.monthlyBonuses)}
+                              </div>
+                            </div>
+                          </Col>
+                          <Col span={8}>
+                            <div className="text-center">
+                              <Text>Gjobat</Text>
+                              <div className="text-lg font-semibold text-red-600">
+                                -{formatMoney(salaryInfo.monthlyPenalties)}
+                              </div>
+                            </div>
+                          </Col>
+                          <Col span={8}>
+                            <div className="text-center">
+                              <Text strong>Paga Finale</Text>
                               <div className="text-xl font-bold text-green-700">
-                                {salaryInfo.totalSalary.toFixed(2)} ден
+                                {formatMoney(salaryInfo.totalSalary)}
                               </div>
-                            </div>
-                          </Col>
-                        </Row>
-                        <Row gutter={16} className="mt-2">
-                          <Col span={12}>
-                            <div className="text-center">
-                              <Text>Bonuset: +{salaryInfo.monthlyBonuses.toFixed(2)} ден</Text>
-                            </div>
-                          </Col>
-                          <Col span={12}>
-                            <div className="text-center">
-                              <Text>Gjobat: -{salaryInfo.monthlyPenalties.toFixed(2)} ден</Text>
                             </div>
                           </Col>
                         </Row>
