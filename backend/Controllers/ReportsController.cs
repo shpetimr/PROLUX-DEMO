@@ -401,16 +401,12 @@ namespace backend.Controllers
                     .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
                     .SumAsync(workSale => workSale.Profit);
 
-                var workSalesCount = await _context.WorkSales
-                    .Where(workSale => workSale.Date >= start && workSale.Date < endExclusive)
-                    .CountAsync();
-
                 var archivedInvoiceRevenue = periodReport.TotalArchivedInvoices;
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
                 var invoiceStockCost = periodReport.TotalInvoiceStockCost;
                 var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
                 var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
-                var expenses = baseExpenses + workSalesCost + invoiceStockCost;
+                var expenses = baseExpenses + invoiceStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
@@ -429,17 +425,6 @@ namespace backend.Controllers
                     })
                     .OrderByDescending(x => x.Amount)
                     .ToListAsync();
-
-                if (workSalesCount > 0 || workSalesCost > 0)
-                {
-                    expenseBreakdown.Add(new
-                    {
-                        Type = "Work Sales Cost",
-                        Amount = workSalesCost,
-                        PercentageOfTotal = totalOutflow > 0 ? (workSalesCost / totalOutflow) * 100 : 0,
-                        PercentageOfIncome = incomes > 0 ? (workSalesCost / incomes) * 100 : 0
-                    });
-                }
 
                 if (invoiceStockCostCount > 0 || invoiceStockCost > 0)
                 {
@@ -826,7 +811,7 @@ namespace backend.Controllers
                 var invoiceStockCost = periodReport.TotalInvoiceStockCost;
                 var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
                 var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
-                var expenses = baseExpenses + workSalesCost + invoiceStockCost;
+                var expenses = baseExpenses + invoiceStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
@@ -852,17 +837,6 @@ namespace backend.Controllers
                     .OrderByDescending(x => x.Total)
                     .Take(5)
                     .ToListAsync();
-
-                if (workSalesCount > 0 || workSalesCost > 0)
-                {
-                    topExpenseTypes.Add(new
-                    {
-                        Type = "Work Sales Cost",
-                        Total = workSalesCost,
-                        Count = workSalesCount,
-                        Percentage = totalOutflow > 0 ? (workSalesCost / totalOutflow) * 100 : 0
-                    });
-                }
 
                 if (invoiceStockCostCount > 0 || invoiceStockCost > 0)
                 {
