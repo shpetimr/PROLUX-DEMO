@@ -14,6 +14,7 @@ namespace backend.Services
     {
         Task<InvoiceStockDeductionStageResult> StageInvoiceDeductionsAsync(
             InvoiceStockDeductionRequestDto? request,
+            bool reserveDeductionKeyWhenEmpty = false,
             CancellationToken cancellationToken = default);
 
         InvoiceStockDeductionRequestDto BuildRequestFromArchivePayload(

@@ -22,6 +22,7 @@ namespace backend.Services
 
         public async Task<InvoiceStockDeductionStageResult> StageInvoiceDeductionsAsync(
             InvoiceStockDeductionRequestDto? request,
+            bool reserveDeductionKeyWhenEmpty = false,
             CancellationToken cancellationToken = default)
         {
             var stage = new InvoiceStockDeductionStageResult();
@@ -33,7 +34,7 @@ namespace backend.Services
                 return stage;
             }
 
-            if (request.Lines == null || request.Lines.Count == 0)
+            if (!reserveDeductionKeyWhenEmpty && (request.Lines == null || request.Lines.Count == 0))
             {
                 return stage;
             }
@@ -50,7 +51,7 @@ namespace backend.Services
 
             var aggregated = new Dictionary<int, (StockItem Item, decimal Quantity)>();
 
-            foreach (var line in request.Lines)
+            foreach (var line in request.Lines ?? Enumerable.Empty<InvoiceStockDeductionLineDto>())
             {
                 var name = line.Name?.Trim() ?? "";
                 if (string.IsNullOrEmpty(name))
@@ -94,7 +95,7 @@ namespace backend.Services
                 }
             }
 
-            if (aggregated.Count == 0)
+            if (aggregated.Count == 0 && !reserveDeductionKeyWhenEmpty)
             {
                 return stage;
             }
@@ -133,6 +134,12 @@ namespace backend.Services
                 CustomerName = string.IsNullOrWhiteSpace(request.CustomerName) ? null : request.CustomerName.Trim(),
                 AppliedAt = now
             });
+
+            if (aggregated.Count == 0)
+            {
+                stage.HasPendingDeductions = true;
+                return stage;
+            }
 
             var noteParts = new List<string> { $"No. {invoiceNumber}" };
             if (!string.IsNullOrWhiteSpace(request.CustomerName))

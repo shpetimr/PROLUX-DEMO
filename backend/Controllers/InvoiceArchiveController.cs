@@ -15,6 +15,9 @@ namespace backend.Controllers
     [Authorize]
     public class InvoiceArchiveController : ControllerBase
     {
+        private const string InvoiceAlreadyArchivedMessage =
+            "Invoice was already archived; stock deduction was not repeated.";
+
         private readonly ApplicationDbContext _context;
         private readonly ICurrentUserService _currentUserService;
         private readonly InvoiceTemplatePdfService _pdfService;
@@ -131,11 +134,19 @@ namespace backend.Controllers
                 return BadRequest(new { message = "ItemsJson must be valid JSON." });
             }
 
+            var existingInvoice = await FindArchivedInvoiceByNumberAsync(invoiceNumber);
+            if (existingInvoice != null)
+            {
+                return Ok(ToAlreadyArchivedDto(existingInvoice));
+            }
+
             var stockRequest = _invoiceStockDeductionService.BuildRequestFromArchivePayload(
                 invoiceNumber,
                 customerName,
                 dto.ItemsJson);
-            var stockStage = await _invoiceStockDeductionService.StageInvoiceDeductionsAsync(stockRequest);
+            var stockStage = await _invoiceStockDeductionService.StageInvoiceDeductionsAsync(
+                stockRequest,
+                reserveDeductionKeyWhenEmpty: true);
             if (!string.IsNullOrWhiteSpace(stockStage.ErrorMessage))
             {
                 return BadRequest(new { message = stockStage.ErrorMessage });
@@ -166,6 +177,14 @@ namespace backend.Controllers
             catch (DbUpdateException ex) when (_invoiceStockDeductionService.IsUniqueInvoiceDeductionViolation(ex))
             {
                 DetachPendingStockDeductionChanges();
+
+                var existingAfterRace = await FindArchivedInvoiceByNumberAsync(invoiceNumber);
+                if (existingAfterRace != null)
+                {
+                    _context.Entry(invoice).State = EntityState.Detached;
+                    return Ok(ToAlreadyArchivedDto(existingAfterRace));
+                }
+
                 stockStage.Result.Applied.Clear();
                 stockStage.Result.AlreadyApplied = true;
                 stockStage.Result.Message = "Stock deduction was already applied for this invoice.";
@@ -211,6 +230,30 @@ namespace backend.Controllers
                 CreatedById = invoice.CreatedById,
                 CreatedByFullName = invoice.CreatedBy.FullName
             };
+        }
+
+        private async Task<InvoiceArchive?> FindArchivedInvoiceByNumberAsync(string invoiceNumber)
+        {
+            var normalizedInvoiceNumber = invoiceNumber.ToUpperInvariant();
+
+            return await _context.InvoiceArchives
+                .AsNoTracking()
+                .Include(entity => entity.CreatedBy)
+                .OrderBy(entity => entity.Id)
+                .FirstOrDefaultAsync(entity =>
+                    entity.InvoiceNumber.ToUpper() == normalizedInvoiceNumber);
+        }
+
+        private static InvoiceArchiveResponseDto ToAlreadyArchivedDto(InvoiceArchive invoice)
+        {
+            var response = ToDto(invoice);
+            response.StockDeduction = new InvoiceStockDeductionResultDto
+            {
+                AlreadyApplied = true,
+                Message = InvoiceAlreadyArchivedMessage
+            };
+
+            return response;
         }
 
         private static bool IsValidItemsJson(string? itemsJson)

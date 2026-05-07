@@ -11,12 +11,10 @@ import {
   Select,
   message,
 } from "antd";
-import { PrinterOutlined, SaveOutlined } from "@ant-design/icons";
+import { PrinterOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
 import { computeInvoiceTotals } from "../utils/invoiceTotals";
 import apiClient, { API_ENDPOINTS } from "../config/api";
-import { useAuth } from "../contexts/AuthContext";
-import { PERMISSIONS } from "../config/permissions";
 
 const { Title, Text } = Typography;
 
@@ -223,8 +221,6 @@ const readStockDeduction = (response) =>
 
 function TemplatePrint() {
   const location = useLocation();
-  const { hasPermission } = useAuth();
-  const canSaveArchive = hasPermission(PERMISSIONS.TEMPLATES_PRINT);
   const [rows, setRows] = useState(createEmptyRows);
   const [header, setHeader] = useState({
     customer: "",
@@ -237,7 +233,6 @@ function TemplatePrint() {
   const [description, setDescription] = useState(["", "", "", "", "", ""]);
   const [archivedSnapshotDirty, setArchivedSnapshotDirty] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
-  const [archiveLoading, setArchiveLoading] = useState(false);
   const printRef = useRef();
   const issuedInvoiceSignatureRef = useRef(null);
 
@@ -425,15 +420,6 @@ function TemplatePrint() {
     }
   };
 
-  const handleSaveArchive = async () => {
-    setArchiveLoading(true);
-    try {
-      await issueInvoice({ showArchiveMessage: true });
-    } finally {
-      setArchiveLoading(false);
-    }
-  };
-
   const openPrintWindow = () => {
     if (!printRef.current) {
       return;
@@ -508,15 +494,6 @@ function TemplatePrint() {
           >
             {labels.print}
           </Button>
-          {canSaveArchive && (
-            <Button
-              icon={<SaveOutlined />}
-              onClick={handleSaveArchive}
-              loading={archiveLoading}
-            >
-              {labels.saveArchive}
-            </Button>
-          )}
           <Space align="center">
             <Text>{labels.language}</Text>
             <Select
