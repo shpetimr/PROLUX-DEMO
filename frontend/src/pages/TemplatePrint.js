@@ -63,8 +63,9 @@ const TEXT = {
     archiveFailed: "Fatura nuk u ruajt n\u00EB arkiv.",
     popupBlocked: "Dritarja e printimit u bllokua nga shfletuesi.",
     stockInfo:
-      "Zbrit nga stoku para printimit: emri n\u00EB rresht duhet t\u00EB p\u00EBrputhet me emrin ose SKU t\u00EB artikullit n\u00EB stok; sasia merret nga m2/pcs. N\u00EBse stoku nuk mjafton, printimi anulohet. Printimi i dyfisht\u00EB zbrit dy her\u00EB.",
+      "Zbrit nga stoku para printimit: emri n\u00EB rresht duhet t\u00EB p\u00EBrputhet me emrin ose SKU t\u00EB artikullit n\u00EB stok; sasia merret nga m2/pcs. N\u00EBse stoku nuk mjafton, printimi anulohet. Riprintimi i s\u00EB nj\u00EBjt\u00EBs fatur\u00EB nuk zbrit stok p\u00EBrs\u00EBri.",
     stockDeducted: (details) => `Stoku u zbrit: ${details}`,
+    stockAlreadyDeducted: "Stoku \u00EBsht\u00EB zbritur tashm\u00EB p\u00EBr k\u00EBt\u00EB fatur\u00EB.",
     noStockRows: "Nuk u gjet asnj\u00EB rresht q\u00EB p\u00EBrputhet me stokun.",
     stockFailed: "Zbritja nga stoku d\u00EBshtoi. Printimi u anulua.",
   },
@@ -111,6 +112,8 @@ const TEXT = {
       "\u041E\u0434\u0437\u0435\u043C\u0438 \u043E\u0434 \u0441\u0442\u043E\u043A \u043F\u0440\u0435\u0434 \u043F\u0435\u0447\u0430\u0442\u0435\u045A\u0435: \u0438\u043C\u0435\u0442\u043E \u0432\u043E \u0440\u0435\u0434\u043E\u0442 \u0442\u0440\u0435\u0431\u0430 \u0434\u0430 \u0441\u0435 \u0441\u043E\u0432\u043F\u0430\u0453\u0430 \u0441\u043E \u0438\u043C\u0435\u0442\u043E \u0438\u043B\u0438 SKU \u043D\u0430 \u0430\u0440\u0442\u0438\u043A\u043B\u043E\u0442; \u043A\u043E\u043B\u0438\u0447\u0438\u043D\u0430\u0442\u0430 \u0441\u0435 \u0437\u0435\u043C\u0430 \u043E\u0434 m2/pcs. \u0410\u043A\u043E \u043D\u0435\u043C\u0430 \u0434\u043E\u0432\u043E\u043B\u043D\u043E \u0441\u0442\u043E\u043A, \u043F\u0435\u0447\u0430\u0442\u0435\u045A\u0435\u0442\u043E \u0441\u0435 \u043E\u0442\u043A\u0430\u0436\u0443\u0432\u0430.",
     stockDeducted: (details) =>
       `\u0421\u0442\u043E\u043A\u043E\u0442 \u0435 \u043E\u0434\u0437\u0435\u043C\u0435\u043D: ${details}`,
+    stockAlreadyDeducted:
+      "\u0421\u0442\u043E\u043A\u043E\u0442 \u0435 \u0432\u0435\u045C\u0435 \u043E\u0434\u0437\u0435\u043C\u0435\u043D \u0437\u0430 \u043E\u0432\u0430\u0430 \u0444\u0430\u043A\u0442\u0443\u0440\u0430.",
     noStockRows:
       "\u041D\u0435 \u0435 \u043D\u0430\u0458\u0434\u0435\u043D \u0440\u0435\u0434 \u0448\u0442\u043E \u0441\u0435 \u0441\u043E\u0432\u043F\u0430\u0453\u0430 \u0441\u043E \u0441\u0442\u043E\u043A\u043E\u0442.",
     stockFailed:
@@ -214,6 +217,11 @@ const normalizeLanguage = (language) =>
     ? INVOICE_LANGUAGES.Macedonian
     : INVOICE_LANGUAGES.Albanian;
 
+const buildInvoiceStockDeductionKey = (invoiceNumber) => {
+  const normalized = textValue(invoiceNumber).trim().toUpperCase();
+  return normalized ? `invoice:${normalized}` : "";
+};
+
 function TemplatePrint() {
   const location = useLocation();
   const { hasPermission } = useAuth();
@@ -233,6 +241,7 @@ function TemplatePrint() {
   const [printLoading, setPrintLoading] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const printRef = useRef();
+  const appliedStockDeductionKeyRef = useRef(null);
 
   const labels = TEXT[language] || TEXT.Albanian;
 
@@ -406,6 +415,16 @@ function TemplatePrint() {
 
   const handlePrint = async () => {
     if (deductStockOnPrint && canManageStock) {
+      const stockDeductionKey = buildInvoiceStockDeductionKey(header.invoice);
+      if (
+        stockDeductionKey &&
+        appliedStockDeductionKeyRef.current === stockDeductionKey
+      ) {
+        message.info(labels.stockAlreadyDeducted);
+        openPrintWindow();
+        return;
+      }
+
       setPrintLoading(true);
       try {
         const res = await apiClient.post(
@@ -422,7 +441,12 @@ function TemplatePrint() {
         const data = res.data || {};
         const applied = data.applied || data.Applied || [];
         const skipped = data.skipped || data.Skipped || [];
-        if (applied.length > 0) {
+        const alreadyApplied = data.alreadyApplied || data.AlreadyApplied;
+        if (alreadyApplied) {
+          appliedStockDeductionKeyRef.current = stockDeductionKey;
+          message.info(data.message || data.Message || labels.stockAlreadyDeducted);
+        } else if (applied.length > 0) {
+          appliedStockDeductionKeyRef.current = stockDeductionKey;
           message.success(
             labels.stockDeducted(
               applied

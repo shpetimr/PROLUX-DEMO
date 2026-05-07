@@ -22,6 +22,7 @@ namespace backend.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Project> Projects { get; set; }
         public DbSet<InvoiceArchive> InvoiceArchives { get; set; }
+        public DbSet<InvoiceStockDeduction> InvoiceStockDeductions { get; set; }
         public DbSet<StockItem> StockItems { get; set; }
         public DbSet<StockMovement> StockMovements { get; set; }
         public DbSet<WorkerTask> WorkerTasks { get; set; }
@@ -230,6 +231,15 @@ namespace backend.Data
                 entity.Property(e => e.MovementKind).HasMaxLength(50);
                 entity.Property(e => e.Note).HasMaxLength(500);
                 entity.HasIndex(e => e.StockItemId);
+            });
+
+            modelBuilder.Entity<InvoiceStockDeduction>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.DeductionKey).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.InvoiceNumber).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.CustomerName).HasMaxLength(200);
+                entity.HasIndex(e => e.DeductionKey).IsUnique();
             });
 
             modelBuilder.Entity<WorkerTask>(entity =>

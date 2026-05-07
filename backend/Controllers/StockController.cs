@@ -14,6 +14,10 @@ namespace backend.Controllers
     [Authorize(Policy = AppPermissions.StockManage)]
     public class StockController : ControllerBase
     {
+        private const string InvoiceMovementKind = "Invoice";
+        private const string InvoiceDeductionKeyPrefix = "invoice:";
+        private const string AlreadyAppliedMessage = "Stock deduction was already applied for this invoice.";
+
         private readonly ApplicationDbContext _context;
 
         public StockController(ApplicationDbContext context)
@@ -220,6 +224,9 @@ namespace backend.Controllers
             [FromBody] InvoiceStockDeductionRequestDto body)
         {
             var result = new InvoiceStockDeductionResultDto();
+            if (body == null)
+                return BadRequest(new { message = "Request body is required." });
+
             if (body.Lines == null || body.Lines.Count == 0)
                 return Ok(result);
 
@@ -265,6 +272,31 @@ namespace backend.Controllers
                     aggregated[match.Id] = (match, qty);
             }
 
+            if (aggregated.Count == 0)
+                return Ok(result);
+
+            var invoiceNumber = NormalizeInvoiceNumber(body.InvoiceNumber);
+            if (string.IsNullOrWhiteSpace(invoiceNumber))
+            {
+                return BadRequest(new { message = "Invoice number is required before deducting stock." });
+            }
+
+            var deductionKey = BuildInvoiceDeductionKey(invoiceNumber);
+            if (await InvoiceDeductionAlreadyAppliedAsync(deductionKey, invoiceNumber))
+            {
+                result.AlreadyApplied = true;
+                result.Message = AlreadyAppliedMessage;
+                return Ok(result);
+            }
+
+            _context.InvoiceStockDeductions.Add(new InvoiceStockDeduction
+            {
+                DeductionKey = deductionKey,
+                InvoiceNumber = invoiceNumber,
+                CustomerName = string.IsNullOrWhiteSpace(body.CustomerName) ? null : body.CustomerName.Trim(),
+                AppliedAt = DateTime.UtcNow
+            });
+
             foreach (var kv in aggregated)
             {
                 var bal = balances.TryGetValue(kv.Key, out var b) ? b : 0m;
@@ -278,8 +310,7 @@ namespace backend.Controllers
             }
 
             var noteParts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(body.InvoiceNumber))
-                noteParts.Add($"Nr. {body.InvoiceNumber.Trim()}");
+            noteParts.Add($"Nr. {invoiceNumber}");
             if (!string.IsNullOrWhiteSpace(body.CustomerName))
                 noteParts.Add(body.CustomerName.Trim());
             var noteBase = noteParts.Count > 0 ? string.Join(" — ", noteParts) : "Faturë";
@@ -292,7 +323,7 @@ namespace backend.Controllers
                 {
                     StockItemId = item.Id,
                     QuantityChange = -qty,
-                    MovementKind = "Invoice",
+                    MovementKind = InvoiceMovementKind,
                     Note = $"Faturë: {noteBase}",
                     OccurredAt = DateTime.UtcNow
                 };
@@ -305,8 +336,85 @@ namespace backend.Controllers
                 });
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (IsUniqueInvoiceDeductionViolation(ex))
+            {
+                result.Applied.Clear();
+                result.AlreadyApplied = true;
+                result.Message = AlreadyAppliedMessage;
+            }
+
             return Ok(result);
+        }
+
+        private async Task<bool> InvoiceDeductionAlreadyAppliedAsync(string deductionKey, string invoiceNumber)
+        {
+            if (await _context.InvoiceStockDeductions
+                .AsNoTracking()
+                .AnyAsync(deduction => deduction.DeductionKey == deductionKey))
+            {
+                return true;
+            }
+
+            var candidateNotes = await _context.StockMovements
+                .AsNoTracking()
+                .Where(movement =>
+                    movement.MovementKind == InvoiceMovementKind &&
+                    movement.Note != null &&
+                    movement.Note.Contains(invoiceNumber))
+                .Select(movement => movement.Note!)
+                .ToListAsync();
+
+            return candidateNotes.Any(note => IsLegacyInvoiceDeductionNote(note, invoiceNumber));
+        }
+
+        private static bool IsLegacyInvoiceDeductionNote(string note, string invoiceNumber)
+        {
+            var marker = $"Nr. {invoiceNumber}";
+            var index = CultureInfo.InvariantCulture.CompareInfo.IndexOf(
+                note,
+                marker,
+                CompareOptions.IgnoreCase);
+
+            if (index < 0)
+                return false;
+
+            var afterMarker = index + marker.Length;
+            return afterMarker >= note.Length || !char.IsLetterOrDigit(note[afterMarker]);
+        }
+
+        private static string NormalizeInvoiceNumber(string? invoiceNumber)
+        {
+            return invoiceNumber?.Trim() ?? "";
+        }
+
+        private static string BuildInvoiceDeductionKey(string invoiceNumber)
+        {
+            return $"{InvoiceDeductionKeyPrefix}{invoiceNumber.ToUpperInvariant()}";
+        }
+
+        private static bool IsUniqueInvoiceDeductionViolation(DbUpdateException exception)
+        {
+            for (var current = exception.InnerException; current != null; current = current.InnerException)
+            {
+                if (current.Message.Contains(
+                        "IX_InvoiceStockDeductions_DeductionKey",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    current.Message.Contains(
+                        "duplicate key value violates unique constraint",
+                        StringComparison.OrdinalIgnoreCase) ||
+                    current.Message.Contains(
+                        "UNIQUE constraint failed",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static decimal ParseInvoiceQuantity(string? raw)

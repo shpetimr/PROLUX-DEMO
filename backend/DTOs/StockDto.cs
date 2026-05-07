@@ -87,7 +87,11 @@ namespace backend.DTOs
     public class InvoiceStockDeductionRequestDto
     {
         public List<InvoiceStockDeductionLineDto> Lines { get; set; } = new();
+
+        [StringLength(100)]
         public string? InvoiceNumber { get; set; }
+
+        [StringLength(200)]
         public string? CustomerName { get; set; }
     }
 
@@ -102,5 +106,7 @@ namespace backend.DTOs
     {
         public List<InvoiceStockDeductionAppliedDto> Applied { get; set; } = new();
         public List<string> Skipped { get; set; } = new();
+        public bool AlreadyApplied { get; set; }
+        public string? Message { get; set; }
     }
 }

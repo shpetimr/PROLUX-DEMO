@@ -488,6 +488,37 @@ namespace backend.Migrations
                     b.ToTable("SalaryRecords");
                 });
 
+            modelBuilder.Entity("backend.Models.InvoiceStockDeduction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AppliedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeductionKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeductionKey")
+                        .IsUnique();
+
+                    b.ToTable("InvoiceStockDeductions");
+                });
+
             modelBuilder.Entity("backend.Models.StockItem", b =>
                 {
                     b.Property<int>("Id")
