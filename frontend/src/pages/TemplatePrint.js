@@ -8,7 +8,6 @@ import {
   Space,
   Row,
   Col,
-  Switch,
   Select,
   message,
 } from "antd";
@@ -217,15 +216,14 @@ const normalizeLanguage = (language) =>
     ? INVOICE_LANGUAGES.Macedonian
     : INVOICE_LANGUAGES.Albanian;
 
-const buildInvoiceStockDeductionKey = (invoiceNumber) => {
-  const normalized = textValue(invoiceNumber).trim().toUpperCase();
-  return normalized ? `invoice:${normalized}` : "";
-};
+const buildIssueSignature = (payload) => JSON.stringify(payload);
+
+const readStockDeduction = (response) =>
+  response?.data?.stockDeduction || response?.data?.StockDeduction || null;
 
 function TemplatePrint() {
   const location = useLocation();
   const { hasPermission } = useAuth();
-  const canManageStock = hasPermission(PERMISSIONS.STOCK_MANAGE);
   const canSaveArchive = hasPermission(PERMISSIONS.TEMPLATES_PRINT);
   const [rows, setRows] = useState(createEmptyRows);
   const [header, setHeader] = useState({
@@ -237,11 +235,11 @@ function TemplatePrint() {
   const [discountPercent, setDiscountPercent] = useState("");
   const [advancePayment, setAdvancePayment] = useState("");
   const [description, setDescription] = useState(["", "", "", "", "", ""]);
-  const [deductStockOnPrint, setDeductStockOnPrint] = useState(false);
+  const [archivedSnapshotDirty, setArchivedSnapshotDirty] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
   const [archiveLoading, setArchiveLoading] = useState(false);
   const printRef = useRef();
-  const appliedStockDeductionKeyRef = useRef(null);
+  const issuedInvoiceSignatureRef = useRef(null);
 
   const labels = TEXT[language] || TEXT.Albanian;
 
@@ -291,6 +289,8 @@ function TemplatePrint() {
           readProperty(snapshotTotals, ["advance"])
       )
     );
+    setArchivedSnapshotDirty(false);
+    issuedInvoiceSignatureRef.current = null;
   }, [location.state]);
 
   const formatCurrency = (value) => {
@@ -298,7 +298,12 @@ function TemplatePrint() {
     return `${amount.toFixed(2)} ${labels.currency}`;
   };
 
+  const markInvoiceEdited = () => {
+    setArchivedSnapshotDirty(true);
+  };
+
   const handleRowChange = (idx, field, value) => {
+    markInvoiceEdited();
     setRows((prev) => {
       const updated = [...prev];
       updated[idx] = { ...updated[idx], [field]: value };
@@ -307,10 +312,12 @@ function TemplatePrint() {
   };
 
   const handleHeaderChange = (field, value) => {
+    markInvoiceEdited();
     setHeader((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleDescriptionChange = (idx, value) => {
+    markInvoiceEdited();
     setDescription((prev) => {
       const updated = [...prev];
       updated[idx] = value;
@@ -351,23 +358,77 @@ function TemplatePrint() {
     notes: null,
   });
 
-  const handleSaveArchive = async () => {
+  const showStockDeductionFeedback = (stockDeduction) => {
+    if (!stockDeduction) {
+      return;
+    }
+
+    const applied = stockDeduction.applied || stockDeduction.Applied || [];
+    const skipped = stockDeduction.skipped || stockDeduction.Skipped || [];
+    const alreadyApplied =
+      stockDeduction.alreadyApplied || stockDeduction.AlreadyApplied;
+
+    if (alreadyApplied) {
+      message.info(
+        stockDeduction.message ||
+          stockDeduction.Message ||
+          labels.stockAlreadyDeducted
+      );
+    } else if (applied.length > 0) {
+      message.success(
+        labels.stockDeducted(
+          applied
+            .map(
+              (item) =>
+                `${item.stockItemName || item.StockItemName} (-${
+                  item.quantityDeducted ?? item.QuantityDeducted
+                })`
+            )
+            .join(", ")
+        )
+      );
+    }
+
+    if (skipped.length > 0) {
+      message.warning(skipped.slice(0, 5).join(" - "));
+    }
+  };
+
+  const issueInvoice = async ({ showArchiveMessage = true } = {}) => {
     const payload = buildArchivePayload();
 
     if (!payload.invoiceNumber || !payload.customerName) {
       message.warning(labels.archiveRequired);
-      return;
+      return false;
     }
 
-    setArchiveLoading(true);
+    const signature = buildIssueSignature(payload);
+    if (issuedInvoiceSignatureRef.current === signature) {
+      return true;
+    }
+
     try {
-      await apiClient.post(API_ENDPOINTS.INVOICE_ARCHIVE, payload);
-      message.success(labels.archiveSaved);
+      const response = await apiClient.post(API_ENDPOINTS.INVOICE_ARCHIVE, payload);
+      issuedInvoiceSignatureRef.current = signature;
+      setArchivedSnapshotDirty(false);
+      if (showArchiveMessage) {
+        message.success(labels.archiveSaved);
+      }
+      showStockDeductionFeedback(readStockDeduction(response));
+      return true;
     } catch (e) {
       const msg =
         e?.response?.data?.message ||
         (typeof e?.response?.data === "string" ? e.response.data : null);
       message.error(msg || labels.archiveFailed);
+      return false;
+    }
+  };
+
+  const handleSaveArchive = async () => {
+    setArchiveLoading(true);
+    try {
+      await issueInvoice({ showArchiveMessage: true });
     } finally {
       setArchiveLoading(false);
     }
@@ -414,64 +475,15 @@ function TemplatePrint() {
   };
 
   const handlePrint = async () => {
-    if (deductStockOnPrint && canManageStock) {
-      const stockDeductionKey = buildInvoiceStockDeductionKey(header.invoice);
-      if (
-        stockDeductionKey &&
-        appliedStockDeductionKeyRef.current === stockDeductionKey
-      ) {
-        message.info(labels.stockAlreadyDeducted);
-        openPrintWindow();
-        return;
-      }
-
+    const isArchivedReprint = Boolean(location.state?.archivedInvoice);
+    const shouldIssueBeforePrint = !isArchivedReprint || archivedSnapshotDirty;
+    if (shouldIssueBeforePrint) {
       setPrintLoading(true);
       try {
-        const res = await apiClient.post(
-          API_ENDPOINTS.STOCK_APPLY_INVOICE_DEDUCTIONS,
-          {
-            lines: rows.map((r) => ({
-              name: r.name,
-              m2Pcs: r.m2pcs,
-            })),
-            invoiceNumber: header.invoice || null,
-            customerName: header.customer || null,
-          }
-        );
-        const data = res.data || {};
-        const applied = data.applied || data.Applied || [];
-        const skipped = data.skipped || data.Skipped || [];
-        const alreadyApplied = data.alreadyApplied || data.AlreadyApplied;
-        if (alreadyApplied) {
-          appliedStockDeductionKeyRef.current = stockDeductionKey;
-          message.info(data.message || data.Message || labels.stockAlreadyDeducted);
-        } else if (applied.length > 0) {
-          appliedStockDeductionKeyRef.current = stockDeductionKey;
-          message.success(
-            labels.stockDeducted(
-              applied
-                .map(
-                  (a) =>
-                    `${a.stockItemName || a.StockItemName} (-${
-                      a.quantityDeducted ?? a.QuantityDeducted
-                    })`
-                )
-                .join(", ")
-            )
-          );
-        } else {
-          message.info(labels.noStockRows);
+        const issued = await issueInvoice({ showArchiveMessage: false });
+        if (!issued) {
+          return;
         }
-        if (skipped.length > 0) {
-          message.warning(skipped.slice(0, 5).join(" - "));
-        }
-      } catch (e) {
-        const msg =
-          e?.response?.data?.message ||
-          (typeof e?.response?.data === "string" ? e.response.data : null);
-        message.error(msg || labels.stockFailed);
-        setPrintLoading(false);
-        return;
       } finally {
         setPrintLoading(false);
       }
@@ -510,21 +522,13 @@ function TemplatePrint() {
             <Select
               value={language}
               options={LANGUAGE_OPTIONS}
-              onChange={setLanguage}
+              onChange={(value) => {
+                markInvoiceEdited();
+                setLanguage(value);
+              }}
               style={{ width: 150 }}
             />
           </Space>
-          {canManageStock && (
-            <Space align="center" wrap>
-              <Switch
-                checked={deductStockOnPrint}
-                onChange={setDeductStockOnPrint}
-              />
-              <Text type="secondary" style={{ maxWidth: 520 }}>
-                {labels.stockInfo}
-              </Text>
-            </Space>
-          )}
         </Space>
       </Space>
       <div
@@ -669,7 +673,10 @@ function TemplatePrint() {
             <Input
               placeholder="0"
               value={discountPercent}
-              onChange={(e) => setDiscountPercent(e.target.value)}
+              onChange={(e) => {
+                markInvoiceEdited();
+                setDiscountPercent(e.target.value);
+              }}
               suffix="%"
               style={{ marginTop: 4 }}
             />
@@ -679,7 +686,10 @@ function TemplatePrint() {
             <Input
               placeholder="0"
               value={advancePayment}
-              onChange={(e) => setAdvancePayment(e.target.value)}
+              onChange={(e) => {
+                markInvoiceEdited();
+                setAdvancePayment(e.target.value);
+              }}
               style={{ marginTop: 4 }}
             />
           </Col>

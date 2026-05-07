@@ -50,5 +50,6 @@ namespace backend.DTOs
         public DateTime CreatedAt { get; set; }
         public int CreatedById { get; set; }
         public string CreatedByFullName { get; set; } = string.Empty;
+        public InvoiceStockDeductionResultDto? StockDeduction { get; set; }
     }
 }

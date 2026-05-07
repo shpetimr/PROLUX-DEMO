@@ -18,15 +18,18 @@ namespace backend.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ICurrentUserService _currentUserService;
         private readonly InvoiceTemplatePdfService _pdfService;
+        private readonly IInvoiceStockDeductionService _invoiceStockDeductionService;
 
         public InvoiceArchiveController(
             ApplicationDbContext context,
             ICurrentUserService currentUserService,
-            InvoiceTemplatePdfService pdfService)
+            InvoiceTemplatePdfService pdfService,
+            IInvoiceStockDeductionService invoiceStockDeductionService)
         {
             _context = context;
             _currentUserService = currentUserService;
             _pdfService = pdfService;
+            _invoiceStockDeductionService = invoiceStockDeductionService;
         }
 
         [HttpGet]
@@ -128,6 +131,16 @@ namespace backend.Controllers
                 return BadRequest(new { message = "ItemsJson must be valid JSON." });
             }
 
+            var stockRequest = _invoiceStockDeductionService.BuildRequestFromArchivePayload(
+                invoiceNumber,
+                customerName,
+                dto.ItemsJson);
+            var stockStage = await _invoiceStockDeductionService.StageInvoiceDeductionsAsync(stockRequest);
+            if (!string.IsNullOrWhiteSpace(stockStage.ErrorMessage))
+            {
+                return BadRequest(new { message = stockStage.ErrorMessage });
+            }
+
             var invoice = new InvoiceArchive
             {
                 InvoiceNumber = invoiceNumber,
@@ -145,9 +158,23 @@ namespace backend.Controllers
             };
 
             _context.InvoiceArchives.Add(invoice);
-            await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetArchivedInvoice), new { id = invoice.Id }, ToDto(invoice));
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (_invoiceStockDeductionService.IsUniqueInvoiceDeductionViolation(ex))
+            {
+                DetachPendingStockDeductionChanges();
+                stockStage.Result.Applied.Clear();
+                stockStage.Result.AlreadyApplied = true;
+                stockStage.Result.Message = "Stock deduction was already applied for this invoice.";
+                await _context.SaveChangesAsync();
+            }
+
+            var response = ToDto(invoice);
+            response.StockDeduction = stockStage.Result;
+            return CreatedAtAction(nameof(GetArchivedInvoice), new { id = invoice.Id }, response);
         }
 
         [HttpDelete("{id:int}")]
@@ -208,6 +235,20 @@ namespace backend.Controllers
         private static string? NormalizeOptional(string? value)
         {
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
+        private void DetachPendingStockDeductionChanges()
+        {
+            var entries = _context.ChangeTracker.Entries()
+                .Where(entry =>
+                    entry.State == EntityState.Added &&
+                    (entry.Entity is InvoiceStockDeduction || entry.Entity is StockMovement))
+                .ToList();
+
+            foreach (var entry in entries)
+            {
+                entry.State = EntityState.Detached;
+            }
         }
 
         private static string SanitizeFileName(string value)
