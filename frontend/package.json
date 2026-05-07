@@ -19,6 +19,7 @@
     "electron-dev": "concurrently \"npm start\" \"node scripts/wait-for-frontend.js && electron .\"",
     "prebuild": "node scripts/validate-production-env.js",
     "build": "node scripts/react-scripts-runner.js build",
+    "postbuild": "node scripts/write-netlify-redirects.js",
     "backend:build": "dotnet build ../backend/backend.csproj",
     "publish-backend": "dotnet publish ../backend/backend.csproj -c Release -r win-x64 --self-contained true -o ../artifacts/backend-publish",
     "build-electron": "npm run clean:artifacts && npm run build && npm run publish-backend && electron-builder",

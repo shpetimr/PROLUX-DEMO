@@ -7,13 +7,5 @@
   CI = "true"
   PUBLIC_URL = "/"
 
-[[redirects]]
-  from = "/api/*"
-  to = "https://prolux-production.up.railway.app/api/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Production API proxy redirects are generated into frontend/build/_redirects
+# from REACT_APP_API_URL during Netlify builds.

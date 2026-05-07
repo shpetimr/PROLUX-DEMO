@@ -19,15 +19,18 @@ Use the repository root with the included `netlify.toml`.
 - Required production variable:
 
 ```env
-REACT_APP_API_URL=https://prolux-production.up.railway.app/api
+REACT_APP_API_URL=https://<railway-backend-domain>/api
 ```
 
-The production build guard fails Netlify production builds when
-`REACT_APP_API_URL` is missing, non-HTTPS, or points to localhost.
+The production build guard fails Netlify production builds with a clear message
+when `REACT_APP_API_URL` is missing, not HTTPS, points to localhost or a private
+network, includes credentials/query/hash values, or does not end with `/api`.
 
-The included `netlify.toml` also proxies `/api/*` to the Railway backend. On
-Netlify production hosts, the frontend automatically uses this same-origin
-`/api` path to avoid browser CORS failures.
+During Netlify builds, the frontend writes `build/_redirects` from
+`REACT_APP_API_URL` so `/api/*` proxies to the configured Railway backend
+without hardcoding a production URL in the repository. On Netlify production
+hosts, the frontend automatically uses this same-origin `/api` path to avoid
+browser CORS failures.
 
 ## Railway backend
 
@@ -47,7 +50,7 @@ DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require
 JWT_KEY=replace-with-43-plus-character-random-secret
 JWT_ISSUER=PROLUX.Backend
 JWT_AUDIENCE=PROLUX.Web
-CORS_ALLOWED_ORIGINS=https://prolux-group.netlify.app
+CORS_ALLOWED_ORIGINS=https://<netlify-site-domain>
 ```
 
 `CORS_ALLOWED_ORIGINS` must be the frontend origin only: scheme and host, no

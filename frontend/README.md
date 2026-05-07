@@ -165,16 +165,18 @@ The frontend connects to the .NET Core backend API configured by `REACT_APP_API_
 Copy `frontend/.env.example` to `frontend/.env` and point the frontend at the backend API:
 
 ```env
-REACT_APP_API_URL=https://api.example.com/api
+REACT_APP_API_URL=https://<backend-domain>/api
 ```
 
 For local desktop development, the example env file also supports composing that URL from `PROLUX_BACKEND_SCHEME`, `PROLUX_BACKEND_HOST`, `PROLUX_BACKEND_PORT`, and `PROLUX_API_PATH`.
 
-For Netlify production, set only the public Railway API URL:
+For Netlify production, set only the public Railway API URL. Production builds fail early with a clear message if this value is missing, not HTTPS, local/private, or missing the `/api` path:
 
 ```env
-REACT_APP_API_URL=https://your-railway-backend.up.railway.app/api
+REACT_APP_API_URL=https://<railway-backend-domain>/api
 ```
+
+Netlify builds generate the `/api/*` proxy redirect from this value, so the repository does not need a hardcoded production backend URL.
 
 Do not put `DATABASE_URL`, PostgreSQL credentials, or Supabase keys in frontend environment files.
 
