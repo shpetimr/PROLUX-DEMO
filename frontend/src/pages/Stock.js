@@ -56,6 +56,8 @@ const normalizeStockType = (value) =>
 const getStockTypeLabel = (value) =>
   stockTypeOptions.find((option) => option.value === value)?.label || "Material";
 
+const formatDen = (value) => `${Number(value || 0).toFixed(2)} DEN`;
+
 function Stock({ stockType = STOCK_TYPES.Material, title }) {
   const activeStockType = normalizeStockType(stockType);
   const pageTitle = title || stockPageTitles[activeStockType];
@@ -274,27 +276,36 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
     }
   };
 
-  const priceColumns =
-    activeStockType === STOCK_TYPES.Material
+  const priceColumns = [
+    ...(activeStockType === STOCK_TYPES.Product
       ? [
           {
-            title: "Cmimi i blerjes",
-            dataIndex: "buyPrice",
-            key: "buyPrice",
+            title: "Harxhimet",
+            key: "stockCosts",
             width: 140,
             align: "right",
-            render: (value) => `${Number(value || 0).toFixed(2)} DEN`,
-          },
-          {
-            title: "Cmimi i shitjes",
-            dataIndex: "sellPrice",
-            key: "sellPrice",
-            width: 140,
-            align: "right",
-            render: (value) => `${Number(value || 0).toFixed(2)} DEN`,
+            render: (_, row) =>
+              formatDen(Number(row.currentQuantity || 0) * Number(row.buyPrice || 0)),
           },
         ]
-      : [];
+      : []),
+    {
+      title: "Cmimi i blerjes",
+      dataIndex: "buyPrice",
+      key: "buyPrice",
+      width: 140,
+      align: "right",
+      render: formatDen,
+    },
+    {
+      title: "Cmimi i shitjes",
+      dataIndex: "sellPrice",
+      key: "sellPrice",
+      width: 140,
+      align: "right",
+      render: formatDen,
+    },
+  ];
 
   const columns = [
     { title: "Emri", dataIndex: "name", key: "name" },
@@ -432,46 +443,42 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
           <Form.Item name="unit" label="Njësia">
             <Input placeholder="pcs, m2, kg..." />
           </Form.Item>
-          {activeStockType === STOCK_TYPES.Material && (
-            <>
-              <Form.Item
-                name="buyPrice"
-                label="Cmimi i blerjes"
-                rules={[
-                  {
-                    type: "number",
-                    min: 0,
-                    message: "Cmimi i blerjes nuk mund te jete negativ.",
-                  },
-                ]}
-              >
-                <InputNumber
-                  min={0}
-                  step={0.01}
-                  style={{ width: "100%" }}
-                  addonAfter="DEN"
-                />
-              </Form.Item>
-              <Form.Item
-                name="sellPrice"
-                label="Cmimi i shitjes"
-                rules={[
-                  {
-                    type: "number",
-                    min: 0,
-                    message: "Cmimi i shitjes nuk mund te jete negativ.",
-                  },
-                ]}
-              >
-                <InputNumber
-                  min={0}
-                  step={0.01}
-                  style={{ width: "100%" }}
-                  addonAfter="DEN"
-                />
-              </Form.Item>
-            </>
-          )}
+          <Form.Item
+            name="buyPrice"
+            label="Cmimi i blerjes"
+            rules={[
+              {
+                type: "number",
+                min: 0,
+                message: "Cmimi i blerjes nuk mund te jete negativ.",
+              },
+            ]}
+          >
+            <InputNumber
+              min={0}
+              step={0.01}
+              style={{ width: "100%" }}
+              addonAfter="DEN"
+            />
+          </Form.Item>
+          <Form.Item
+            name="sellPrice"
+            label="Cmimi i shitjes"
+            rules={[
+              {
+                type: "number",
+                min: 0,
+                message: "Cmimi i shitjes nuk mund te jete negativ.",
+              },
+            ]}
+          >
+            <InputNumber
+              min={0}
+              step={0.01}
+              style={{ width: "100%" }}
+              addonAfter="DEN"
+            />
+          </Form.Item>
           <Form.Item name="stockType" hidden>
             <Input />
           </Form.Item>
