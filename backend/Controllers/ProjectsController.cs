@@ -119,6 +119,8 @@ namespace backend.Controllers
                 Content = createProjectDto.Content,
                 Promet = createProjectDto.Promet,
                 Description = createProjectDto.Description,
+                Expenses = createProjectDto.Expenses,
+                Profit = createProjectDto.Profit,
                 Status = createProjectDto.Status,
                 CreatedById = currentUser.Id,
                 CreatedAt = DateTime.UtcNow

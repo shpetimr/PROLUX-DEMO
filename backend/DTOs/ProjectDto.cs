@@ -27,6 +27,8 @@ namespace backend.DTOs
         public string Content { get; set; } = string.Empty;
         public decimal Promet { get; set; }
         public string? Description { get; set; }
+        public decimal? Expenses { get; set; }
+        public decimal? Profit { get; set; }
         public ProjectStatus Status { get; set; } = ProjectStatus.Pending;
     }
     
