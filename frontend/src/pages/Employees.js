@@ -585,6 +585,41 @@ function Employees() {
     return isMagazine ? "Magazine" : "Terren";
   };
 
+  const getLinkedWorkerAccountLabel = (employee) => {
+    const username = employee?.linkedUsername?.trim();
+
+    if (username) {
+      return `@${username}`;
+    }
+
+    if (employee?.linkedUserId) {
+      return `User #${employee.linkedUserId}`;
+    }
+
+    return null;
+  };
+
+  const renderLinkedWorkerAccount = (employee) => {
+    const accountLabel = getLinkedWorkerAccountLabel(employee);
+
+    if (!accountLabel) {
+      return (
+        <Text type="secondary" className="text-xs">
+          No linked Worker/User account
+        </Text>
+      );
+    }
+
+    return (
+      <Space size={4} wrap>
+        <Tag color="green" className="m-0">
+          Worker/User
+        </Tag>
+        <Text code>{accountLabel}</Text>
+      </Space>
+    );
+  };
+
   const getSalarySnapshot = (employee) => {
     const salaryCalculation = salaryCalculations[employee.id] || {};
     const dailyWage = employee.dailyWage || getDefaultDailyWage(employee.position) || 0;
@@ -720,6 +755,12 @@ function Employees() {
       title: "Emri",
       dataIndex: "fullName",
       key: "fullName",
+      render: (fullName, record) => (
+        <div>
+          <Text strong>{fullName}</Text>
+          <div className="mt-1">{renderLinkedWorkerAccount(record)}</div>
+        </div>
+      ),
       sorter: (a, b) => a.fullName.localeCompare(b.fullName),
     },
     {
@@ -993,6 +1034,15 @@ function Employees() {
           >
             <Input />
           </Form.Item>
+
+          {editingEmployee && (
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+              <Text type="secondary" className="block text-xs mb-1">
+                Linked Worker/User account
+              </Text>
+              {renderLinkedWorkerAccount(editingEmployee)}
+            </div>
+          )}
 
           <Form.Item
             name="position"
