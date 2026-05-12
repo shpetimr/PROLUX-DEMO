@@ -609,6 +609,22 @@ const readStockDeduction = (response) =>
 const readIssuedInvoiceNumber = (response) =>
   response?.data?.invoiceNumber || response?.data?.InvoiceNumber || "";
 
+const PRINT_DIAGNOSTIC_PREFIX = "[TemplatePrint:print]";
+
+const logPrintDiagnostic = (step, details = {}) => {
+  console.debug(PRINT_DIAGNOSTIC_PREFIX, step, details);
+};
+
+const logPrintDiagnosticError = (step, error, details = {}) => {
+  console.error(PRINT_DIAGNOSTIC_PREFIX, step, {
+    ...details,
+    message: error?.message,
+    status: error?.response?.status,
+    response: error?.response?.data,
+    code: error?.code,
+  });
+};
+
 const createClientRequestId = () => {
   if (typeof window !== "undefined" && window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
@@ -904,20 +920,58 @@ function TemplatePrint() {
 
   const issueInvoice = async ({ showArchiveMessage = true } = {}) => {
     const payload = buildArchivePayload();
+    const payloadSummary = {
+      hasCustomerName: Boolean(payload.customerName),
+      requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
+      clientRequestId: payload.clientRequestId || null,
+      itemCount: rows.length,
+      subtotal: payload.subtotal,
+      total: payload.total,
+    };
+
+    logPrintDiagnostic("issueInvoice:start", payloadSummary);
 
     if (!payload.customerName) {
+      logPrintDiagnostic("issueInvoice:blocked", {
+        reason: "missing customer name",
+      });
       message.warning(labels.archiveRequired);
       return false;
     }
 
     const signature = buildIssueSignature(payload);
     if (issuedInvoiceSignatureRef.current === signature) {
+      logPrintDiagnostic("issueInvoice:skipped", {
+        reason: "signature already issued",
+        requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
+      });
       return true;
     }
 
     try {
+      logPrintDiagnostic("archiveApi:request", payloadSummary);
       const response = await apiClient.post(API_ENDPOINTS.INVOICE_ARCHIVE, payload);
       const issuedInvoiceNumber = readIssuedInvoiceNumber(response) || payload.invoiceNumber;
+      const stockDeduction = readStockDeduction(response);
+      logPrintDiagnostic("archiveApi:response", {
+        status: response.status,
+        archiveId: response?.data?.id || response?.data?.Id,
+        requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
+        issuedInvoiceNumber: issuedInvoiceNumber || "(empty)",
+      });
+      logPrintDiagnostic("invoiceNumber:response", {
+        requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
+        issuedInvoiceNumber: issuedInvoiceNumber || "(empty)",
+      });
+      logPrintDiagnostic("stockDeduction:response", {
+        alreadyApplied:
+          stockDeduction?.alreadyApplied || stockDeduction?.AlreadyApplied || false,
+        appliedCount:
+          stockDeduction?.applied?.length || stockDeduction?.Applied?.length || 0,
+        skippedCount:
+          stockDeduction?.skipped?.length || stockDeduction?.Skipped?.length || 0,
+        message: stockDeduction?.message || stockDeduction?.Message || null,
+      });
       if (issuedInvoiceNumber && issuedInvoiceNumber !== header.invoice) {
         flushSync(() => {
           setHeader((prev) =>
@@ -935,54 +989,89 @@ function TemplatePrint() {
       if (showArchiveMessage) {
         message.success(labels.archiveSaved);
       }
-      showStockDeductionFeedback(readStockDeduction(response));
+      showStockDeductionFeedback(stockDeduction);
+      logPrintDiagnostic("issueInvoice:success", {
+        issuedInvoiceNumber: issuedInvoiceNumber || "(empty)",
+      });
       return true;
     } catch (e) {
       const msg =
         e?.response?.data?.message ||
         (typeof e?.response?.data === "string" ? e.response.data : null);
+      logPrintDiagnosticError("issueInvoice:failed", e, {
+        archiveMessage: msg || null,
+        requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
+      });
       message.error(msg || labels.archiveFailed);
       return false;
     }
   };
 
-  const closePrintWindow = (win) => {
+  const closePrintWindow = (win, reason = "unspecified") => {
     try {
       if (win && !win.closed) {
+        logPrintDiagnostic("printWindow:close", { reason });
         win.close();
+      } else {
+        logPrintDiagnostic("printWindow:closeSkipped", {
+          reason,
+          alreadyClosed: Boolean(win?.closed),
+        });
       }
-    } catch {
+    } catch (e) {
+      logPrintDiagnosticError("printWindow:closeFailed", e, { reason });
       // The browser can deny access if the window was already closed.
     }
   };
 
   const openBlankPrintWindow = () => {
+    logPrintDiagnostic("printWindow:open:start");
     const win = window.open("", "", "height=900,width=1200");
     if (!win) {
+      logPrintDiagnostic("printWindow:open:blocked");
       message.error(labels.popupBlocked);
       return null;
     }
 
+    logPrintDiagnostic("printWindow:open:success", { closed: win.closed });
     win.document.open();
     win.document.write("<html><head><title>Print</title></head><body></body></html>");
     win.document.close();
     win.focus();
+    logPrintDiagnostic("printWindow:placeholderWritten", { closed: win.closed });
     return win;
   };
 
   const renderPrintWindow = (win, onPrintTriggered) => {
+    logPrintDiagnostic("renderPrintWindow:start", {
+      hasWindow: Boolean(win),
+      closed: Boolean(win?.closed),
+      hasPrintRef: Boolean(printRef.current),
+    });
+
     if (!win || win.closed) {
+      logPrintDiagnostic("renderPrintWindow:blocked", {
+        reason: "window missing or closed",
+      });
       message.error(labels.popupBlocked);
       return false;
     }
 
     if (!printRef.current) {
-      closePrintWindow(win);
+      logPrintDiagnostic("renderPrintWindow:blocked", {
+        reason: "printRef missing",
+      });
+      closePrintWindow(win, "printRef missing");
       return false;
     }
 
     const printContents = printRef.current.outerHTML;
+    logPrintDiagnostic("printHtml:generated", {
+      htmlLength: printContents.length,
+      startsWithContainer: printContents.includes("print-container"),
+    });
 
+    logPrintDiagnostic("printWindow:write:start", { closed: win.closed });
     win.document.open();
     win.document.write("<html><head><title>Print</title>");
     win.document.write(
@@ -1001,13 +1090,23 @@ function TemplatePrint() {
     win.document.write("</body></html>");
     win.document.close();
     win.focus();
+    logPrintDiagnostic("printWindow:write:complete", {
+      closed: win.closed,
+      htmlLength: printContents.length,
+    });
     setTimeout(() => {
       try {
         if (!win.closed) {
+          logPrintDiagnostic("printWindow:print:trigger", { closed: win.closed });
           win.focus();
           win.print();
+        } else {
+          logPrintDiagnostic("printWindow:print:skipped", {
+            reason: "window already closed",
+          });
         }
       } finally {
+        logPrintDiagnostic("printWindow:print:finally");
         onPrintTriggered?.();
       }
     }, 500);
@@ -1017,11 +1116,18 @@ function TemplatePrint() {
 
   const handlePrint = async () => {
     if (printInProgressRef.current) {
+      logPrintDiagnostic("handlePrint:blocked", {
+        reason: "print already in progress",
+      });
       return;
     }
 
+    logPrintDiagnostic("handlePrint:start");
     const printWindow = openBlankPrintWindow();
     if (!printWindow) {
+      logPrintDiagnostic("handlePrint:aborted", {
+        reason: "popup unavailable",
+      });
       return;
     }
 
@@ -1030,6 +1136,12 @@ function TemplatePrint() {
     const shouldIssueBeforePrint = !isArchivedReprint || archivedSnapshotDirty;
     let releasePrintLock = true;
 
+    logPrintDiagnostic("handlePrint:flow", {
+      isArchivedReprint,
+      archivedSnapshotDirty,
+      shouldIssueBeforePrint,
+    });
+
     if (shouldIssueBeforePrint) {
       setPrintLoading(true);
     }
@@ -1037,17 +1149,23 @@ function TemplatePrint() {
     try {
       if (shouldIssueBeforePrint) {
         const issued = await issueInvoice({ showArchiveMessage: false });
+        logPrintDiagnostic("handlePrint:issueResult", { issued });
         if (!issued) {
-          closePrintWindow(printWindow);
+          closePrintWindow(printWindow, "issueInvoice returned false");
           return;
         }
       }
 
       const rendered = renderPrintWindow(printWindow, () => {
+        logPrintDiagnostic("handlePrint:printCallback");
         printInProgressRef.current = false;
       });
 
       releasePrintLock = !rendered;
+      logPrintDiagnostic("handlePrint:renderResult", {
+        rendered,
+        releasePrintLock,
+      });
     } finally {
       if (shouldIssueBeforePrint) {
         setPrintLoading(false);
@@ -1056,6 +1174,11 @@ function TemplatePrint() {
       if (releasePrintLock) {
         printInProgressRef.current = false;
       }
+      logPrintDiagnostic("handlePrint:cleanup", {
+        releasePrintLock,
+        shouldIssueBeforePrint,
+        windowClosed: Boolean(printWindow.closed),
+      });
     }
   };
 
