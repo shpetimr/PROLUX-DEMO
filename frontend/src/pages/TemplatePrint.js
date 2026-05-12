@@ -637,6 +637,7 @@ function TemplatePrint() {
   const printRef = useRef();
   const issuedInvoiceSignatureRef = useRef(null);
   const invoiceRequestIdRef = useRef(createClientRequestId());
+  const printInProgressRef = useRef(false);
 
   const labels = TEXT[language] || TEXT.Albanian;
 
@@ -945,18 +946,44 @@ function TemplatePrint() {
     }
   };
 
-  const openPrintWindow = () => {
-    if (!printRef.current) {
-      return;
+  const closePrintWindow = (win) => {
+    try {
+      if (win && !win.closed) {
+        win.close();
+      }
+    } catch {
+      // The browser can deny access if the window was already closed.
     }
+  };
 
-    const printContents = printRef.current.outerHTML;
+  const openBlankPrintWindow = () => {
     const win = window.open("", "", "height=900,width=1200");
     if (!win) {
       message.error(labels.popupBlocked);
-      return;
+      return null;
     }
 
+    win.document.open();
+    win.document.write("<html><head><title>Print</title></head><body></body></html>");
+    win.document.close();
+    win.focus();
+    return win;
+  };
+
+  const renderPrintWindow = (win, onPrintTriggered) => {
+    if (!win || win.closed) {
+      message.error(labels.popupBlocked);
+      return false;
+    }
+
+    if (!printRef.current) {
+      closePrintWindow(win);
+      return false;
+    }
+
+    const printContents = printRef.current.outerHTML;
+
+    win.document.open();
     win.document.write("<html><head><title>Print</title>");
     win.document.write(
       '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.16.13/antd.min.css" />'
@@ -974,25 +1001,62 @@ function TemplatePrint() {
     win.document.write("</body></html>");
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 500);
+    setTimeout(() => {
+      try {
+        if (!win.closed) {
+          win.focus();
+          win.print();
+        }
+      } finally {
+        onPrintTriggered?.();
+      }
+    }, 500);
+
+    return true;
   };
 
   const handlePrint = async () => {
-    const isArchivedReprint = Boolean(location.state?.archivedInvoice);
-    const shouldIssueBeforePrint = !isArchivedReprint || archivedSnapshotDirty;
-    if (shouldIssueBeforePrint) {
-      setPrintLoading(true);
-      try {
-        const issued = await issueInvoice({ showArchiveMessage: false });
-        if (!issued) {
-          return;
-        }
-      } finally {
-        setPrintLoading(false);
-      }
+    if (printInProgressRef.current) {
+      return;
     }
 
-    openPrintWindow();
+    const printWindow = openBlankPrintWindow();
+    if (!printWindow) {
+      return;
+    }
+
+    printInProgressRef.current = true;
+    const isArchivedReprint = Boolean(location.state?.archivedInvoice);
+    const shouldIssueBeforePrint = !isArchivedReprint || archivedSnapshotDirty;
+    let releasePrintLock = true;
+
+    if (shouldIssueBeforePrint) {
+      setPrintLoading(true);
+    }
+
+    try {
+      if (shouldIssueBeforePrint) {
+        const issued = await issueInvoice({ showArchiveMessage: false });
+        if (!issued) {
+          closePrintWindow(printWindow);
+          return;
+        }
+      }
+
+      const rendered = renderPrintWindow(printWindow, () => {
+        printInProgressRef.current = false;
+      });
+
+      releasePrintLock = !rendered;
+    } finally {
+      if (shouldIssueBeforePrint) {
+        setPrintLoading(false);
+      }
+
+      if (releasePrintLock) {
+        printInProgressRef.current = false;
+      }
+    }
   };
 
   return (
