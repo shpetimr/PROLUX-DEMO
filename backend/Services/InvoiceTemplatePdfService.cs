@@ -10,6 +10,9 @@ namespace backend.Services
 {
     public class InvoiceTemplatePdfService
     {
+        private const int PrintableInvoiceRowCount = 14;
+        private const int PrintableDescriptionLineCount = 7;
+
         public byte[] GenerateBlankInvoicePdf()
         {
             var document = Document.Create(container =>
@@ -17,7 +20,7 @@ namespace backend.Services
                 container.Page(page =>
                 {
                     page.Size(PageSizes.A4);
-                    page.Margin(30);
+                    page.Margin(28);
                     page.DefaultTextStyle(x => x.FontSize(10));
 
                     page.Header().Element(ComposeHeader);
@@ -41,7 +44,7 @@ namespace backend.Services
                 container.Page(page =>
                 {
                     page.Size(PageSizes.A4);
-                    page.Margin(30);
+                    page.Margin(28);
                     page.DefaultTextStyle(x => x.FontFamily("Lato").FontSize(10));
 
                     page.Header().Element(ComposeHeader);
@@ -79,9 +82,34 @@ namespace backend.Services
         {
             container.Column(col =>
             {
-                col.Item().PaddingBottom(10).Text(""); // Space for custom fields
-                col.Item().Element(ComposeTable);
+                col.Item().PaddingTop(12).AlignCenter().Text("INVOICE / FLETEFATURE").Bold().FontSize(16);
+                col.Item().PaddingTop(10).Element(ComposeBlankInvoiceMeta);
+                col.Item().PaddingTop(10).Element(ComposeTable);
                 col.Item().PaddingTop(10).Element(ComposeDescriptionBox);
+            });
+        }
+
+        void ComposeBlankInvoiceMeta(IContainer container)
+        {
+            container.Border(1).BorderColor("#D5D5D5").Background("#FBFBFB").Padding(8).Row(row =>
+            {
+                row.RelativeItem(2).Column(col =>
+                {
+                    col.Item().Text("Customer Name").Bold().FontSize(8).FontColor("#555555");
+                    col.Item().Height(12).BorderBottom(1).BorderColor("#444444");
+                });
+
+                row.RelativeItem().PaddingLeft(12).Column(col =>
+                {
+                    col.Item().Text("Date").Bold().FontSize(8).FontColor("#555555");
+                    col.Item().Height(12).BorderBottom(1).BorderColor("#444444");
+                });
+
+                row.RelativeItem().PaddingLeft(12).Column(col =>
+                {
+                    col.Item().Text("Invoice No.").Bold().FontSize(8).FontColor("#555555");
+                    col.Item().Height(12).BorderBottom(1).BorderColor("#444444");
+                });
             });
         }
 
@@ -91,12 +119,12 @@ namespace backend.Services
             {
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.ConstantColumn(40); // ITEM
+                    columns.ConstantColumn(34); // ITEM
                     columns.RelativeColumn(2); // Name
                     columns.RelativeColumn(2); // Materials
-                    columns.ConstantColumn(60); // m2/pcs
+                    columns.ConstantColumn(58); // m2/pcs
                     columns.ConstantColumn(60); // Price
-                    columns.ConstantColumn(60); // Total
+                    columns.ConstantColumn(64); // Total
                 });
 
                 table.Header(header =>
@@ -109,9 +137,9 @@ namespace backend.Services
                     header.Cell().Element(CellStyle).Text("Total").Bold();
                 });
 
-                for (int i = 0; i < 8; i++)
+                for (int i = 0; i < PrintableInvoiceRowCount; i++)
                 {
-                    table.Cell().Element(CellStyle).Text("");
+                    table.Cell().Element(CellStyle).Text((i + 1).ToString());
                     table.Cell().Element(CellStyle).Text("");
                     table.Cell().Element(CellStyle).Text("");
                     table.Cell().Element(CellStyle).Text("");
@@ -122,7 +150,7 @@ namespace backend.Services
 
             static IContainer CellStyle(IContainer container)
             {
-                return container.Border(1).Padding(2);
+                return container.Border(1).BorderColor("#D0D0D0").MinHeight(20).PaddingHorizontal(4).PaddingVertical(3);
             }
         }
 
@@ -132,19 +160,26 @@ namespace backend.Services
             {
                 row.RelativeItem(3).Column(col =>
                 {
-                    col.Item().Background("#F5F5F5").Border(1).Padding(5).Column(innerCol =>
+                    col.Item().MinHeight(118).Border(1).BorderColor("#C7C7C7").Padding(8).Column(innerCol =>
                     {
-                        innerCol.Item().Text("Description").Italic().FontSize(10);
-                        for (int i = 1; i <= 6; i++)
+                        innerCol.Item().PaddingBottom(4).BorderBottom(1).BorderColor("#DEDEDE").Text("Description").Bold().FontSize(9);
+                        for (int i = 1; i <= PrintableDescriptionLineCount; i++)
                         {
-                            innerCol.Item().Text($"{i}").FontSize(9).FontColor("#888");
+                            innerCol.Item().PaddingTop(5).Row(line =>
+                            {
+                                line.ConstantItem(16).Text($"{i}").FontSize(8).FontColor("#777777");
+                                line.RelativeItem().BorderBottom(1).BorderColor("#D2D2D2").Height(12);
+                            });
                         }
                     });
                 });
-                row.RelativeItem(2).AlignMiddle().AlignRight().Column(col =>
+                row.ConstantItem(190).PaddingLeft(12).Border(1).BorderColor("#C7C7C7").Padding(8).Column(col =>
                 {
-                    col.Item().Text("TOTAL").Bold().FontSize(12);
-                    col.Item().Text("").FontSize(12);
+                    col.Item().PaddingBottom(4).BorderBottom(1).BorderColor("#DEDEDE").Text("TOTAL").Bold().FontSize(9);
+                    col.Item().PaddingTop(8).Text("Subtotal").FontSize(9);
+                    col.Item().PaddingTop(8).Text("Discount").FontSize(9);
+                    col.Item().PaddingTop(8).Text("Advance").FontSize(9);
+                    col.Item().PaddingTop(10).BorderTop(1).BorderColor("#171717").PaddingTop(6).Text("Balance Due").Bold().FontSize(11);
                 });
             });
         }
@@ -155,15 +190,15 @@ namespace backend.Services
             ArchivedInvoiceSnapshot snapshot,
             InvoiceArchivePdfLabels labels)
         {
-            container.PaddingTop(16).Column(col =>
+            container.PaddingTop(12).Column(col =>
             {
-                col.Item().AlignCenter().Text(labels.Title).Bold().FontSize(18);
-                col.Item().PaddingTop(12).Row(row =>
+                col.Item().Text(labels.Title).Bold().FontSize(16);
+                col.Item().PaddingTop(9).Border(1).BorderColor("#D5D5D5").Background("#FBFBFB").Padding(8).Row(row =>
                 {
-                    row.RelativeItem().Column(customer =>
+                    row.RelativeItem(2).Column(customer =>
                     {
-                        customer.Item().Text(labels.Customer).Bold();
-                        customer.Item().Text(invoice.CustomerName);
+                        customer.Item().Text(labels.Customer).Bold().FontSize(8).FontColor("#555555");
+                        customer.Item().PaddingTop(3).Text(invoice.CustomerName);
 
                         if (!string.IsNullOrWhiteSpace(invoice.CustomerAddress))
                         {
@@ -176,7 +211,7 @@ namespace backend.Services
                         }
                     });
 
-                    row.ConstantItem(190).AlignRight().Column(metadata =>
+                    row.ConstantItem(205).AlignRight().Column(metadata =>
                     {
                         metadata.Item().Text($"{labels.InvoiceNumber}: {invoice.InvoiceNumber}").Bold();
                         metadata.Item().PaddingTop(3).Text($"{labels.Date}: {snapshot.InvoiceDate ?? FormatArchiveDate(invoice.CreatedAt)}");
@@ -185,11 +220,11 @@ namespace backend.Services
                     });
                 });
 
-                col.Item().PaddingTop(16).Element(table => ComposeArchivedItemsTable(table, snapshot.Items, labels));
-                col.Item().PaddingTop(14).Row(row =>
+                col.Item().PaddingTop(12).Element(table => ComposeArchivedItemsTable(table, snapshot.Items, labels));
+                col.Item().PaddingTop(10).Row(row =>
                 {
                     row.RelativeItem().Element(notes => ComposeArchivedNotes(notes, invoice, snapshot, labels));
-                    row.ConstantItem(220).Element(totals => ComposeArchivedTotals(totals, invoice, snapshot, labels));
+                    row.ConstantItem(205).Element(totals => ComposeArchivedTotals(totals, invoice, snapshot, labels));
                 });
             });
         }
@@ -199,20 +234,18 @@ namespace backend.Services
             IReadOnlyList<ArchivedInvoiceItem> items,
             InvoiceArchivePdfLabels labels)
         {
-            var displayItems = items.Count > 0
-                ? items
-                : new[] { new ArchivedInvoiceItem("", "", "", "", "", "") };
+            var displayItems = BuildPrintableArchivedItems(items);
 
             container.Table(table =>
             {
                 table.ColumnsDefinition(columns =>
                 {
-                    columns.ConstantColumn(38);
+                    columns.ConstantColumn(34);
                     columns.RelativeColumn(2);
                     columns.RelativeColumn(2);
+                    columns.ConstantColumn(58);
+                    columns.ConstantColumn(60);
                     columns.ConstantColumn(64);
-                    columns.ConstantColumn(68);
-                    columns.ConstantColumn(72);
                 });
 
                 table.Header(header =>
@@ -239,13 +272,28 @@ namespace backend.Services
 
             static IContainer ArchivedHeaderCellStyle(IContainer container)
             {
-                return container.Border(1).BorderColor("#333333").Background("#EEEEEE").Padding(4);
+                return container.Border(1).BorderColor("#B9B9B9").Background("#F1F2F4").PaddingHorizontal(4).PaddingVertical(4);
             }
 
             static IContainer ArchivedBodyCellStyle(IContainer container)
             {
-                return container.Border(1).BorderColor("#999999").MinHeight(22).Padding(4);
+                return container.Border(1).BorderColor("#D0D0D0").MinHeight(20).PaddingHorizontal(4).PaddingVertical(3);
             }
+        }
+
+        static IReadOnlyList<ArchivedInvoiceItem> BuildPrintableArchivedItems(IReadOnlyList<ArchivedInvoiceItem> items)
+        {
+            var printableItems = items.Count > 0
+                ? items.ToList()
+                : new List<ArchivedInvoiceItem>();
+
+            while (printableItems.Count < PrintableInvoiceRowCount)
+            {
+                var itemNumber = (printableItems.Count + 1).ToString();
+                printableItems.Add(new ArchivedInvoiceItem(itemNumber, "", "", "", "", ""));
+            }
+
+            return printableItems;
         }
 
         void ComposeArchivedNotes(
@@ -254,26 +302,33 @@ namespace backend.Services
             ArchivedInvoiceSnapshot snapshot,
             InvoiceArchivePdfLabels labels)
         {
-            container.PaddingRight(14).Column(col =>
+            container.PaddingRight(12).MinHeight(118).Border(1).BorderColor("#C7C7C7").Padding(8).Column(col =>
             {
-                col.Item().Text(labels.Notes).Bold();
+                col.Item().PaddingBottom(4).BorderBottom(1).BorderColor("#DEDEDE").Text(labels.Notes).Bold().FontSize(9);
 
                 var hasNotes = false;
                 if (!string.IsNullOrWhiteSpace(invoice.Notes))
                 {
                     hasNotes = true;
-                    col.Item().PaddingTop(4).Text(invoice.Notes);
+                    col.Item().PaddingTop(5).Text(invoice.Notes).FontSize(9);
                 }
 
                 foreach (var line in snapshot.DescriptionLines.Where(line => !string.IsNullOrWhiteSpace(line)))
                 {
                     hasNotes = true;
-                    col.Item().PaddingTop(3).Text(line);
+                    col.Item().PaddingTop(4).Text(line).FontSize(9);
                 }
 
                 if (!hasNotes)
                 {
-                    col.Item().PaddingTop(4).Text("-");
+                    for (var i = 1; i <= PrintableDescriptionLineCount; i++)
+                    {
+                        col.Item().PaddingTop(5).Row(row =>
+                        {
+                            row.ConstantItem(16).Text($"{i}").FontSize(8).FontColor("#777777");
+                            row.RelativeItem().BorderBottom(1).BorderColor("#D2D2D2").Height(12);
+                        });
+                    }
                 }
             });
         }
@@ -295,13 +350,13 @@ namespace backend.Services
             var hasAdvance = advance > 0;
             var hasBreakdown = hasDiscount || hasAdvance || totalAfterDiscount.HasValue;
 
-            container.BorderTop(1).BorderColor("#CCCCCC").PaddingTop(8).Column(col =>
+            container.MinHeight(118).Border(1).BorderColor("#C7C7C7").Padding(8).Column(col =>
             {
                 var isFirstRow = true;
 
                 void AddRow(string label, string amount, bool bold = false, int fontSize = 10)
                 {
-                    var item = isFirstRow ? col.Item() : col.Item().PaddingTop(6);
+                    var item = col.Item().PaddingTop(isFirstRow ? 5 : 4);
                     isFirstRow = false;
 
                     item.Row(row =>
@@ -317,6 +372,8 @@ namespace backend.Services
                         row.ConstantItem(90).AlignRight().Text(amount).Bold().FontSize(fontSize);
                     });
                 }
+
+                col.Item().PaddingBottom(4).BorderBottom(1).BorderColor("#DEDEDE").Text(labels.Total).Bold().FontSize(9);
 
                 AddRow(labels.Subtotal, FormatMoney(lineSubtotal));
 
@@ -335,7 +392,12 @@ namespace backend.Services
                     AddRow(labels.Advance, $"- {FormatMoney(advance)}");
                 }
 
-                AddRow(hasBreakdown ? labels.BalanceDue : labels.Total, FormatMoney(balanceDue), true, 12);
+                col.Item().PaddingTop(7).BorderTop(2).BorderColor("#171717").PaddingTop(6).Row(row =>
+                {
+                    var totalLabel = hasBreakdown ? labels.BalanceDue : labels.Total;
+                    row.RelativeItem().Text(totalLabel).Bold();
+                    row.ConstantItem(90).AlignRight().Text(FormatMoney(balanceDue)).Bold().FontSize(12);
+                });
             });
         }
 

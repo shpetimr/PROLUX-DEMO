@@ -5,11 +5,8 @@ import {
   Button,
   Table,
   Input,
-  Card,
   Typography,
   Space,
-  Row,
-  Col,
   Select,
   message,
 } from "antd";
@@ -21,7 +18,7 @@ import {
 } from "../utils/invoiceTotals";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const INVOICE_LANGUAGES = {
   Albanian: "Albanian",
@@ -32,6 +29,342 @@ const LANGUAGE_OPTIONS = [
   { value: INVOICE_LANGUAGES.Albanian, label: "Albanian" },
   { value: INVOICE_LANGUAGES.Macedonian, label: "Macedonian" },
 ];
+
+const PRINT_INVOICE_ROW_COUNT = 14;
+const DESCRIPTION_LINE_COUNT = 7;
+
+const INVOICE_PRINT_STYLES = `
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  .print-container {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 12mm 13mm 10mm;
+    box-sizing: border-box;
+    background: #ffffff;
+    color: #171717;
+    border: 1px solid #d8d8d8;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  .invoice-letterhead {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #161616;
+  }
+
+  .invoice-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .invoice-logo {
+    width: 58px;
+    height: 50px;
+    object-fit: contain;
+    flex: 0 0 auto;
+  }
+
+  .invoice-company-name {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.05;
+    font-weight: 700;
+  }
+
+  .invoice-company-tagline {
+    margin-top: 3px;
+    font-size: 10px;
+    color: #555555;
+    text-transform: uppercase;
+  }
+
+  .invoice-company-details {
+    text-align: right;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #333333;
+  }
+
+  .invoice-heading-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 11px 0 9px;
+  }
+
+  .invoice-title {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+
+  .invoice-meta-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 130px 145px;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border: 1px solid #d5d5d5;
+    background: #fbfbfb;
+  }
+
+  .invoice-field-label {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #555555;
+    text-transform: uppercase;
+  }
+
+  .invoice-field .ant-input,
+  .invoice-adjustment-input.ant-input {
+    height: 23px;
+    padding: 1px 0 3px;
+    border: 0 !important;
+    border-bottom: 1px solid #444444 !important;
+    border-radius: 0;
+    background: transparent;
+    font-size: 12px;
+    line-height: 1.2;
+    box-shadow: none !important;
+  }
+
+  .invoice-items-table {
+    margin-bottom: 0;
+  }
+
+  .invoice-items-table .ant-table {
+    font-size: 11px;
+    line-height: 1.2;
+    color: #171717;
+  }
+
+  .invoice-items-table .ant-table-container,
+  .invoice-items-table .ant-table-content > table {
+    border-color: #bdbdbd !important;
+  }
+
+  .invoice-items-table .ant-table-thead > tr > th {
+    height: 27px;
+    padding: 4px 6px !important;
+    background: #f1f2f4 !important;
+    border-color: #b9b9b9 !important;
+    color: #1f1f1f;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .invoice-items-table .ant-table-tbody > tr > td {
+    height: 26px;
+    padding: 0 5px !important;
+    border-color: #d2d2d2 !important;
+    vertical-align: middle;
+  }
+
+  .invoice-items-table .ant-input,
+  .invoice-items-table .ant-input-affix-wrapper {
+    min-height: 22px;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0;
+    background: transparent !important;
+    font-size: 11px;
+    line-height: 1.2;
+    box-shadow: none !important;
+  }
+
+  .invoice-items-table .ant-input-affix-wrapper .ant-input {
+    min-height: 20px;
+  }
+
+  .invoice-items-table .ant-input-suffix {
+    margin-left: 3px;
+    color: #666666;
+    font-size: 9px;
+  }
+
+  .invoice-detail-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 215px;
+    gap: 13px;
+    align-items: start;
+    margin-top: 10px;
+  }
+
+  .invoice-description-box,
+  .invoice-totals-panel {
+    border: 1px solid #c7c7c7;
+    background: #ffffff;
+  }
+
+  .invoice-description-box {
+    min-height: 132px;
+    padding: 8px 10px 9px;
+  }
+
+  .invoice-section-title {
+    margin-bottom: 4px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #dedede;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #333333;
+  }
+
+  .invoice-description-line {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: end;
+    min-height: 15px;
+    gap: 6px;
+    margin-top: 3px;
+  }
+
+  .invoice-description-index {
+    font-size: 9px;
+    color: #777777;
+  }
+
+  .invoice-description-line .ant-input {
+    height: 17px;
+    padding: 0 0 2px;
+    border: 0 !important;
+    border-bottom: 1px solid #d2d2d2 !important;
+    border-radius: 0;
+    background: transparent;
+    font-size: 11px;
+    line-height: 1.2;
+    box-shadow: none !important;
+  }
+
+  .invoice-totals-panel {
+    padding: 8px 10px 9px;
+  }
+
+  .invoice-total-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 20px;
+    font-size: 10px;
+  }
+
+  .invoice-total-row + .invoice-total-row {
+    margin-top: 4px;
+  }
+
+  .invoice-total-label {
+    color: #333333;
+  }
+
+  .invoice-total-value {
+    min-width: 82px;
+    text-align: right;
+    font-weight: 700;
+  }
+
+  .invoice-adjustment-input.ant-input {
+    width: 72px;
+    text-align: right;
+    font-size: 10px;
+  }
+
+  .invoice-grand-total {
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 2px solid #171717;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .invoice-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 11px;
+    padding-top: 8px;
+    border-top: 1px solid #dddddd;
+    color: #666666;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+
+  .invoice-socials {
+    display: flex;
+    gap: 10px;
+    margin-top: 2px;
+    flex-wrap: wrap;
+  }
+
+  @media screen and (max-width: 920px) {
+    .print-container {
+      width: 100%;
+      min-height: auto;
+      padding: 18px;
+    }
+
+    .invoice-meta-grid,
+    .invoice-detail-row {
+      grid-template-columns: 1fr;
+    }
+
+    .invoice-company-details {
+      text-align: left;
+    }
+  }
+
+  @media print {
+    html,
+    body {
+      width: 210mm;
+      min-height: 297mm;
+      background: #ffffff !important;
+    }
+
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .print-container {
+      width: 210mm !important;
+      min-height: 297mm !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 11mm 12mm 8mm !important;
+      border: 0 !important;
+      box-shadow: none !important;
+    }
+
+    .invoice-items-table .ant-table-tbody > tr > td {
+      height: 25px;
+    }
+
+    .ant-input,
+    .ant-input-affix-wrapper {
+      color: #171717 !important;
+    }
+  }
+`;
 
 const TEXT = {
   Albanian: {
@@ -124,7 +457,7 @@ const TEXT = {
 };
 
 const createEmptyRows = () =>
-  Array.from({ length: 8 }, (_, i) => ({
+  Array.from({ length: PRINT_INVOICE_ROW_COUNT }, (_, i) => ({
     key: i,
     item: i + 1,
     name: "",
@@ -201,7 +534,7 @@ const stockMatchesSearch = (item, searchValue) => {
 
 const normalizeRows = (items) => {
   const sourceItems = Array.isArray(items) ? items : [];
-  const rowCount = Math.max(8, sourceItems.length);
+  const rowCount = Math.max(PRINT_INVOICE_ROW_COUNT, sourceItems.length);
 
   return Array.from({ length: rowCount }, (_, index) => {
     const item = sourceItems[index] || {};
@@ -230,7 +563,7 @@ const normalizeDescription = (value, fallbackNotes) => {
     ? [textValue(fallbackNotes)]
     : [];
 
-  return Array.from({ length: 6 }, (_, index) => lines[index] || "");
+  return Array.from({ length: DESCRIPTION_LINE_COUNT }, (_, index) => lines[index] || "");
 };
 
 const parseArchiveSnapshot = (archivedInvoice) => {
@@ -295,7 +628,9 @@ function TemplatePrint() {
   const [language, setLanguage] = useState(INVOICE_LANGUAGES.Albanian);
   const [discountPercent, setDiscountPercent] = useState("");
   const [advancePayment, setAdvancePayment] = useState("");
-  const [description, setDescription] = useState(["", "", "", "", "", ""]);
+  const [description, setDescription] = useState(() =>
+    Array.from({ length: DESCRIPTION_LINE_COUNT }, () => "")
+  );
   const [stockItems, setStockItems] = useState([]);
   const [archivedSnapshotDirty, setArchivedSnapshotDirty] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
@@ -312,12 +647,12 @@ function TemplatePrint() {
 
   const columns = useMemo(
     () => [
-      { title: labels.columns.item, dataIndex: "item", width: 60 },
-      { title: labels.columns.name, dataIndex: "name" },
-      { title: labels.columns.materials, dataIndex: "materials" },
-      { title: labels.columns.quantity, dataIndex: "m2pcs", width: 80 },
-      { title: labels.columns.price, dataIndex: "price", width: 80 },
-      { title: labels.columns.total, dataIndex: "total", width: 80 },
+      { title: labels.columns.item, dataIndex: "item", width: 46 },
+      { title: labels.columns.name, dataIndex: "name", width: 190 },
+      { title: labels.columns.materials, dataIndex: "materials", width: 160 },
+      { title: labels.columns.quantity, dataIndex: "m2pcs", width: 74 },
+      { title: labels.columns.price, dataIndex: "price", width: 78 },
+      { title: labels.columns.total, dataIndex: "total", width: 84 },
     ],
     [labels]
   );
@@ -615,7 +950,7 @@ function TemplatePrint() {
       return;
     }
 
-    const printContents = printRef.current.innerHTML;
+    const printContents = printRef.current.outerHTML;
     const win = window.open("", "", "height=900,width=1200");
     if (!win) {
       message.error(labels.popupBlocked);
@@ -628,17 +963,9 @@ function TemplatePrint() {
     );
     win.document.write(`
       <style>
+        ${INVOICE_PRINT_STYLES}
         @media print {
-          body { margin: 0; padding: 0; }
-          .print-container {
-            max-width: 100% !important;
-            padding: 15px !important;
-            margin: 0 !important;
-            page-break-inside: avoid;
-          }
-          table { font-size: 12px; }
-          .ant-table { font-size: 12px; }
-          .ant-input { font-size: 12px; padding: 4px; }
+          .print-container { page-break-inside: avoid; }
         }
       </style>
     `);
@@ -701,103 +1028,70 @@ function TemplatePrint() {
       <div
         ref={printRef}
         className="print-container"
-        style={{
-          background: "#fff",
-          padding: "20px",
-          maxWidth: "800px",
-          margin: "0 auto",
-          border: "2px solid #000",
-          minHeight: "100vh",
-          boxSizing: "border-box",
-        }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <img
-            src={
-              process.env.NODE_ENV === "development"
-                ? "/prolux-logo.png"
-                : "./prolux-logo.png"
-            }
-            alt="ProLux Group Logo"
-            style={{ height: 50 }}
-          />
-          <div style={{ textAlign: "right", fontSize: 12 }}>
+        <style>{INVOICE_PRINT_STYLES}</style>
+        <div className="invoice-letterhead">
+          <div className="invoice-brand">
+            <img
+              src={
+                process.env.NODE_ENV === "development"
+                  ? "/prolux-logo.png"
+                  : "./prolux-logo.png"
+              }
+              alt="ProLux Group Logo"
+              className="invoice-logo"
+            />
+            <div>
+              <h2 className="invoice-company-name">PROLUX GROUP</h2>
+              <div className="invoice-company-tagline">
+                Superior Natural Surfaces
+              </div>
+            </div>
+          </div>
+          <div className="invoice-company-details">
             <div>PROLUX Group - Superior Natural Surfaces</div>
             <div>Address: 11 Noemvri br.52</div>
             <div>Email: proluxceramics01@gmail.com</div>
             <div>Tel: 071/764/334</div>
           </div>
         </div>
-        <Title level={3} style={{ textAlign: "center", margin: "8px 0" }}>
-          PROLUX GROUP
-        </Title>
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: 500,
-            color: "#555",
-            marginBottom: 12,
-            fontSize: "14px",
-          }}
-        >
-          SUPERIOR NATURAL SURFACES
+
+        <div className="invoice-heading-row">
+          <h1 className="invoice-title">{labels.title}</h1>
         </div>
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: 700,
-            marginBottom: 8,
-            fontSize: "16px",
-          }}
-        >
-          {labels.title}
+
+        <div className="invoice-meta-grid">
+          <label className="invoice-field">
+            <span className="invoice-field-label">
+              {labels.customerPlaceholder}
+            </span>
+            <Input
+              value={header.customer}
+              onChange={(e) => handleHeaderChange("customer", e.target.value)}
+              bordered={false}
+            />
+          </label>
+          <label className="invoice-field">
+            <span className="invoice-field-label">{labels.datePlaceholder}</span>
+            <Input
+              value={header.date}
+              onChange={(e) => handleHeaderChange("date", e.target.value)}
+              bordered={false}
+            />
+          </label>
+          <label className="invoice-field">
+            <span className="invoice-field-label">
+              {labels.invoicePlaceholder}
+            </span>
+            <Input value={header.invoice} readOnly bordered={false} />
+          </label>
         </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 12,
-          }}
-        >
-          <Input
-            placeholder={labels.customerPlaceholder}
-            value={header.customer}
-            onChange={(e) => handleHeaderChange("customer", e.target.value)}
-            style={{ width: 250 }}
-            bordered={false}
-          />
-          <Input
-            placeholder={labels.datePlaceholder}
-            value={header.date}
-            onChange={(e) => handleHeaderChange("date", e.target.value)}
-            style={{ width: 150 }}
-            bordered={false}
-          />
-          <Input
-            placeholder={labels.invoicePlaceholder}
-            value={header.invoice}
-            readOnly
-            style={{ width: 150 }}
-            bordered={false}
-          />
-        </div>
+
         <Table
           columns={columns.map((col) => ({
             ...col,
-            render: (text, record, idx) => {
+            render: (text, _record, idx) => {
               const row = rows[idx] || {};
-              const inputStyle = {
-                background: "transparent",
-                borderBottom: "2px solid #000",
-                minWidth: 40,
-              };
 
               if (col.dataIndex === "name") {
                 return (
@@ -812,7 +1106,7 @@ function TemplatePrint() {
                     style={{ width: "100%" }}
                     popupMatchSelectWidth={360}
                   >
-                    <Input bordered={false} style={inputStyle} />
+                    <Input bordered={false} />
                   </AutoComplete>
                 );
               }
@@ -834,7 +1128,6 @@ function TemplatePrint() {
                       : undefined
                   }
                   bordered={false}
-                  style={inputStyle}
                 />
               );
             },
@@ -842,110 +1135,96 @@ function TemplatePrint() {
           dataSource={rows}
           pagination={false}
           bordered
-          style={{ marginBottom: 12 }}
+          size="small"
+          tableLayout="fixed"
+          className="invoice-items-table"
         />
-        <div style={{ marginBottom: 12 }}>
-          <Card size="small" title={<b>{labels.description}</b>} bordered={false}>
+
+        <div className="invoice-detail-row">
+          <div className="invoice-description-box">
+            <div className="invoice-section-title">{labels.description}</div>
             {description.map((desc, idx) => (
               <div
                 key={idx}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  marginBottom: 2,
-                }}
+                className="invoice-description-line"
               >
-                <span style={{ width: 20, color: "#888" }}>{idx + 1}</span>
+                <span className="invoice-description-index">{idx + 1}</span>
                 <Input
                   value={desc}
                   onChange={(e) => handleDescriptionChange(idx, e.target.value)}
                   bordered={false}
-                  style={{ borderBottom: "2px solid #000", flex: 1 }}
                 />
               </div>
             ))}
-          </Card>
-        </div>
+          </div>
 
-        <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
-          <Col xs={24} sm={12}>
-            <Text strong>{labels.discount}</Text>
-            <Input
-              placeholder="0"
-              value={discountPercent}
-              onChange={(e) => {
-                markInvoiceEdited();
-                setDiscountPercent(e.target.value);
-              }}
-              suffix="%"
-              style={{ marginTop: 4 }}
-            />
-          </Col>
-          <Col xs={24} sm={12}>
-            <Text strong>{labels.advance}</Text>
-            <Input
-              placeholder="0"
-              value={advancePayment}
-              onChange={(e) => {
-                markInvoiceEdited();
-                setAdvancePayment(e.target.value);
-              }}
-              style={{ marginTop: 4 }}
-            />
-          </Col>
-        </Row>
-
-        <div
-          style={{
-            maxWidth: 420,
-            marginLeft: "auto",
-            fontSize: 14,
-            borderTop: "1px solid #ccc",
-            paddingTop: 12,
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Text>{labels.subtotal}</Text>
-            <Text strong>{formatCurrency(totals.lineSubtotal)}</Text>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Text>{labels.discountRow(totals.discountPercent)}</Text>
-            <Text strong>- {formatCurrency(totals.discountAmount)}</Text>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Text>{labels.totalAfterDiscount}</Text>
-            <Text strong>{formatCurrency(totals.totalAfterDiscount)}</Text>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Text>{labels.advanceRow}</Text>
-            <Text strong>- {formatCurrency(totals.advance)}</Text>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 8,
-              fontWeight: 700,
-              fontSize: 16,
-            }}
-          >
-            <Text strong>{labels.balanceDue}</Text>
-            <Text strong>{formatCurrency(totals.balanceDue)}</Text>
+          <div className="invoice-totals-panel">
+            <div className="invoice-section-title">{labels.columns.total}</div>
+            <div className="invoice-total-row">
+              <span className="invoice-total-label">{labels.discount}</span>
+              <Input
+                className="invoice-adjustment-input"
+                placeholder="0"
+                value={discountPercent}
+                onChange={(e) => {
+                  markInvoiceEdited();
+                  setDiscountPercent(e.target.value);
+                }}
+                bordered={false}
+              />
+            </div>
+            <div className="invoice-total-row">
+              <span className="invoice-total-label">{labels.advance}</span>
+              <Input
+                className="invoice-adjustment-input"
+                placeholder="0"
+                value={advancePayment}
+                onChange={(e) => {
+                  markInvoiceEdited();
+                  setAdvancePayment(e.target.value);
+                }}
+                bordered={false}
+              />
+            </div>
+            <div className="invoice-total-row">
+              <span className="invoice-total-label">{labels.subtotal}</span>
+              <span className="invoice-total-value">
+                {formatCurrency(totals.lineSubtotal)}
+              </span>
+            </div>
+            <div className="invoice-total-row">
+              <span className="invoice-total-label">
+                {labels.discountRow(totals.discountPercent)}
+              </span>
+              <span className="invoice-total-value">
+                - {formatCurrency(totals.discountAmount)}
+              </span>
+            </div>
+            <div className="invoice-total-row">
+              <span className="invoice-total-label">
+                {labels.totalAfterDiscount}
+              </span>
+              <span className="invoice-total-value">
+                {formatCurrency(totals.totalAfterDiscount)}
+              </span>
+            </div>
+            <div className="invoice-total-row">
+              <span className="invoice-total-label">{labels.advanceRow}</span>
+              <span className="invoice-total-value">
+                - {formatCurrency(totals.advance)}
+              </span>
+            </div>
+            <div className="invoice-total-row invoice-grand-total">
+              <span>{labels.balanceDue}</span>
+              <span>{formatCurrency(totals.balanceDue)}</span>
+            </div>
           </div>
         </div>
 
-        <div
-          style={{
-            marginTop: 16,
-            fontSize: 11,
-            color: "#888",
-            display: "flex",
-            justifyContent: "space-between",
-          }}
-        >
+        <div className="invoice-footer">
           <div>
             {labels.footer}
-            <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
+            <div className="invoice-socials">
               <span>www.proluxgroup.com</span>
               <span>facebook.com/proluxgroup</span>
               <span>instagram.com/proluxgroup</span>
