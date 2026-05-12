@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AutoComplete,
   Button,
   Table,
   Input,
@@ -125,6 +126,10 @@ const createEmptyRows = () =>
     name: "",
     materials: "",
     m2pcs: "",
+    stockItemId: null,
+    stockSku: "",
+    stockType: "",
+    stockUnit: "",
     price: "",
     total: "",
   }));
@@ -154,6 +159,42 @@ const readText = (source, keys, fallback = "") => {
   return value === null || value === undefined ? fallback : String(value);
 };
 
+const formatStockPriceInput = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+
+  const amount = Number(value);
+  return Number.isFinite(amount) ? String(amount) : String(value);
+};
+
+const normalizeStockItem = (item) => {
+  const id = readProperty(item, ["id"]);
+  const name = readText(item, ["name"]).trim();
+
+  return {
+    id,
+    name,
+    sku: readText(item, ["sku"]).trim(),
+    unit: readText(item, ["unit"]).trim(),
+    stockType: readText(item, ["stockType"]).trim(),
+    sellPrice: readProperty(item, ["sellPrice"]),
+    currentQuantity: readProperty(item, ["currentQuantity"]),
+  };
+};
+
+const stockMatchesSearch = (item, searchValue) => {
+  const needle = textValue(searchValue).trim().toLowerCase();
+  if (!needle) {
+    return false;
+  }
+
+  return (
+    item.name.toLowerCase().includes(needle) ||
+    item.sku.toLowerCase().includes(needle)
+  );
+};
+
 const normalizeRows = (items) => {
   const sourceItems = Array.isArray(items) ? items : [];
   const rowCount = Math.max(8, sourceItems.length);
@@ -166,6 +207,10 @@ const normalizeRows = (items) => {
       name: readText(item, ["name", "itemName", "description"]),
       materials: readText(item, ["materials", "material"]),
       m2pcs: readText(item, ["m2pcs", "m2Pcs", "quantity", "qty", "unit"]),
+      stockItemId: readProperty(item, ["stockItemId", "stockId"]) ?? null,
+      stockSku: readText(item, ["stockSku", "sku"]),
+      stockType: readText(item, ["stockType"]),
+      stockUnit: readText(item, ["stockUnit", "unitType", "unitLabel"]),
       price: readText(item, ["price", "unitPrice"]),
       total: readText(item, ["total", "lineTotal"]),
     };
@@ -231,6 +276,7 @@ function TemplatePrint() {
   const [discountPercent, setDiscountPercent] = useState("");
   const [advancePayment, setAdvancePayment] = useState("");
   const [description, setDescription] = useState(["", "", "", "", "", ""]);
+  const [stockItems, setStockItems] = useState([]);
   const [archivedSnapshotDirty, setArchivedSnapshotDirty] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
   const printRef = useRef();
@@ -254,6 +300,37 @@ function TemplatePrint() {
     ],
     [labels]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchStockItems = async () => {
+      try {
+        const response = await apiClient.get(API_ENDPOINTS.STOCK_ITEMS);
+        if (cancelled) {
+          return;
+        }
+
+        const items = Array.isArray(response.data)
+          ? response.data.map(normalizeStockItem).filter((item) => item.name)
+          : [];
+        setStockItems(items);
+      } catch {
+        if (!cancelled) {
+          setStockItems([]);
+          message.warning(
+            "Stock suggestions could not be loaded. Manual item entry still works."
+          );
+        }
+      }
+    };
+
+    fetchStockItems();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const archivedInvoice = location.state?.archivedInvoice;
@@ -301,10 +378,77 @@ function TemplatePrint() {
     markInvoiceEdited();
     setRows((prev) => {
       const updated = [...prev];
-      updated[idx] = { ...updated[idx], [field]: value };
+      const row = { ...updated[idx], [field]: value };
+      if (field === "name") {
+        row.stockItemId = null;
+        row.stockSku = "";
+        row.stockType = "";
+        row.stockUnit = "";
+      }
+      updated[idx] = row;
       return updated;
     });
   };
+
+  const handleStockItemSelect = (idx, selectedItem) => {
+    if (!selectedItem) {
+      return;
+    }
+
+    markInvoiceEdited();
+    setRows((prev) => {
+      const updated = [...prev];
+      updated[idx] = {
+        ...updated[idx],
+        name: selectedItem.name,
+        stockItemId: selectedItem.id ?? null,
+        stockSku: selectedItem.sku,
+        stockType: selectedItem.stockType,
+        stockUnit: selectedItem.unit,
+        price: formatStockPriceInput(selectedItem.sellPrice),
+      };
+      return updated;
+    });
+  };
+
+  const getStockOptions = useCallback(
+    (searchValue) =>
+      stockItems
+        .filter((item) => stockMatchesSearch(item, searchValue))
+        .slice(0, 20)
+        .map((item) => {
+          const price = formatStockPriceInput(item.sellPrice);
+          const details = [item.stockType, item.unit, price ? `${price} MKD` : ""]
+            .filter(Boolean)
+            .join(" - ");
+
+          return {
+            key: String(item.id ?? item.name),
+            value: item.name,
+            stockItem: item,
+            label: (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
+                <span>
+                  {item.name}
+                  {item.sku ? ` (${item.sku})` : ""}
+                </span>
+                {details ? (
+                  <span style={{ color: "#666", whiteSpace: "nowrap" }}>
+                    {details}
+                  </span>
+                ) : null}
+              </div>
+            ),
+          };
+        }),
+    [stockItems]
+  );
 
   const handleHeaderChange = (field, value) => {
     markInvoiceEdited();
@@ -333,6 +477,10 @@ function TemplatePrint() {
         name: textValue(row.name),
         materials: textValue(row.materials),
         m2pcs: textValue(row.m2pcs),
+        stockItemId: row.stockItemId ?? null,
+        stockSku: textValue(row.stockSku),
+        stockType: textValue(row.stockType),
+        stockUnit: textValue(row.stockUnit),
         price: textValue(row.price),
         total: textValue(row.total),
       })),
@@ -601,20 +749,48 @@ function TemplatePrint() {
         <Table
           columns={columns.map((col) => ({
             ...col,
-            render: (text, record, idx) => (
-              <Input
-                value={rows[idx][col.dataIndex]}
-                onChange={(e) =>
-                  handleRowChange(idx, col.dataIndex, e.target.value)
-                }
-                bordered={false}
-                style={{
-                  background: "transparent",
-                  borderBottom: "2px solid #000",
-                  minWidth: 40,
-                }}
-              />
-            ),
+            render: (text, record, idx) => {
+              const row = rows[idx] || {};
+              const inputStyle = {
+                background: "transparent",
+                borderBottom: "2px solid #000",
+                minWidth: 40,
+              };
+
+              if (col.dataIndex === "name") {
+                return (
+                  <AutoComplete
+                    value={textValue(row.name)}
+                    options={getStockOptions(row.name)}
+                    onChange={(value) => handleRowChange(idx, "name", value)}
+                    onSelect={(...args) =>
+                      handleStockItemSelect(idx, args[1]?.stockItem)
+                    }
+                    filterOption={false}
+                    style={{ width: "100%" }}
+                    popupMatchSelectWidth={360}
+                  >
+                    <Input bordered={false} style={inputStyle} />
+                  </AutoComplete>
+                );
+              }
+
+              return (
+                <Input
+                  value={textValue(row[col.dataIndex])}
+                  onChange={(e) =>
+                    handleRowChange(idx, col.dataIndex, e.target.value)
+                  }
+                  suffix={
+                    col.dataIndex === "m2pcs" && row.stockUnit
+                      ? row.stockUnit
+                      : undefined
+                  }
+                  bordered={false}
+                  style={inputStyle}
+                />
+              );
+            },
           }))}
           dataSource={rows}
           pagination={false}
