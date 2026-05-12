@@ -134,7 +134,7 @@ ALTER TABLE "Users" ADD COLUMN "EmployeeId" INTEGER NULL;
         private static async Task BackfillWorkerEmployeesAsync(ApplicationDbContext db)
         {
             var workers = await db.Users
-                .Where(user => user.Role == UserRole.User)
+                .Where(user => user.Role == UserRole.User && user.IsActive)
                 .OrderBy(user => user.Id)
                 .ToListAsync();
 
@@ -144,6 +144,7 @@ ALTER TABLE "Users" ADD COLUMN "EmployeeId" INTEGER NULL;
             }
 
             var employees = await db.Employees
+                .Where(employee => !employee.IsDeleted)
                 .OrderBy(employee => employee.Id)
                 .ToListAsync();
 

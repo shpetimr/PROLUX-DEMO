@@ -32,6 +32,7 @@ namespace backend.Services
                 .ThenInclude(employee => employee.UserAccount)
                 .FirstOrDefaultAsync(record =>
                     record.EmployeeId == employeeId &&
+                    !record.Employee.IsDeleted &&
                     record.Month >= monthStart &&
                     record.Month < monthEnd);
 
@@ -43,7 +44,7 @@ namespace backend.Services
             var employee = await _context.Employees
                 .AsNoTracking()
                 .Include(e => e.UserAccount)
-                .FirstOrDefaultAsync(e => e.Id == employeeId);
+                .FirstOrDefaultAsync(e => e.Id == employeeId && !e.IsDeleted);
             if (employee == null)
                 throw new ArgumentException("Employee not found");
 
@@ -74,6 +75,7 @@ namespace backend.Services
             var employees = await _context.Employees
                 .AsNoTracking()
                 .Include(e => e.UserAccount)
+                .Where(e => !e.IsDeleted)
                 .OrderBy(e => e.FullName)
                 .ToListAsync();
 
@@ -133,7 +135,8 @@ namespace backend.Services
         {
             // Check if salary record already exists for this month
             var existingRecord = await _context.SalaryRecords
-                .FirstOrDefaultAsync(sr => sr.EmployeeId == employeeId && 
+                .FirstOrDefaultAsync(sr => sr.EmployeeId == employeeId &&
+                                          !sr.Employee.IsDeleted &&
                                           sr.Month.Year == month.Year && 
                                           sr.Month.Month == month.Month);
 
@@ -164,7 +167,7 @@ namespace backend.Services
         public async Task<List<SalaryRecord>> GetEmployeeSalaryHistoryAsync(int employeeId)
         {
             return await _context.SalaryRecords
-                .Where(sr => sr.EmployeeId == employeeId)
+                .Where(sr => sr.EmployeeId == employeeId && !sr.Employee.IsDeleted)
                 .OrderByDescending(sr => sr.Month)
                 .ToListAsync();
         }

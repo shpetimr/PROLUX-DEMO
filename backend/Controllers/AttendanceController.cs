@@ -26,7 +26,8 @@ namespace backend.Controllers
         [HttpGet("employee/{employeeId}/month/{year}/{month}")]
         public async Task<ActionResult<MonthlyAttendanceDto>> GetMonthlyAttendance(int employeeId, int year, int month)
         {
-            var employee = await _context.Employees.FindAsync(employeeId);
+            var employee = await _context.Employees
+                .FirstOrDefaultAsync(entity => entity.Id == employeeId && !entity.IsDeleted);
             if (employee == null)
                 return NotFound("Punëtori nuk u gjet");
 
@@ -87,7 +88,9 @@ namespace backend.Controllers
             var startDate = DateTimeUtc.MonthStart(year, month);
             var endDate = startDate.AddMonths(1);
 
-            var employees = await _context.Employees.ToListAsync();
+            var employees = await _context.Employees
+                .Where(employee => !employee.IsDeleted)
+                .ToListAsync();
             var result = new List<MonthlyAttendanceDto>();
 
             foreach (var employee in employees)
@@ -133,7 +136,8 @@ namespace backend.Controllers
         [HttpPost]
         public async Task<ActionResult<AttendanceDto>> CreateAttendance(CreateAttendanceDto createDto)
         {
-            var employee = await _context.Employees.FindAsync(createDto.EmployeeId);
+            var employee = await _context.Employees
+                .FirstOrDefaultAsync(entity => entity.Id == createDto.EmployeeId && !entity.IsDeleted);
             if (employee == null)
                 return NotFound("Punëtori nuk u gjet");
 
@@ -195,6 +199,11 @@ namespace backend.Controllers
             if (attendanceRecord == null)
                 return NotFound("Regjistrimi i pranisë nuk u gjet");
 
+            var canUpdateEmployee = await _context.Employees
+                .AnyAsync(employee => employee.Id == attendanceRecord.EmployeeId && !employee.IsDeleted);
+            if (!canUpdateEmployee)
+                return NotFound("Punetori nuk u gjet");
+
             attendanceRecord.IsPresent = updateDto.IsPresent;
             attendanceRecord.Notes = updateDto.Notes;
             attendanceRecord.DailyBonus = updateDto.DailyBonus ?? 0;
@@ -209,7 +218,8 @@ namespace backend.Controllers
             // Update employee's comprehensive data for the current month
             await UpdateEmployeeComprehensiveData(attendanceRecord.EmployeeId, attendanceRecord.Date.Year, attendanceRecord.Date.Month);
 
-            var employee = await _context.Employees.FindAsync(attendanceRecord.EmployeeId);
+            var employee = await _context.Employees
+                .FirstOrDefaultAsync(entity => entity.Id == attendanceRecord.EmployeeId && !entity.IsDeleted);
 
             return new AttendanceDto
             {
@@ -237,6 +247,11 @@ namespace backend.Controllers
             if (attendanceRecord == null)
                 return NotFound("Regjistrimi i pranisë nuk u gjet");
 
+            var canDeleteEmployeeAttendance = await _context.Employees
+                .AnyAsync(employee => employee.Id == attendanceRecord.EmployeeId && !employee.IsDeleted);
+            if (!canDeleteEmployeeAttendance)
+                return NotFound("Punetori nuk u gjet");
+
             _context.AttendanceRecords.Remove(attendanceRecord);
             await _context.SaveChangesAsync();
 
@@ -252,7 +267,8 @@ namespace backend.Controllers
         {
             foreach (var createDto in createDtos)
             {
-                var employee = await _context.Employees.FindAsync(createDto.EmployeeId);
+                var employee = await _context.Employees
+                    .FirstOrDefaultAsync(entity => entity.Id == createDto.EmployeeId && !entity.IsDeleted);
                 if (employee == null)
                     continue;
 
@@ -309,7 +325,8 @@ namespace backend.Controllers
             var totalDailyBonuses = attendanceRecords.Sum(a => a.DailyBonus ?? 0);
             var totalDailyPenalties = attendanceRecords.Sum(a => a.DailyPenalty ?? 0);
 
-            var employee = await _context.Employees.FindAsync(employeeId);
+            var employee = await _context.Employees
+                .FirstOrDefaultAsync(entity => entity.Id == employeeId && !entity.IsDeleted);
             if (employee != null)
             {
                 employee.DaysWorkedThisMonth = daysWorked;

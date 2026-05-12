@@ -111,6 +111,7 @@ namespace backend.Controllers
                 
                 // Get recent data for dashboard
                 var recentEmployees = await _context.Employees
+                    .Where(e => !e.IsDeleted)
                     .OrderByDescending(e => e.CreatedAt)
                     .Take(5)
                     .Select(e => new

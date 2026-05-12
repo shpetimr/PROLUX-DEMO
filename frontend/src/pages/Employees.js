@@ -43,6 +43,7 @@ function Employees() {
   const [selectedSalaryMonth, setSelectedSalaryMonth] = useState(dayjs());
   const [salaryCalculations, setSalaryCalculations] = useState({});
   const [salaryLoading, setSalaryLoading] = useState(false);
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
   
   // Simple attendance states
   const [attendanceModalVisible, setAttendanceModalVisible] = useState(false);
@@ -102,6 +103,20 @@ function Employees() {
     }
   };
 
+  const getApiErrorMessage = (error, fallbackMessage) => {
+    const data = error?.response?.data;
+
+    if (data?.message) {
+      return data.message;
+    }
+
+    if (typeof data === "string") {
+      return data;
+    }
+
+    return fallbackMessage;
+  };
+
   const fetchSalaryCalculations = async (month = selectedSalaryMonth) => {
     setSalaryLoading(true);
     try {
@@ -116,7 +131,7 @@ function Employees() {
     } catch (error) {
       console.error("Error fetching salary calculations:", error);
       setSalaryCalculations({});
-      message.error("Deshtoi te merren kalkulimet e pagave");
+      message.error(getApiErrorMessage(error, "Deshtoi te merren kalkulimet e pagave"));
     } finally {
       setSalaryLoading(false);
     }
@@ -166,13 +181,16 @@ function Employees() {
   };
 
   const handleDelete = async (id) => {
+    setDeletingEmployeeId(id);
     try {
       await apiClient.delete(API_ENDPOINTS.EMPLOYEE_BY_ID(id));
       message.success("Punëtori u fshi me sukses");
       await refreshEmployeesAndSalary();
       notifyDataChanged();
+      setDeletingEmployeeId(null);
     } catch (error) {
-      message.error("Dështoi të fshihet punëtori");
+      setDeletingEmployeeId(null);
+      message.error(getApiErrorMessage(error, "Deshtoi te fshihet punetori"));
     }
   };
 
@@ -620,6 +638,16 @@ function Employees() {
     );
   };
 
+  const getDeleteConfirmationDescription = (employee) => {
+    const accountLabel = getLinkedWorkerAccountLabel(employee);
+
+    if (accountLabel) {
+      return `Worker/User ${accountLabel} will be deactivated. Salary and attendance history stays attached.`;
+    }
+
+    return "Salary and attendance history stays attached. Employee will be removed from the active list.";
+  };
+
   const getSalarySnapshot = (employee) => {
     const salaryCalculation = salaryCalculations[employee.id] || {};
     const dailyWage = employee.dailyWage || getDefaultDailyWage(employee.position) || 0;
@@ -917,11 +945,18 @@ function Employees() {
 
           <Popconfirm
             title="A jeni të sigurt që dëshironi ta fshini këtë punëtor?"
+            description={getDeleteConfirmationDescription(record)}
             onConfirm={() => handleDelete(record.id)}
             okText="Po"
             cancelText="Jo"
+            okButtonProps={{ danger: true }}
           >
-            <Button icon={<DeleteOutlined />} size="small" danger>
+            <Button
+              icon={<DeleteOutlined />}
+              size="small"
+              danger
+              loading={deletingEmployeeId === record.id}
+            >
               Fshi
             </Button>
           </Popconfirm>

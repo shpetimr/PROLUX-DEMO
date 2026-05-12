@@ -47,6 +47,19 @@ namespace backend.Services
                 throw new UnauthorizedAccessException("Invalid username or password");
             }
 
+            if (!user.IsActive)
+            {
+                throw new UnauthorizedAccessException("This account is inactive.");
+            }
+
+            if (user.Role == UserRole.User && user.Employee?.IsDeleted == true)
+            {
+                user.IsActive = false;
+                user.DeactivatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                throw new UnauthorizedAccessException("This worker account is inactive because its employee record was deleted.");
+            }
+
             if (PasswordSecurity.NeedsRehash(user.PasswordHash))
             {
                 user.PasswordHash = PasswordSecurity.HashPassword(loginDto.Password);
@@ -77,6 +90,7 @@ namespace backend.Services
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 EmployeeId = user.EmployeeId,
                 EmployeeFullName = user.Employee?.FullName,
                 Permissions = userDto.Permissions,
@@ -130,6 +144,7 @@ namespace backend.Services
                 FullName = fullName,
                 Role = registerDto.Role,
                 Employee = linkedEmployee,
+                IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -151,6 +166,7 @@ namespace backend.Services
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 EmployeeId = user.EmployeeId,
                 EmployeeFullName = user.Employee?.FullName,
                 Permissions = userDto.Permissions,
@@ -158,14 +174,14 @@ namespace backend.Services
             };
         }
 
-        public Task<bool> ValidateTokenAsync(string token)
+        public async Task<bool> ValidateTokenAsync(string token)
         {
             try
             {
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var key = Encoding.UTF8.GetBytes(_jwtSettings.Key);
 
-                tokenHandler.ValidateToken(token, new TokenValidationParameters
+                var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
@@ -175,13 +191,28 @@ namespace backend.Services
                     ValidAudience = _jwtSettings.Audience,
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
-                }, out SecurityToken validatedToken);
+                }, out _);
 
-                return Task.FromResult(true);
+                var userIdValue =
+                    principal.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                    principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+                if (!int.TryParse(userIdValue, out var userId))
+                {
+                    return false;
+                }
+
+                return await _context.Users.AnyAsync(user =>
+                    user.Id == userId &&
+                    user.IsActive &&
+                    (user.Role != UserRole.User ||
+                        (user.EmployeeId != null &&
+                         user.Employee != null &&
+                         !user.Employee.IsDeleted)));
             }
             catch
             {
-                return Task.FromResult(false);
+                return false;
             }
         }
 
@@ -189,7 +220,11 @@ namespace backend.Services
         {
             var user = await _context.Users
                 .Include(entity => entity.Employee)
-                .FirstOrDefaultAsync(entity => entity.Id == userId);
+                .FirstOrDefaultAsync(entity =>
+                    entity.Id == userId &&
+                    entity.IsActive &&
+                    (entity.Role != UserRole.User ||
+                        (entity.Employee != null && !entity.Employee.IsDeleted)));
             return user == null ? null : ToUserResponseDto(user);
         }
 
@@ -263,6 +298,7 @@ namespace backend.Services
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 EmployeeId = user.EmployeeId,
                 EmployeeFullName = user.Employee?.FullName,
                 Permissions = AppPermissions.GetPermissionsForRole(user.Role),
@@ -279,7 +315,9 @@ namespace backend.Services
             if (registerDto.EmployeeId.HasValue)
             {
                 var employee = await _context.Employees
-                    .FirstOrDefaultAsync(entity => entity.Id == registerDto.EmployeeId.Value);
+                    .FirstOrDefaultAsync(entity =>
+                        entity.Id == registerDto.EmployeeId.Value &&
+                        !entity.IsDeleted);
 
                 if (employee == null)
                 {
@@ -315,7 +353,9 @@ namespace backend.Services
         {
             var normalizedFullName = fullName.Trim().ToUpperInvariant();
             var candidates = await _context.Employees
-                .Where(employee => employee.FullName.ToUpper() == normalizedFullName)
+                .Where(employee =>
+                    !employee.IsDeleted &&
+                    employee.FullName.ToUpper() == normalizedFullName)
                 .OrderBy(employee => employee.Id)
                 .ToListAsync();
 

@@ -47,6 +47,7 @@ namespace backend.Data
                 entity.Property(e => e.DailyRate).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.OvertimeRate).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Position).HasConversion<string>();
+                entity.HasIndex(e => e.IsDeleted);
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -151,6 +152,7 @@ namespace backend.Data
                 entity.Property(e => e.FullName).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Role).HasConversion<string>();
                 entity.HasIndex(e => e.Username).IsUnique();
+                entity.HasIndex(e => e.IsActive);
                 entity.HasOne(e => e.Employee)
                     .WithOne(e => e.UserAccount)
                     .HasForeignKey<User>(e => e.EmployeeId)

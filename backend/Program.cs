@@ -151,6 +151,7 @@ using (var scope = app.Services.CreateScope())
         }
 
         await StockSchemaBootstrapper.EnsureAsync(context);
+        await EmployeeDeletionSchemaBootstrapper.EnsureAsync(context);
         await UserEmployeeLinkSchemaBootstrapper.EnsureAsync(context);
         await SalaryRecordSchemaBootstrapper.EnsureAsync(context);
         await WorkerTaskSchemaBootstrapper.EnsureAsync(context);

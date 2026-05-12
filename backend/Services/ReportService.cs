@@ -223,9 +223,9 @@ namespace backend.Services
                 }
                 
                 // Employee statistics with new position system (only for admins)
-                var totalEmployees = isAdmin ? await _context.Employees.CountAsync() : 0;
-                var magazineEmployees = isAdmin ? await _context.Employees.CountAsync(e => e.Position == Models.EmployeePosition.Magazine) : 0;
-                var terrenEmployees = isAdmin ? await _context.Employees.CountAsync(e => e.Position == Models.EmployeePosition.Terren) : 0;
+                var totalEmployees = isAdmin ? await _context.Employees.CountAsync(e => !e.IsDeleted) : 0;
+                var magazineEmployees = isAdmin ? await _context.Employees.CountAsync(e => !e.IsDeleted && e.Position == Models.EmployeePosition.Magazine) : 0;
+                var terrenEmployees = isAdmin ? await _context.Employees.CountAsync(e => !e.IsDeleted && e.Position == Models.EmployeePosition.Terren) : 0;
                 
                 // Calculate current month salaries using new system
                 var currentMonthSalaryTotals = await GetSalaryFinancialTotalsAsync(currentMonthStart, currentMonthEnd);
@@ -1457,6 +1457,7 @@ namespace backend.Services
 
             var employees = await _context.Employees
                 .AsNoTracking()
+                .Where(employee => !employee.IsDeleted)
                 .ToListAsync();
             if (employees.Count == 0)
             {

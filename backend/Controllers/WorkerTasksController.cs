@@ -206,7 +206,10 @@ namespace backend.Controllers
                 .FirstOrDefaultAsync(user =>
                     user.Id == userId &&
                     user.Role == UserRole.User &&
-                    user.EmployeeId != null);
+                    user.IsActive &&
+                    user.EmployeeId != null &&
+                    user.Employee != null &&
+                    !user.Employee.IsDeleted);
         }
 
         private static WorkerTaskDto ToDto(WorkerTask task)

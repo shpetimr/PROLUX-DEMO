@@ -1,6 +1,7 @@
 using backend.Models;
 using backend.Data;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace backend.Services
@@ -21,7 +22,13 @@ namespace backend.Services
             var userId = GetCurrentUserId();
             if (userId == 0) return null;
             
-            return _context.Users.FirstOrDefault(u => u.Id == userId);
+            return _context.Users
+                .Include(u => u.Employee)
+                .FirstOrDefault(u =>
+                    u.Id == userId &&
+                    u.IsActive &&
+                    (u.Role != UserRole.User ||
+                        (u.Employee != null && !u.Employee.IsDeleted)));
         }
 
         public int GetCurrentUserId()
@@ -43,8 +50,11 @@ namespace backend.Services
             }
 
             return _context.Users
-                .Where(user => user.Id == userId)
-                .Select(user => user.EmployeeId)
+                .Where(user => user.Id == userId && user.IsActive)
+                .Select(user =>
+                    user.Employee != null && user.Employee.IsDeleted
+                        ? null
+                        : user.EmployeeId)
                 .FirstOrDefault();
         }
 

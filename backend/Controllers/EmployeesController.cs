@@ -29,7 +29,8 @@ namespace backend.Controllers
         {
             // Only admins can see all employees, users can only see their own
             IQueryable<Employee> employeesQuery = _context.Employees
-                .Include(e => e.UserAccount);
+                .Include(e => e.UserAccount)
+                .Where(e => !e.IsDeleted);
             
             if (!_currentUserService.IsAdmin())
             {
@@ -90,7 +91,7 @@ namespace backend.Controllers
             
             var employee = await _context.Employees
                 .Include(e => e.UserAccount)
-                .FirstOrDefaultAsync(e => e.Id == id);
+                .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
 
             if (employee == null)
             {
@@ -248,7 +249,7 @@ namespace backend.Controllers
             
             var employee = await _context.Employees
                 .Include(e => e.UserAccount)
-                .FirstOrDefaultAsync(e => e.Id == id);
+                .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
 
             if (employee == null)
             {
@@ -327,19 +328,33 @@ namespace backend.Controllers
             }
             var employee = await _context.Employees
                 .Include(e => e.UserAccount)
-                .FirstOrDefaultAsync(e => e.Id == id);
+                .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
             if (employee == null)
             {
                 return NotFound();
             }
 
-            if (employee.UserAccount != null)
+            var linkedUser = employee.UserAccount;
+            if (linkedUser?.Role == UserRole.Admin)
             {
-                return BadRequest(new { message = "This employee is linked to a worker login account and cannot be deleted." });
+                return BadRequest(new { message = "This employee is linked to an admin account and cannot be deleted from Employees." });
             }
 
-            _context.Employees.Remove(employee);
+            var deletedAt = DateTime.UtcNow;
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            employee.IsDeleted = true;
+            employee.DeletedAt = deletedAt;
+            employee.UpdatedAt = deletedAt;
+
+            if (linkedUser != null)
+            {
+                linkedUser.IsActive = false;
+                linkedUser.DeactivatedAt = deletedAt;
+            }
+
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             return NoContent();
         }

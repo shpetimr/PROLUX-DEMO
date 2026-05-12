@@ -99,6 +99,7 @@ namespace backend.Controllers
                     user.Username,
                     user.FullName,
                     user.Role,
+                    user.IsActive,
                     user.EmployeeId,
                     EmployeeFullName = user.Employee == null ? null : user.Employee.FullName,
                     user.CreatedAt,
@@ -112,6 +113,7 @@ namespace backend.Controllers
                 Username = user.Username,
                 FullName = user.FullName,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 EmployeeId = user.EmployeeId,
                 EmployeeFullName = user.EmployeeFullName,
                 Permissions = AppPermissions.GetPermissionsForRole(user.Role),
@@ -127,7 +129,12 @@ namespace backend.Controllers
             var workers = await _context.Users
                 .AsNoTracking()
                 .Include(user => user.Employee)
-                .Where(user => user.Role == UserRole.User && user.EmployeeId != null)
+                .Where(user =>
+                    user.Role == UserRole.User &&
+                    user.IsActive &&
+                    user.EmployeeId != null &&
+                    user.Employee != null &&
+                    !user.Employee.IsDeleted)
                 .OrderBy(user => user.Employee!.FullName)
                 .ThenBy(user => user.Username)
                 .Select(user => new
@@ -136,6 +143,7 @@ namespace backend.Controllers
                     user.Username,
                     user.FullName,
                     user.Role,
+                    user.IsActive,
                     user.EmployeeId,
                     EmployeeFullName = user.Employee == null ? null : user.Employee.FullName,
                     user.CreatedAt,
@@ -149,6 +157,7 @@ namespace backend.Controllers
                 Username = user.Username,
                 FullName = user.EmployeeFullName ?? user.FullName,
                 Role = user.Role,
+                IsActive = user.IsActive,
                 EmployeeId = user.EmployeeId,
                 EmployeeFullName = user.EmployeeFullName,
                 Permissions = AppPermissions.GetPermissionsForRole(user.Role),

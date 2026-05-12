@@ -58,6 +58,8 @@ namespace backend.Models
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAt { get; set; }
         
         // User who created this employee
         public int CreatedById { get; set; }

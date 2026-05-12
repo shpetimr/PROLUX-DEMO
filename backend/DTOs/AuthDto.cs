@@ -52,6 +52,7 @@ namespace backend.DTOs
         public string Username { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public UserRole Role { get; set; }
+        public bool IsActive { get; set; } = true;
         public int? EmployeeId { get; set; }
         public string? EmployeeFullName { get; set; }
         public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
@@ -70,6 +71,7 @@ namespace backend.DTOs
         public string Username { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public UserRole Role { get; set; }
+        public bool IsActive { get; set; } = true;
         public int? EmployeeId { get; set; }
         public string? EmployeeFullName { get; set; }
         public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
