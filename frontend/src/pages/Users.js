@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -21,6 +21,7 @@ import {
 import dayjs from "dayjs";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 import { ROLES } from "../config/permissions";
+import { useDataChange } from "../contexts/DataChangeContext";
 
 const { Title, Text } = Typography;
 
@@ -78,25 +79,26 @@ function Users() {
   const [createdUser, setCreatedUser] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const { notifyDataChanged } = useDataChange();
   const selectedRole = Form.useWatch("role", form);
   const selectedEmployeeId = Form.useWatch("employeeId", form);
   const currentRole = selectedRole ?? ROLES.USER;
 
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      setLoadingEmployees(true);
-      try {
-        const response = await apiClient.get(API_ENDPOINTS.EMPLOYEES);
-        setEmployees(Array.isArray(response.data) ? response.data : []);
-      } catch {
-        setEmployees([]);
-      } finally {
-        setLoadingEmployees(false);
-      }
-    };
-
-    fetchEmployees();
+  const fetchEmployees = useCallback(async () => {
+    setLoadingEmployees(true);
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.EMPLOYEES);
+      setEmployees(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      setEmployees([]);
+    } finally {
+      setLoadingEmployees(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const employeeOptions = useMemo(
     () =>
@@ -197,19 +199,8 @@ function Users() {
         fullName: user.fullName ?? payload.fullName,
         role: user.role ?? payload.role,
       });
-      if (user.employeeId) {
-        setEmployees((currentEmployees) =>
-          currentEmployees.map((employee) =>
-            employee.id === user.employeeId
-              ? {
-                  ...employee,
-                  linkedUserId: user.id,
-                  linkedUsername: user.username ?? payload.username,
-                }
-              : employee
-          )
-        );
-      }
+      await fetchEmployees();
+      notifyDataChanged();
 
       message.success("User account created.");
       form.resetFields();

@@ -52,8 +52,9 @@ namespace backend.Services
                 user.PasswordHash = PasswordSecurity.HashPassword(loginDto.Password);
             }
 
-            if (user.Role == UserRole.User && user.EmployeeId == null)
+            if (user.Role == UserRole.User && user.Employee == null)
             {
+                user.EmployeeId = null;
                 var existingEmployee = await FindSingleUnlinkedEmployeeByNameAsync(user.FullName);
                 user.Employee = existingEmployee
                     ?? CreateEmployeeForWorker(
@@ -109,6 +110,7 @@ namespace backend.Services
 
             var passwordHash = PasswordSecurity.HashPassword(registerDto.Password);
             Employee? linkedEmployee = null;
+
             if (registerDto.Role == UserRole.User)
             {
                 var creatorUserId = _currentUserService.GetCurrentUserId();
@@ -133,6 +135,11 @@ namespace backend.Services
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+
+            if (user.Role == UserRole.User)
+            {
+                await EnsureSavedWorkerEmployeeLinkAsync(user);
+            }
 
             var userDto = ToUserResponseDto(user);
             var token = GenerateJwtToken(userDto);
@@ -184,6 +191,32 @@ namespace backend.Services
                 .Include(entity => entity.Employee)
                 .FirstOrDefaultAsync(entity => entity.Id == userId);
             return user == null ? null : ToUserResponseDto(user);
+        }
+
+        private async Task EnsureSavedWorkerEmployeeLinkAsync(User user)
+        {
+            if (!user.EmployeeId.HasValue && user.Employee?.Id > 0)
+            {
+                user.EmployeeId = user.Employee.Id;
+                await _context.SaveChangesAsync();
+            }
+
+            if (!user.EmployeeId.HasValue)
+            {
+                throw new InvalidOperationException("Worker account must be linked to an employee record.");
+            }
+
+            if (user.Employee == null)
+            {
+                await _context.Entry(user)
+                    .Reference(entity => entity.Employee)
+                    .LoadAsync();
+            }
+
+            if (user.Employee == null)
+            {
+                throw new InvalidOperationException("Worker account was linked to an employee record that no longer exists.");
+            }
         }
 
         public string GenerateJwtToken(UserResponseDto user)
