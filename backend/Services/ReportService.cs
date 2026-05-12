@@ -1746,8 +1746,7 @@ namespace backend.Services
                 .AsNoTracking()
                 .Where(movement =>
                     movement.MovementKind == InvoiceStockMovementKind &&
-                    movement.QuantityChange < 0 &&
-                    movement.StockItem.StockType == StockType.Product);
+                    movement.QuantityChange < 0);
 
             if (startDate.HasValue)
             {
