@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
@@ -323,10 +324,23 @@ namespace backend.Services
                 return 0m;
             }
 
-            var normalized = raw.Trim().Replace(',', '.');
+            var normalized = raw.Trim().Replace('\u00A0', ' ').Replace(',', '.');
+            var matches = Regex.Matches(normalized, @"[-+]?(?:\d+\.?\d*|\.\d+)");
+            var quantityText = matches
+                .Cast<Match>()
+                .FirstOrDefault(match =>
+                    match.Index == 0 ||
+                    !char.IsLetter(normalized[match.Index - 1]))
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(quantityText))
+            {
+                return 0m;
+            }
+
             return decimal.TryParse(
-                normalized,
-                NumberStyles.Any,
+                quantityText,
+                NumberStyles.Number,
                 CultureInfo.InvariantCulture,
                 out var parsed)
                     ? parsed

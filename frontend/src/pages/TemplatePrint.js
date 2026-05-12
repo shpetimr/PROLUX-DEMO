@@ -14,7 +14,10 @@ import {
 } from "antd";
 import { PrinterOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
-import { computeInvoiceTotals } from "../utils/invoiceTotals";
+import {
+  computeInvoiceTotals,
+  formatInvoiceLineTotal,
+} from "../utils/invoiceTotals";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 
 const { Title, Text } = Typography;
@@ -259,6 +262,11 @@ const normalizeLanguage = (language) =>
     ? INVOICE_LANGUAGES.Macedonian
     : INVOICE_LANGUAGES.Albanian;
 
+const recalculateRowTotal = (row) => ({
+  ...row,
+  total: formatInvoiceLineTotal(row),
+});
+
 const buildIssueSignature = (payload) => JSON.stringify(payload);
 
 const readStockDeduction = (response) =>
@@ -378,12 +386,15 @@ function TemplatePrint() {
     markInvoiceEdited();
     setRows((prev) => {
       const updated = [...prev];
-      const row = { ...updated[idx], [field]: value };
+      let row = { ...updated[idx], [field]: value };
       if (field === "name") {
         row.stockItemId = null;
         row.stockSku = "";
         row.stockType = "";
         row.stockUnit = "";
+      }
+      if (field === "m2pcs" || field === "price") {
+        row = recalculateRowTotal(row);
       }
       updated[idx] = row;
       return updated;
@@ -398,7 +409,7 @@ function TemplatePrint() {
     markInvoiceEdited();
     setRows((prev) => {
       const updated = [...prev];
-      updated[idx] = {
+      updated[idx] = recalculateRowTotal({
         ...updated[idx],
         name: selectedItem.name,
         stockItemId: selectedItem.id ?? null,
@@ -406,7 +417,7 @@ function TemplatePrint() {
         stockType: selectedItem.stockType,
         stockUnit: selectedItem.unit,
         price: formatStockPriceInput(selectedItem.sellPrice),
-      };
+      });
       return updated;
     });
   };
@@ -775,12 +786,17 @@ function TemplatePrint() {
                 );
               }
 
+              const isAutoTotal = col.dataIndex === "total";
               return (
                 <Input
                   value={textValue(row[col.dataIndex])}
-                  onChange={(e) =>
-                    handleRowChange(idx, col.dataIndex, e.target.value)
+                  onChange={
+                    isAutoTotal
+                      ? undefined
+                      : (e) =>
+                          handleRowChange(idx, col.dataIndex, e.target.value)
                   }
+                  readOnly={isAutoTotal}
                   suffix={
                     col.dataIndex === "m2pcs" && row.stockUnit
                       ? row.stockUnit
