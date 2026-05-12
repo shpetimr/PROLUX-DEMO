@@ -5,9 +5,11 @@ namespace backend.DTOs
 {
     public class CreateInvoiceArchiveDto
     {
-        [Required]
         [StringLength(100)]
-        public string InvoiceNumber { get; set; } = string.Empty;
+        public string? InvoiceNumber { get; set; }
+
+        [StringLength(100)]
+        public string? ClientRequestId { get; set; }
 
         [Required]
         [StringLength(200)]

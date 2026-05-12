@@ -269,6 +269,10 @@ namespace backend.Migrations
                     b.Property<int>("CreatedById")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("ClientRequestId")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CustomerAddress")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
@@ -310,6 +314,9 @@ namespace backend.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.HasIndex("CreatedById");
+
+                    b.HasIndex("ClientRequestId")
+                        .IsUnique();
 
                     b.HasIndex("InvoiceNumber");
 

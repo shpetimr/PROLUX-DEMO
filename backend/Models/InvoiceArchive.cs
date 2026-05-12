@@ -10,6 +10,9 @@ namespace backend.Models
         [MaxLength(100)]
         public string InvoiceNumber { get; set; } = string.Empty;
 
+        [MaxLength(100)]
+        public string? ClientRequestId { get; set; }
+
         [Required]
         [MaxLength(200)]
         public string CustomerName { get; set; } = string.Empty;

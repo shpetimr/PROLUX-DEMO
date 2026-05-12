@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   AutoComplete,
   Button,
@@ -59,7 +60,7 @@ const TEXT = {
       price: "Price",
       total: "Total",
     },
-    archiveRequired: "Plot\u00EBsoni klientin dhe numrin e fatur\u00EBs para arkivimit.",
+    archiveRequired: "Plot\u00EBsoni klientin para arkivimit.",
     archiveSaved: "Fatura u ruajt n\u00EB arkiv.",
     archiveFailed: "Fatura nuk u ruajt n\u00EB arkiv.",
     popupBlocked: "Dritarja e printimit u bllokua nga shfletuesi.",
@@ -102,7 +103,7 @@ const TEXT = {
       total: "\u0412\u043A\u0443\u043F\u043D\u043E",
     },
     archiveRequired:
-      "\u041F\u043E\u043F\u043E\u043B\u043D\u0435\u0442\u0435 \u043A\u043B\u0438\u0435\u043D\u0442 \u0438 \u0431\u0440\u043E\u0458 \u043D\u0430 \u0444\u0430\u043A\u0442\u0443\u0440\u0430 \u043F\u0440\u0435\u0434 \u0430\u0440\u0445\u0438\u0432\u0438\u0440\u0430\u045A\u0435.",
+      "\u041F\u043E\u043F\u043E\u043B\u043D\u0435\u0442\u0435 \u043A\u043B\u0438\u0435\u043D\u0442 \u043F\u0440\u0435\u0434 \u0430\u0440\u0445\u0438\u0432\u0438\u0440\u0430\u045A\u0435.",
     archiveSaved:
       "\u0424\u0430\u043A\u0442\u0443\u0440\u0430\u0442\u0430 \u0435 \u0437\u0430\u0447\u0443\u0432\u0430\u043D\u0430 \u0432\u043E \u0430\u0440\u0445\u0438\u0432\u0430.",
     archiveFailed:
@@ -272,6 +273,17 @@ const buildIssueSignature = (payload) => JSON.stringify(payload);
 const readStockDeduction = (response) =>
   response?.data?.stockDeduction || response?.data?.StockDeduction || null;
 
+const readIssuedInvoiceNumber = (response) =>
+  response?.data?.invoiceNumber || response?.data?.InvoiceNumber || "";
+
+const createClientRequestId = () => {
+  if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+
+  return `invoice-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 function TemplatePrint() {
   const location = useLocation();
   const [rows, setRows] = useState(createEmptyRows);
@@ -289,6 +301,7 @@ function TemplatePrint() {
   const [printLoading, setPrintLoading] = useState(false);
   const printRef = useRef();
   const issuedInvoiceSignatureRef = useRef(null);
+  const invoiceRequestIdRef = useRef(createClientRequestId());
 
   const labels = TEXT[language] || TEXT.Albanian;
 
@@ -343,9 +356,13 @@ function TemplatePrint() {
   useEffect(() => {
     const archivedInvoice = location.state?.archivedInvoice;
     if (!archivedInvoice) {
+      if (!invoiceRequestIdRef.current) {
+        invoiceRequestIdRef.current = createClientRequestId();
+      }
       return;
     }
 
+    invoiceRequestIdRef.current = null;
     const snapshot = parseArchiveSnapshot(archivedInvoice);
     const snapshotTotals = snapshot.totals || {};
 
@@ -477,6 +494,7 @@ function TemplatePrint() {
 
   const buildArchivePayload = () => ({
     invoiceNumber: header.invoice.trim(),
+    clientRequestId: invoiceRequestIdRef.current,
     customerName: header.customer.trim(),
     customerAddress: null,
     customerPhone: null,
@@ -551,7 +569,7 @@ function TemplatePrint() {
   const issueInvoice = async ({ showArchiveMessage = true } = {}) => {
     const payload = buildArchivePayload();
 
-    if (!payload.invoiceNumber || !payload.customerName) {
+    if (!payload.customerName) {
       message.warning(labels.archiveRequired);
       return false;
     }
@@ -563,7 +581,20 @@ function TemplatePrint() {
 
     try {
       const response = await apiClient.post(API_ENDPOINTS.INVOICE_ARCHIVE, payload);
-      issuedInvoiceSignatureRef.current = signature;
+      const issuedInvoiceNumber = readIssuedInvoiceNumber(response) || payload.invoiceNumber;
+      if (issuedInvoiceNumber && issuedInvoiceNumber !== header.invoice) {
+        flushSync(() => {
+          setHeader((prev) =>
+            prev.invoice === issuedInvoiceNumber
+              ? prev
+              : { ...prev, invoice: issuedInvoiceNumber }
+          );
+        });
+      }
+      issuedInvoiceSignatureRef.current = buildIssueSignature({
+        ...payload,
+        invoiceNumber: issuedInvoiceNumber,
+      });
       setArchivedSnapshotDirty(false);
       if (showArchiveMessage) {
         message.success(labels.archiveSaved);
@@ -752,7 +783,7 @@ function TemplatePrint() {
           <Input
             placeholder={labels.invoicePlaceholder}
             value={header.invoice}
-            onChange={(e) => handleHeaderChange("invoice", e.target.value)}
+            readOnly
             style={{ width: 150 }}
             bordered={false}
           />
