@@ -26,14 +26,22 @@ const pointsToLocalhost = (value) => {
   }
 };
 
-const normalizeBaseUrl = (value) => {
+const isLocalFileRuntime = () =>
+  typeof window !== "undefined" && window.location.protocol === "file:";
+
+const normalizeBaseUrl = (value, options = {}) => {
+  const { allowLoopback = false } = options;
   const configuredValue = value?.trim();
 
   if (!configuredValue) {
     return "/api";
   }
 
-  if (isProductionBuild && pointsToLocalhost(configuredValue)) {
+  if (
+    isProductionBuild &&
+    !allowLoopback &&
+    pointsToLocalhost(configuredValue)
+  ) {
     console.error(
       "Ignoring localhost API URL in a production build. Set REACT_APP_API_URL to the public Railway API URL."
     );
@@ -75,6 +83,7 @@ const getRuntimeApiUrl = () => {
 
   if (
     isProductionBuild &&
+    !isLocalFileRuntime() &&
     process.env.REACT_APP_ALLOW_RUNTIME_API_OVERRIDE !== "true"
   ) {
     return "";
@@ -124,8 +133,10 @@ const joinUrl = (baseUrl, endpoint = "") => {
   return `${baseUrl}${cleanEndpoint}`;
 };
 
+const runtimeApiUrl = getRuntimeApiUrl();
 export const API_BASE_URL = normalizeBaseUrl(
-  getRuntimeApiUrl() || buildConfiguredApiUrl()
+  runtimeApiUrl || buildConfiguredApiUrl(),
+  { allowLoopback: Boolean(runtimeApiUrl && isLocalFileRuntime()) }
 );
 export const getApiUrl = (endpoint = "") => joinUrl(API_BASE_URL, endpoint);
 export const getSwaggerUrl = () => {
