@@ -87,7 +87,7 @@ function Users() {
   const fetchEmployees = useCallback(async () => {
     setLoadingEmployees(true);
     try {
-      const response = await apiClient.get(API_ENDPOINTS.EMPLOYEES);
+      const response = await apiClient.get(API_ENDPOINTS.AVAILABLE_EMPLOYEES);
       setEmployees(Array.isArray(response.data) ? response.data : []);
     } catch {
       setEmployees([]);
@@ -103,7 +103,6 @@ function Users() {
   const employeeOptions = useMemo(
     () =>
       employees
-        .filter((employee) => !employee.linkedUserId)
         .map((employee) => ({
           value: employee.id,
           label: `${employee.fullName} (${employee.position})`,

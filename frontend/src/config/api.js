@@ -192,6 +192,7 @@ export const API_ENDPOINTS = {
   VALIDATE_TOKEN: "/auth/validate",
 
   EMPLOYEES: "/employees",
+  AVAILABLE_EMPLOYEES: "/employees/available",
   EMPLOYEE_BY_ID: (id) => `/employees/${id}`,
 
   SALARY_MONTH: (year, month) => `/salary/month/${year}/${month}`,

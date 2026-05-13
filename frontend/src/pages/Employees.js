@@ -150,16 +150,32 @@ function Employees() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSalaryMonth]);
 
+  const getDefaultDailyWage = (position) => {
+    if (position === "magazine" || position === "Magazine" || position === 0) {
+      return 1850;
+    }
+
+    return 2460;
+  };
+
+  const getDefaultEmployeeFormValues = (position = "magazine") => {
+    const dailyWage = getDefaultDailyWage(position);
+
+    return {
+      position,
+      hireDate: dayjs(),
+      daysWorkedThisMonth: 0,
+      baseSalary: dailyWage * STANDARD_WORKING_DAYS_PER_MONTH,
+      monthlyBonuses: 0,
+      monthlyPenalties: 0,
+      dailyWage,
+    };
+  };
+
   const handleCreate = () => {
     setEditingEmployee(null);
     form.resetFields();
-    form.setFieldsValue({
-      daysWorkedThisMonth: 0,
-      baseSalary: 0,
-      monthlyBonuses: 0,
-      monthlyPenalties: 0,
-      dailyWage: 0,
-    });
+    form.setFieldsValue(getDefaultEmployeeFormValues());
     setModalVisible(true);
   };
 
@@ -556,10 +572,14 @@ function Employees() {
 
       const createData = {
         fullName: values.fullName,
-        position: values.position,
+        position: values.position || "magazine",
         hireDate: values.hireDate ? values.hireDate.format("YYYY-MM-DD") : null,
-        baseSalary: values.baseSalary,
-        dailyWage: values.dailyWage,
+        baseSalary:
+          values.baseSalary ??
+          (values.dailyWage ?? getDefaultDailyWage(values.position || "magazine")) *
+            STANDARD_WORKING_DAYS_PER_MONTH,
+        dailyWage: values.dailyWage ?? getDefaultDailyWage(values.position || "magazine"),
+        dailyRate: values.dailyWage ?? getDefaultDailyWage(values.position || "magazine"),
         monthlyBonuses: values.monthlyBonuses || 0,
         monthlyPenalties: values.monthlyPenalties || 0,
       };
@@ -577,15 +597,6 @@ function Employees() {
       } else {
         message.error("Gabim në rrjet. Ju lutemi provoni përsëri.");
       }
-    }
-  };
-
-  // Function to get default daily wage based on position
-  const getDefaultDailyWage = (position) => {
-    if (position === "magazine" || position === "Magazine" || position === 0) {
-      return 1850;
-    } else {
-      return 2460;
     }
   };
 

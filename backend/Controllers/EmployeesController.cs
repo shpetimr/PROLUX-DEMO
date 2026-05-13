@@ -80,6 +80,52 @@ namespace backend.Controllers
             return Ok(response);
         }
 
+        [HttpGet("available")]
+        [Authorize]
+        public async Task<ActionResult<IEnumerable<EmployeeResponseDto>>> GetAvailableEmployees()
+        {
+            if (!_currentUserService.IsAdmin())
+            {
+                return Forbid();
+            }
+
+            var employees = await _context.Employees
+                .AsNoTracking()
+                .Where(e =>
+                    !e.IsDeleted &&
+                    !_context.Users.Any(user => user.EmployeeId == e.Id))
+                .OrderBy(e => e.FullName)
+                .ToListAsync();
+
+            return Ok(employees.Select(e => new EmployeeResponseDto
+            {
+                id = e.Id,
+                fullName = e.FullName,
+                position = e.Position.ToString(),
+                hireDate = e.HireDate,
+                baseSalary = e.BaseSalary,
+                dailyWage = e.DailyWage,
+                daysWorkedThisMonth = e.DaysWorkedThisMonth,
+                halfDaysThisMonth = e.HalfDaysThisMonth,
+                absentDaysThisMonth = e.AbsentDaysThisMonth,
+                totalOvertimeHoursThisMonth = e.TotalOvertimeHoursThisMonth,
+                monthlyBonuses = e.MonthlyBonuses,
+                monthlyPenalties = e.MonthlyPenalties,
+                calculatedDailyBonuses = e.CalculatedDailyBonuses,
+                calculatedDailyPenalties = e.CalculatedDailyPenalties,
+                monthlySalary = e.CalculatedMonthlySalary,
+                dailyRate = e.DailyRate,
+                overtimeRate = e.OvertimeRate,
+                createdAt = e.CreatedAt,
+                updatedAt = e.UpdatedAt,
+                createdById = e.CreatedById,
+                linkedUserId = null,
+                linkedUsername = null,
+                currencyCode = "MKD",
+                currencySymbol = "MKD"
+            }));
+        }
+
         [HttpGet("{id}")]
         [Authorize]
         public async Task<ActionResult<EmployeeResponseDto>> GetEmployee(int id)
