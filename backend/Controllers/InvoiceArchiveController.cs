@@ -252,70 +252,77 @@ namespace backend.Controllers
             string customerName,
             string? clientRequestId)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            var createdAt = DateTime.UtcNow;
-            var invoice = new InvoiceArchive
-            {
-                InvoiceNumber = BuildPendingInvoiceNumber(),
-                ClientRequestId = clientRequestId,
-                CustomerName = customerName,
-                CustomerAddress = NormalizeOptional(dto.CustomerAddress),
-                CustomerPhone = NormalizeOptional(dto.CustomerPhone),
-                Language = dto.Language!.Value,
-                ItemsJson = dto.ItemsJson,
-                Subtotal = dto.Subtotal,
-                Total = dto.Total,
-                Notes = NormalizeOptional(dto.Notes),
-                CreatedAt = createdAt,
-                CreatedById = currentUser.Id,
-                CreatedBy = currentUser
-            };
+            var strategy = _context.Database.CreateExecutionStrategy();
 
-            _context.InvoiceArchives.Add(invoice);
-
-            try
+            return await strategy.ExecuteAsync<ActionResult<InvoiceArchiveResponseDto>>(async () =>
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException ex) when (IsUniqueClientRequestIdViolation(ex))
-            {
-                await transaction.RollbackAsync();
-                DetachPendingInvoiceArchiveChanges();
+                _context.ChangeTracker.Clear();
 
-                if (!string.IsNullOrWhiteSpace(clientRequestId))
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                var createdAt = DateTime.UtcNow;
+                var invoice = new InvoiceArchive
                 {
-                    var existingAfterRace = await FindArchivedInvoiceByClientRequestIdAsync(clientRequestId);
-                    if (existingAfterRace != null)
+                    InvoiceNumber = BuildPendingInvoiceNumber(),
+                    ClientRequestId = clientRequestId,
+                    CustomerName = customerName,
+                    CustomerAddress = NormalizeOptional(dto.CustomerAddress),
+                    CustomerPhone = NormalizeOptional(dto.CustomerPhone),
+                    Language = dto.Language!.Value,
+                    ItemsJson = dto.ItemsJson,
+                    Subtotal = dto.Subtotal,
+                    Total = dto.Total,
+                    Notes = NormalizeOptional(dto.Notes),
+                    CreatedAt = createdAt,
+                    CreatedById = currentUser.Id
+                };
+
+                _context.InvoiceArchives.Add(invoice);
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException ex) when (IsUniqueClientRequestIdViolation(ex))
+                {
+                    await transaction.RollbackAsync();
+                    DetachPendingInvoiceArchiveChanges();
+
+                    if (!string.IsNullOrWhiteSpace(clientRequestId))
                     {
-                        return Ok(ToAlreadyArchivedDto(existingAfterRace));
+                        var existingAfterRace = await FindArchivedInvoiceByClientRequestIdAsync(clientRequestId);
+                        if (existingAfterRace != null)
+                        {
+                            return Ok(ToAlreadyArchivedDto(existingAfterRace));
+                        }
                     }
+
+                    throw;
                 }
 
-                throw;
-            }
+                var invoiceNumber = await GenerateInvoiceNumberForArchiveAsync(invoice.Id, createdAt);
+                invoice.InvoiceNumber = invoiceNumber;
 
-            var invoiceNumber = await GenerateInvoiceNumberForArchiveAsync(invoice.Id, createdAt);
-            invoice.InvoiceNumber = invoiceNumber;
+                var stockRequest = _invoiceStockDeductionService.BuildRequestFromArchivePayload(
+                    invoiceNumber,
+                    customerName,
+                    dto.ItemsJson);
+                var stockStage = await _invoiceStockDeductionService.StageInvoiceDeductionsAsync(
+                    stockRequest,
+                    reserveDeductionKeyWhenEmpty: true);
+                if (!string.IsNullOrWhiteSpace(stockStage.ErrorMessage))
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { message = stockStage.ErrorMessage });
+                }
 
-            var stockRequest = _invoiceStockDeductionService.BuildRequestFromArchivePayload(
-                invoiceNumber,
-                customerName,
-                dto.ItemsJson);
-            var stockStage = await _invoiceStockDeductionService.StageInvoiceDeductionsAsync(
-                stockRequest,
-                reserveDeductionKeyWhenEmpty: true);
-            if (!string.IsNullOrWhiteSpace(stockStage.ErrorMessage))
-            {
-                await transaction.RollbackAsync();
-                return BadRequest(new { message = stockStage.ErrorMessage });
-            }
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            var response = ToDto(invoice);
-            response.StockDeduction = stockStage.Result;
-            return CreatedAtAction(nameof(GetArchivedInvoice), new { id = invoice.Id }, response);
+                invoice.CreatedBy = currentUser;
+                var response = ToDto(invoice);
+                response.StockDeduction = stockStage.Result;
+                return CreatedAtAction(nameof(GetArchivedInvoice), new { id = invoice.Id }, response);
+            });
         }
 
         [HttpDelete("{id:int}")]
