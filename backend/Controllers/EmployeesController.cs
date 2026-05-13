@@ -6,6 +6,7 @@ using backend.Data;
 using backend.Models;
 using backend.DTOs;
 using backend.Services;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
@@ -216,6 +217,7 @@ namespace backend.Controllers
             {
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
+            hireDate = DateTimeUtc.Date(hireDate);
             
             var configuredDailySalary = dto.dailyWage > 0 ? dto.dailyWage : dto.dailyRate;
             var configuredMonthlySalary = dto.baseSalary ??
@@ -335,7 +337,7 @@ namespace backend.Controllers
                 {
                     return BadRequest("Invalid date format. Expected YYYY-MM-DD");
                 }
-                employee.HireDate = hireDate;
+                employee.HireDate = DateTimeUtc.Date(hireDate);
             }
 
             if (dto.baseSalary.HasValue)

@@ -9,6 +9,7 @@ using backend.Data;
 using backend.Models;
 using backend.DTOs;
 using backend.Security;
+using backend.Utilities;
 
 namespace backend.Services
 {
@@ -389,7 +390,7 @@ namespace backend.Services
             {
                 FullName = fullName.Trim(),
                 Position = position,
-                HireDate = hireDate,
+                HireDate = DateTimeUtc.Date(hireDate),
                 BaseSalary = (dailyWage ?? defaultDailyWage) * SalaryCalculator.StandardWorkingDaysPerMonth,
                 DailyWage = dailyWage ?? defaultDailyWage,
                 DaysWorkedThisMonth = 0,
@@ -428,7 +429,7 @@ namespace backend.Services
         private static DateTime ParseHireDateOrDefault(string? hireDate)
         {
             return DateTime.TryParse(hireDate, out var parsedHireDate)
-                ? parsedHireDate
+                ? DateTimeUtc.Date(parsedHireDate)
                 : DateTime.UtcNow.Date;
         }
 
