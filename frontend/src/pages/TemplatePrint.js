@@ -609,6 +609,9 @@ const readStockDeduction = (response) =>
 const readIssuedInvoiceNumber = (response) =>
   response?.data?.invoiceNumber || response?.data?.InvoiceNumber || "";
 
+const getInvoiceNumberMode = (invoiceNumber) =>
+  invoiceNumber ? "provided" : "auto";
+
 const PRINT_DIAGNOSTIC_PREFIX = "[TemplatePrint:print]";
 
 const logPrintDiagnostic = (step, details = {}) => {
@@ -882,6 +885,30 @@ function TemplatePrint() {
     notes: null,
   });
 
+  const summarizeArchivePayload = (payload) => ({
+    hasCustomerName: Boolean(payload.customerName),
+    requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
+    invoiceNumberMode: getInvoiceNumberMode(payload.invoiceNumber),
+    clientRequestId: payload.clientRequestId || null,
+    itemCount: rows.length,
+    subtotal: payload.subtotal,
+    total: payload.total,
+  });
+
+  const getIssueBlockReason = (payload) => {
+    if (!payload.customerName) {
+      return "missing customer name";
+    }
+
+    return null;
+  };
+
+  const warnIssueBlocked = (reason) => {
+    if (reason === "missing customer name") {
+      message.warning(labels.archiveRequired);
+    }
+  };
+
   const showStockDeductionFeedback = (stockDeduction) => {
     if (!stockDeduction) {
       return;
@@ -920,22 +947,17 @@ function TemplatePrint() {
 
   const issueInvoice = async ({ showArchiveMessage = true } = {}) => {
     const payload = buildArchivePayload();
-    const payloadSummary = {
-      hasCustomerName: Boolean(payload.customerName),
-      requestedInvoiceNumber: payload.invoiceNumber || "(auto)",
-      clientRequestId: payload.clientRequestId || null,
-      itemCount: rows.length,
-      subtotal: payload.subtotal,
-      total: payload.total,
-    };
+    const payloadSummary = summarizeArchivePayload(payload);
 
     logPrintDiagnostic("issueInvoice:start", payloadSummary);
 
-    if (!payload.customerName) {
+    const blockReason = getIssueBlockReason(payload);
+    if (blockReason) {
       logPrintDiagnostic("issueInvoice:blocked", {
-        reason: "missing customer name",
+        reason: blockReason,
+        ...payloadSummary,
       });
-      message.warning(labels.archiveRequired);
+      warnIssueBlocked(blockReason);
       return false;
     }
 
@@ -1123,6 +1145,28 @@ function TemplatePrint() {
     }
 
     logPrintDiagnostic("handlePrint:start");
+    const isArchivedReprint = Boolean(location.state?.archivedInvoice);
+    const shouldIssueBeforePrint = !isArchivedReprint || archivedSnapshotDirty;
+
+    logPrintDiagnostic("handlePrint:flow", {
+      isArchivedReprint,
+      archivedSnapshotDirty,
+      shouldIssueBeforePrint,
+    });
+
+    if (shouldIssueBeforePrint) {
+      const preflightPayload = buildArchivePayload();
+      const blockReason = getIssueBlockReason(preflightPayload);
+      if (blockReason) {
+        logPrintDiagnostic("handlePrint:preflightBlocked", {
+          reason: blockReason,
+          ...summarizeArchivePayload(preflightPayload),
+        });
+        warnIssueBlocked(blockReason);
+        return;
+      }
+    }
+
     const printWindow = openBlankPrintWindow();
     if (!printWindow) {
       logPrintDiagnostic("handlePrint:aborted", {
@@ -1132,15 +1176,7 @@ function TemplatePrint() {
     }
 
     printInProgressRef.current = true;
-    const isArchivedReprint = Boolean(location.state?.archivedInvoice);
-    const shouldIssueBeforePrint = !isArchivedReprint || archivedSnapshotDirty;
     let releasePrintLock = true;
-
-    logPrintDiagnostic("handlePrint:flow", {
-      isArchivedReprint,
-      archivedSnapshotDirty,
-      shouldIssueBeforePrint,
-    });
 
     if (shouldIssueBeforePrint) {
       setPrintLoading(true);
