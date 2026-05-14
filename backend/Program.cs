@@ -182,12 +182,27 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine($"[Auth] {action} administrator account '{provisioningResult.Username}' (id {provisioningResult.UserId}).");
         }
 
+        if (commandOptions.ShouldResetAdminPassword)
+        {
+            var adminPasswordResetSettings = AdminBootstrapSettingsLoader.GetRequiredPasswordReset(builder.Configuration);
+            var resetResult = await authMaintenance.ResetAdminPasswordAsync(
+                adminPasswordResetSettings.Username,
+                adminPasswordResetSettings.Password);
+
+            var reactivated = resetResult.Reactivated ? " and reactivated" : string.Empty;
+            Console.WriteLine($"[Auth] Reset password for existing administrator account '{resetResult.Username}' (id {resetResult.UserId}){reactivated}.");
+        }
+
         if (commandOptions.ShouldSanitizeSampleUsers)
         {
             string? preservedUsername = null;
             if (commandOptions.ShouldProvisionAdmin)
             {
                 preservedUsername = AdminBootstrapSettingsLoader.GetRequired(builder.Configuration).Username;
+            }
+            else if (commandOptions.ShouldResetAdminPassword)
+            {
+                preservedUsername = AdminBootstrapSettingsLoader.GetRequiredPasswordReset(builder.Configuration).Username;
             }
 
             var cleanupResult = await authMaintenance.SanitizeSampleUsersAsync(preservedUsername);
@@ -200,8 +215,18 @@ using (var scope = app.Services.CreateScope())
 
         await UserEmployeeLinkSchemaBootstrapper.EnsureAsync(context);
 
+        string? preservedAuditUsername = null;
+        if (commandOptions.ShouldProvisionAdmin)
+        {
+            preservedAuditUsername = AdminBootstrapSettingsLoader.GetRequired(builder.Configuration).Username;
+        }
+        else if (commandOptions.ShouldResetAdminPassword)
+        {
+            preservedAuditUsername = AdminBootstrapSettingsLoader.GetRequiredPasswordReset(builder.Configuration).Username;
+        }
+
         var audit = await authMaintenance.AuditUsersAsync(
-            commandOptions.ShouldProvisionAdmin ? AdminBootstrapSettingsLoader.GetRequired(builder.Configuration).Username : null);
+            preservedAuditUsername);
 
         Console.WriteLine($"[Auth] User audit: {audit.Users.Count} total users, {audit.AdminCount} admin account(s), {audit.SampleCandidates.Count} sample/test candidate(s).");
         foreach (var user in audit.Users)

@@ -7,6 +7,12 @@ namespace backend.Configuration
         public string Password { get; init; } = string.Empty;
     }
 
+    public sealed class AdminPasswordResetSettings
+    {
+        public string Username { get; init; } = string.Empty;
+        public string Password { get; init; } = string.Empty;
+    }
+
     public static class AdminBootstrapSettingsLoader
     {
         public static AdminBootstrapSettings GetRequired(IConfiguration configuration)
@@ -34,6 +40,28 @@ namespace backend.Configuration
             {
                 Username = username.Trim(),
                 FullName = fullName.Trim(),
+                Password = password
+            };
+        }
+
+        public static AdminPasswordResetSettings GetRequiredPasswordReset(IConfiguration configuration)
+        {
+            var username = EnvironmentConfiguration.Get(configuration, "ADMIN_USERNAME", "AdminBootstrap:Username");
+            var password = EnvironmentConfiguration.Get(configuration, "ADMIN_PASSWORD", "AdminBootstrap:Password");
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                throw new InvalidOperationException("Admin username is not configured. Set ADMIN_USERNAME to the existing administrator username before resetting the password.");
+            }
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException("Admin password is not configured. Set ADMIN_PASSWORD to the new administrator password before resetting the password.");
+            }
+
+            return new AdminPasswordResetSettings
+            {
+                Username = username.Trim(),
                 Password = password
             };
         }

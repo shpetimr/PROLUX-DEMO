@@ -5,6 +5,7 @@ using backend.Models;
 namespace backend.Security
 {
     public sealed record AdminProvisioningResult(int UserId, string Username, bool Created);
+    public sealed record AdminPasswordResetResult(int UserId, string Username, bool Reactivated);
 
     public sealed record UserReferenceSummary(
         int Employees,
@@ -151,6 +152,38 @@ namespace backend.Security
             await _context.SaveChangesAsync();
 
             return new AdminProvisioningResult(existingUser.Id, existingUser.Username, created);
+        }
+
+        public async Task<AdminPasswordResetResult> ResetAdminPasswordAsync(string username, string password)
+        {
+            var normalizedUsername = NormalizeUsername(username);
+
+            if (string.IsNullOrWhiteSpace(normalizedUsername))
+            {
+                throw new InvalidOperationException("Admin username is required.");
+            }
+
+            var existingUser = await FindUserByUsernameAsync(normalizedUsername);
+            if (existingUser is null)
+            {
+                throw new InvalidOperationException("No existing administrator account was found for the configured ADMIN_USERNAME. Update ADMIN_USERNAME to the current admin username or use --provision-admin for first-time setup.");
+            }
+
+            if (existingUser.Role != UserRole.Admin)
+            {
+                throw new InvalidOperationException("The configured ADMIN_USERNAME belongs to a non-admin account. Password reset will not promote users or create duplicate admins.");
+            }
+
+            PasswordSecurity.EnsureStrongPassword(password, existingUser.Username, existingUser.FullName);
+
+            var reactivated = !existingUser.IsActive;
+            existingUser.PasswordHash = PasswordSecurity.HashPassword(password);
+            existingUser.IsActive = true;
+            existingUser.DeactivatedAt = null;
+
+            await _context.SaveChangesAsync();
+
+            return new AdminPasswordResetResult(existingUser.Id, existingUser.Username, reactivated);
         }
 
         public async Task<SampleUserCleanupResult> SanitizeSampleUsersAsync(string? preservedUsername = null)

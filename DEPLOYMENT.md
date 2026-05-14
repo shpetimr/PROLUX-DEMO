@@ -56,13 +56,18 @@ CORS_ALLOWED_ORIGINS=https://<netlify-site-domain>
 `CORS_ALLOWED_ORIGINS` must be the frontend origin only: scheme and host, no
 `/api`, no hash route, and no page path.
 
-One-time admin provisioning variables:
+Admin provisioning/reset variables:
 
 ```env
 ADMIN_USERNAME=prolux-admin
 ADMIN_FULL_NAME=PROLUX Administrator
 ADMIN_PASSWORD=replace-with-a-strong-admin-password
 ```
+
+Create the admin once with `dotnet run -- --provision-admin`. To change the
+password later without creating another admin, keep `ADMIN_USERNAME` set to the
+existing admin username, set `ADMIN_PASSWORD` to the new strong password, and
+run `dotnet run -- --reset-admin-password`.
 
 ## Local development
 

@@ -225,21 +225,34 @@ Copy `backend/.env.example` to `backend/.env` for local development. Runtime val
 - `JWT_KEY`: Required. Use a long random secret, preferably 32 random bytes encoded as Base64Url or 64 hex characters
 - `JWT_ISSUER`: Required token issuer
 - `JWT_AUDIENCE`: Required token audience
-- `ADMIN_USERNAME`: Required for `--provision-admin`
-- `ADMIN_FULL_NAME`: Required for `--provision-admin`
-- `ADMIN_PASSWORD`: Required for `--provision-admin`
+- `ADMIN_USERNAME`: Required for `--provision-admin` and `--reset-admin-password`
+- `ADMIN_FULL_NAME`: Required only for `--provision-admin`
+- `ADMIN_PASSWORD`: Required for `--provision-admin` and used as the new password for `--reset-admin-password`
 
 ### Security Maintenance Commands
 
 ```bash
 dotnet run -- --audit-users
 dotnet run -- --provision-admin
+dotnet run -- --reset-admin-password
 dotnet run -- --provision-admin --sanitize-sample-users
 ```
 
 - `--audit-users`: Lists current users, flags placeholder/sample accounts, and reports legacy password hashes
 - `--provision-admin`: Creates or updates the admin account from `backend/.env`
+- `--reset-admin-password`: Updates the password hash for the existing admin named by `ADMIN_USERNAME`; it does not create users or promote non-admin accounts
 - `--sanitize-sample-users`: Deletes unreferenced placeholder users and rotates referenced ones to non-loginable retired accounts
+
+To change an existing admin password, set `ADMIN_USERNAME` to the current admin
+username and set `ADMIN_PASSWORD` to the new strong password. Then run:
+
+```bash
+dotnet run -- --reset-admin-password
+```
+
+The reset command uses the same PBKDF2 password hashing and password-strength
+rules as normal account creation, leaves the existing admin account in place,
+and fails instead of creating a duplicate admin when the username is wrong.
 
 ## Data
 
