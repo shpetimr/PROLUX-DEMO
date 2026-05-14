@@ -6,7 +6,9 @@ namespace backend.Data
         {
             // Do not run startup maintenance while an explicit data clear is requested.
             var commandLineArgs = Environment.GetCommandLineArgs();
-            bool shouldClearDatabase = commandLineArgs.Contains("--clear-database");
+            bool shouldClearDatabase =
+                commandLineArgs.Contains("--clear-database") ||
+                commandLineArgs.Contains("--reset-production-data");
             
             if (shouldClearDatabase)
             {
@@ -31,22 +33,9 @@ namespace backend.Data
 
         public static async Task ClearAllDataAsync(ApplicationDbContext context)
         {
-            Console.WriteLine("Starting database cleanup...");
-            
-            // Clear all data except users
-            context.SalaryRecords.RemoveRange(context.SalaryRecords);
-            context.Expenses.RemoveRange(context.Expenses);
-            context.Purchases.RemoveRange(context.Purchases);
-            context.Rents.RemoveRange(context.Rents);
-            context.Incomes.RemoveRange(context.Incomes);
-            context.Projects.RemoveRange(context.Projects);
-            context.Debts.RemoveRange(context.Debts);
-            context.Employees.RemoveRange(context.Employees);
-            
-            await context.SaveChangesAsync();
-            
-            Console.WriteLine("All data cleared successfully!");
-            Console.WriteLine("User accounts were preserved during cleanup.");
+            await Task.CompletedTask;
+            throw new NotSupportedException(
+                "Use the guarded --reset-production-data maintenance command instead of DatabaseSeeder.ClearAllDataAsync().");
         }
     }
 } 

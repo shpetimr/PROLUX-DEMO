@@ -236,12 +236,16 @@ dotnet run -- --audit-users
 dotnet run -- --provision-admin
 dotnet run -- --reset-admin-password
 dotnet run -- --provision-admin --sanitize-sample-users
+dotnet run -- --reset-production-data
+dotnet run -- --reset-production-data --confirm-production-reset
 ```
 
 - `--audit-users`: Lists current users, flags placeholder/sample accounts, and reports legacy password hashes
 - `--provision-admin`: Creates or updates the admin account from `backend/.env`
 - `--reset-admin-password`: Updates the password hash for the existing admin named by `ADMIN_USERNAME`; it does not create users or promote non-admin accounts
 - `--sanitize-sample-users`: Deletes unreferenced placeholder users and rotates referenced ones to non-loginable retired accounts
+- `--reset-production-data`: Maintenance-mode dry run for pre-production cleanup. It prints the business records and non-preserved users that would be removed, then exits without starting the API.
+- `--confirm-production-reset`: Applies `--reset-production-data`. This is destructive and should only be used after reviewing the dry run and taking a backup.
 
 To change an existing admin password, set `ADMIN_USERNAME` to the current admin
 username and set `ADMIN_PASSWORD` to the new strong password. Then run:
@@ -253,6 +257,45 @@ dotnet run -- --reset-admin-password
 The reset command uses the same PBKDF2 password hashing and password-strength
 rules as normal account creation, leaves the existing admin account in place,
 and fails instead of creating a duplicate admin when the username is wrong.
+
+### Pre-Production Data Reset
+
+Use this only to remove development, testing, or demo data before the system is
+handed over for real production use. It does not drop schema, delete migrations,
+or change the authentication/authorization model.
+
+Dry run first:
+
+```bash
+dotnet run -- --reset-production-data
+```
+
+Apply after review:
+
+```bash
+dotnet run -- --reset-production-data --confirm-production-reset
+```
+
+Recommended first-time production handover:
+
+```bash
+dotnet run -- --provision-admin --reset-production-data --confirm-production-reset
+```
+
+The reset preserves the configured active administrator account from
+`ADMIN_USERNAME`. If `ADMIN_USERNAME` is not set, the command only proceeds when
+there is exactly one active admin account; otherwise it fails and asks you to set
+`ADMIN_USERNAME` so it cannot preserve the wrong user.
+
+Cleaned data includes worker tasks, work sales, invoice archives, invoice stock
+deductions, stock items and movements, salary records, attendance records,
+expenses, purchases, rents, incomes, debts, projects, employees, and all users
+except the preserved admin account. Report screens are reset because reports are
+calculated from these cleared business records.
+
+Before applying the reset, create a verified database backup. SQLite databases
+receive an automatic local backup file; PostgreSQL/Supabase databases require an
+external backup from the host/provider before running the confirmed command.
 
 ## Data
 

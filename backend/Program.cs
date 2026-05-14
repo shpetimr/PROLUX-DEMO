@@ -86,6 +86,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<AuthMaintenanceService>();
 builder.Services.AddScoped<SqliteToPostgresMigrator>();
+builder.Services.AddScoped<ProductionDataResetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISalaryService, SalaryService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -170,6 +171,19 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
+        if (commandOptions.WillMutateProductionData)
+        {
+            var backupPath = DatabaseBackup.TryCreateBeforeProductionDataReset(databaseOptions);
+            if (!string.IsNullOrWhiteSpace(backupPath))
+            {
+                Console.WriteLine($"[Database] Backup created at {backupPath}");
+            }
+            else
+            {
+                Console.WriteLine("[Database] Warning: no automatic database backup was created for this provider. Verify an external backup before running this command against shared data.");
+            }
+        }
+
         if (commandOptions.ShouldProvisionAdmin)
         {
             var adminBootstrapSettings = AdminBootstrapSettingsLoader.GetRequired(builder.Configuration);
@@ -193,7 +207,11 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine($"[Auth] Reset password for existing administrator account '{resetResult.Username}' (id {resetResult.UserId}){reactivated}.");
         }
 
-        if (commandOptions.ShouldSanitizeSampleUsers)
+        if (commandOptions.ShouldSanitizeSampleUsers && commandOptions.ShouldResetProductionData)
+        {
+            Console.WriteLine("[Auth] Skipping sample-user cleanup because --reset-production-data removes all non-preserved users after admin validation.");
+        }
+        else if (commandOptions.ShouldSanitizeSampleUsers)
         {
             string? preservedUsername = null;
             if (commandOptions.ShouldProvisionAdmin)
@@ -235,24 +253,58 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine($"[Auth] User #{user.Id} '{user.Username}' role={user.Role} refs={user.References.Total} flags={flags}");
         }
 
-        if (commandOptions.IsMaintenanceMode)
+        AuthMaintenanceService.EnsureAdminAccountExists(audit);
+        if (commandOptions.ShouldResetProductionData)
         {
-            AuthMaintenanceService.EnsureAdminAccountExists(audit);
+            var resetService = scope.ServiceProvider.GetRequiredService<ProductionDataResetService>();
+            var preservedAdminUsername = EnvironmentConfiguration.Get(
+                app.Configuration,
+                "ADMIN_USERNAME",
+                "AdminBootstrap:Username");
+            var resetResult = await resetService.ResetAsync(
+                new ProductionDataResetOptions(
+                    commandOptions.ShouldConfirmProductionReset,
+                    preservedAdminUsername));
+
+            Console.WriteLine(commandOptions.ShouldConfirmProductionReset
+                ? "[Database] Production data reset completed."
+                : "[Database] Production data reset dry run completed. No data was deleted.");
+            Console.WriteLine($"[Database] Preserved admin account(s): {string.Join(", ", resetResult.PreservedAdmins)}");
+            Console.WriteLine($"[Database] Planned reset rows: {resetResult.PlannedRows}");
+
+            foreach (var count in resetResult.PlannedCounts.Where(static count => count.Count > 0))
+            {
+                Console.WriteLine($"[Database] {(resetResult.DryRun ? "Would clean" : "Planned")} {count.Name}: {count.Count}");
+            }
+
+            if (resetResult.DryRun)
+            {
+                Console.WriteLine("[Database] Re-run with --confirm-production-reset to apply this cleanup.");
+            }
+            else
+            {
+                foreach (var count in resetResult.AppliedCounts.Where(static count => count.Count > 0))
+                {
+                    Console.WriteLine($"[Database] Cleaned {count.Name}: {count.Count}");
+                }
+
+                Console.WriteLine($"[Database] Applied reset rows: {resetResult.AppliedRows}");
+            }
+
             return;
         }
 
-        AuthMaintenanceService.EnsureAdminAccountExists(audit);
+        if (commandOptions.IsMaintenanceMode)
+        {
+            return;
+        }
+
         if (audit.SampleCandidates.Count > 0)
         {
             Console.WriteLine("[Auth] Warning: sample/test user candidates still exist in the database. Run 'dotnet run -- --sanitize-sample-users' after reviewing the audit output.");
         }
 
-        if (commandOptions.ShouldClearDatabase)
-        {
-            // Clear all data
-            await DatabaseSeeder.ClearAllDataAsync(context);
-        }
-        else if (isProductionEnvironment)
+        if (isProductionEnvironment)
         {
             Console.WriteLine("[Database] Production startup: skipping automatic DatabaseSeeder.SeedAsync().");
         }

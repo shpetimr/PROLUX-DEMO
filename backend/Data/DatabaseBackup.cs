@@ -7,15 +7,29 @@ namespace backend.Data
     {
         public static string? TryCreateBeforeAuthMutation(DatabaseOptions databaseOptions)
         {
+            return TryCreateSqliteBackup(databaseOptions, "auth-backup");
+        }
+
+        public static string? TryCreateBeforeProductionDataReset(DatabaseOptions databaseOptions)
+        {
+            return TryCreateSqliteBackup(databaseOptions, "production-reset-backup");
+        }
+
+        private static string? TryCreateSqliteBackup(
+            DatabaseOptions databaseOptions,
+            string suffix)
+        {
             if (databaseOptions.Provider != DatabaseProvider.Sqlite)
             {
                 return null;
             }
 
-            return CreateSqliteBackup(databaseOptions.ConnectionString);
+            return CreateSqliteBackup(databaseOptions.ConnectionString, suffix);
         }
 
-        private static string? CreateSqliteBackup(string connectionString)
+        private static string? CreateSqliteBackup(
+            string connectionString,
+            string suffix)
         {
             var builder = new SqliteConnectionStringBuilder(connectionString);
             var sqliteFilePath = builder.DataSource;
@@ -32,7 +46,7 @@ namespace backend.Data
             var extension = Path.GetExtension(sqliteFilePath);
             var backupPath = Path.Combine(
                 directory!,
-                $"{fileNameWithoutExtension}.auth-backup-{DateTime.UtcNow:yyyyMMddHHmmss}{extension}");
+                $"{fileNameWithoutExtension}.{suffix}-{DateTime.UtcNow:yyyyMMddHHmmss}{extension}");
 
             File.Copy(sqliteFilePath, backupPath, overwrite: false);
             return backupPath;

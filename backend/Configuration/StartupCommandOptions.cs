@@ -2,7 +2,8 @@ namespace backend.Configuration
 {
     public sealed class StartupCommandOptions
     {
-        public bool ShouldClearDatabase { get; init; }
+        public bool ShouldResetProductionData { get; init; }
+        public bool ShouldConfirmProductionReset { get; init; }
         public bool ShouldSkipSeeding { get; init; }
         public bool ShouldAuditUsers { get; init; }
         public bool ShouldProvisionAdmin { get; init; }
@@ -17,8 +18,13 @@ namespace backend.Configuration
             || ShouldProvisionAdmin
             || ShouldResetAdminPassword
             || ShouldSanitizeSampleUsers
+            || ShouldResetProductionData
             || ShouldMigrateSqliteToPostgres;
-        public bool WillMutateAuthData => ShouldProvisionAdmin || ShouldResetAdminPassword || ShouldSanitizeSampleUsers;
+        public bool WillMutateAuthData =>
+            ShouldProvisionAdmin
+            || ShouldResetAdminPassword
+            || ShouldSanitizeSampleUsers;
+        public bool WillMutateProductionData => ShouldResetProductionData && ShouldConfirmProductionReset;
 
         public static StartupCommandOptions Parse(string[] args)
         {
@@ -26,7 +32,8 @@ namespace backend.Configuration
 
             return new StartupCommandOptions
             {
-                ShouldClearDatabase = HasArg("--clear-database"),
+                ShouldResetProductionData = HasArg("--reset-production-data") || HasArg("--clear-database"),
+                ShouldConfirmProductionReset = HasArg("--confirm-production-reset"),
                 ShouldSkipSeeding = HasArg("--skip-seeding"),
                 ShouldAuditUsers = HasArg("--audit-users"),
                 ShouldProvisionAdmin = HasArg("--provision-admin"),

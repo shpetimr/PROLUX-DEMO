@@ -15,9 +15,23 @@ namespace backend.Security
         int Rents,
         int Debts,
         int Projects,
-        int InvoiceArchives)
+        int InvoiceArchives,
+        int WorkerTasksAssigned,
+        int WorkerTasksCreated,
+        int WorkSales)
     {
-        public int Total => Employees + Expenses + Purchases + Incomes + Rents + Debts + Projects + InvoiceArchives;
+        public int Total =>
+            Employees
+            + Expenses
+            + Purchases
+            + Incomes
+            + Rents
+            + Debts
+            + Projects
+            + InvoiceArchives
+            + WorkerTasksAssigned
+            + WorkerTasksCreated
+            + WorkSales;
     }
 
     public sealed record AuthUserAuditSummary(
@@ -251,8 +265,22 @@ namespace backend.Security
             var debts = await _context.Debts.CountAsync(entity => entity.CreatedById == userId);
             var projects = await _context.Projects.CountAsync(entity => entity.CreatedById == userId);
             var invoiceArchives = await _context.InvoiceArchives.CountAsync(entity => entity.CreatedById == userId);
+            var workerTasksAssigned = await _context.WorkerTasks.CountAsync(entity => entity.AssignedUserId == userId);
+            var workerTasksCreated = await _context.WorkerTasks.CountAsync(entity => entity.CreatedById == userId);
+            var workSales = await _context.WorkSales.CountAsync(entity => entity.CreatedById == userId);
 
-            return new UserReferenceSummary(employees, expenses, purchases, incomes, rents, debts, projects, invoiceArchives);
+            return new UserReferenceSummary(
+                employees,
+                expenses,
+                purchases,
+                incomes,
+                rents,
+                debts,
+                projects,
+                invoiceArchives,
+                workerTasksAssigned,
+                workerTasksCreated,
+                workSales);
         }
 
         private static string NormalizeUsername(string username)
