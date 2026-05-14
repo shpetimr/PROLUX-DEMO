@@ -6,6 +6,7 @@ using backend.Data;
 using backend.Models;
 using backend.DTOs;
 using backend.Services;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
@@ -102,6 +103,7 @@ namespace backend.Controllers
             {
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
+            purchaseDate = DateTimeUtc.Date(purchaseDate);
             
             var totalPrice = createDto.Quantity * createDto.UnitPrice;
 
@@ -178,7 +180,7 @@ namespace backend.Controllers
                 // Parse the date string to DateTime
                 if (DateTime.TryParse(updateDto.PurchaseDate, out DateTime newPurchaseDate))
                 {
-                    purchase.PurchaseDate = newPurchaseDate;
+                    purchase.PurchaseDate = DateTimeUtc.Date(newPurchaseDate);
                 }
                 else
                 {

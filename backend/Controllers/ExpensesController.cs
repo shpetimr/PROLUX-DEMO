@@ -99,6 +99,7 @@ namespace backend.Controllers
             {
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
+            expenseDate = DateTimeUtc.Date(expenseDate);
             
             var expense = new Expense
             {
@@ -154,7 +155,7 @@ namespace backend.Controllers
                 // Parse the date string to DateTime
                 if (DateTime.TryParse(updateDto.date, out DateTime newExpenseDate))
                 {
-                    expense.Date = newExpenseDate;
+                    expense.Date = DateTimeUtc.Date(newExpenseDate);
                 }
                 else
                 {
