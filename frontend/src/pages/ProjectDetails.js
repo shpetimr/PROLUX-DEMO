@@ -296,7 +296,7 @@ const ProjectDetails = () => {
               <div className="text-2xl font-bold text-green-600">
                 {project.promet?.toLocaleString()} €
               </div>
-              <div className="text-sm text-gray-600">Prometi Total</div>
+              <div className="text-sm text-gray-600">Prometi Gjithsej</div>
             </div>
           </Col>
           <Col span={8}>

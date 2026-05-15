@@ -89,7 +89,7 @@ namespace backend.Services
             var totalPurchases = (decimal)await purchases.SumAsync(p => (double)p.TotalPrice);
             var baseIncome = (decimal)await incomes.SumAsync(i => (double)i.Amount);
             var totalExpenses = baseExpenses + invoiceStockCostTotals.Cost;
-            var totalIncome = baseIncome + workSaleTotals.Revenue + archivedInvoiceTotals.Total;
+            var totalIncome = baseIncome + workSaleTotals.Profit + archivedInvoiceTotals.Total;
             var netBalance = totalIncome - (totalExpenses + totalRent + totalPurchases + salaryTotals.TotalSalaries);
 
             return new FinancialReportDto
@@ -254,7 +254,7 @@ namespace backend.Services
                         .Where(i => i.Date >= currentMonthStart && i.Date < currentMonthEnd)
                         .SumAsync(i => i.Amount)
                     : 0m;
-                currentMonthIncome += currentMonthWorkSaleTotals.Revenue + currentMonthArchivedInvoiceTotals.Total;
+                currentMonthIncome += currentMonthWorkSaleTotals.Profit + currentMonthArchivedInvoiceTotals.Total;
                 currentMonthExpenses += currentMonthInvoiceStockCostTotals.Cost;
                     
                 var currentMonthPurchases = await purchasesQuery
@@ -286,7 +286,7 @@ namespace backend.Services
                         .Where(i => i.Date >= yearStart && i.Date <= currentDate)
                         .SumAsync(i => i.Amount)
                     : 0m;
-                yearToDateIncome += yearToDateWorkSaleTotals.Revenue + yearToDateArchivedInvoiceTotals.Total;
+                yearToDateIncome += yearToDateWorkSaleTotals.Profit + yearToDateArchivedInvoiceTotals.Total;
                     
                 var yearToDateExpenses = await expensesQuery
                     .Where(e => e.Date >= yearStart && e.Date <= currentDate)
@@ -324,7 +324,7 @@ namespace backend.Services
                 var totalPurchases = await purchasesQuery.SumAsync(p => p.TotalPrice);
                 var totalRents = isAdmin ? await _context.Rents.SumAsync(r => r.MonthlyAmount) : 0m;
                 totalExpenses += allTimeInvoiceStockCostTotals.Cost;
-                totalIncomes += allTimeWorkSaleTotals.Revenue + allTimeArchivedInvoiceTotals.Total;
+                totalIncomes += allTimeWorkSaleTotals.Profit + allTimeArchivedInvoiceTotals.Total;
                 var profitMargin = totalIncomes > 0
                     ? ((totalIncomes - totalExpenses - totalPurchases - totalRents) / totalIncomes) * 100
                     : 0m;
@@ -426,7 +426,7 @@ namespace backend.Services
             var workerTaskCounts = await GetWorkerTaskCountsAsync(targetDate, nextDate);
 
             var totalExpenses = dailyExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = dailyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue + archivedInvoiceTotals.Total;
+            var totalIncome = dailyIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var totalRents = dailyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
@@ -487,7 +487,7 @@ namespace backend.Services
                                        .Where(movement => movement.OccurredAt.Hour == hour)
                                        .Sum(GetInvoiceStockMovementCost),
                         Incomes = dailyIncomes.Where(i => i.Date.Hour == hour).Sum(i => i.Amount) +
-                                  dailyWorkSales.Where(workSale => workSale.Date.Hour == hour).Sum(workSale => workSale.TotalRevenue) +
+                                  dailyWorkSales.Where(workSale => workSale.Date.Hour == hour).Sum(workSale => workSale.Profit) +
                                   dailyArchivedInvoices.Where(invoice => invoice.CreatedAt.Hour == hour).Sum(invoice => invoice.Total),
                         Count = dailyExpenses.Count(e => e.Date.Hour == hour) + 
                                dailyIncomes.Count(i => i.Date.Hour == hour) +
@@ -537,7 +537,7 @@ namespace backend.Services
             var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfWeek, endOfWeek);
 
             var totalExpenses = weeklyExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = weeklyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue + archivedInvoiceTotals.Total;
+            var totalIncome = weeklyIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
             var totalPurchases = weeklyPurchases.Sum(p => p.TotalPrice);
             var totalRents = weeklyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
@@ -560,7 +560,7 @@ namespace backend.Services
                         Date = day,
                         DayOfWeek = day.DayOfWeek.ToString(),
                         Expenses = dayExpenses + dayInvoiceStockCostTotals.Cost,
-                        Incomes = dayIncomes + dayWorkSaleTotals.Revenue + dayArchivedInvoiceTotals.Total,
+                        Incomes = dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total,
                         Purchases = dayPurchases,
                         Rents = dayRents,
                         ArchivedInvoices = dayArchivedInvoiceTotals.Total,
@@ -568,7 +568,7 @@ namespace backend.Services
                         WorkSalesCost = dayWorkSaleTotals.Cost,
                         WorkSalesProfit = dayWorkSaleTotals.Profit,
                         InvoiceStockCost = dayInvoiceStockCostTotals.Cost,
-                        NetIncome = (dayIncomes + dayWorkSaleTotals.Revenue + dayArchivedInvoiceTotals.Total) -
+                        NetIncome = (dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total) -
                                     (dayExpenses + dayInvoiceStockCostTotals.Cost) -
                                     dayPurchases -
                                     dayRents
@@ -668,7 +668,7 @@ namespace backend.Services
             var totalEmployeePayments = salaryTotals.TotalSalaries;
             
             var totalExpenses = monthlyExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = monthlyIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue + archivedInvoiceTotals.Total;
+            var totalIncome = monthlyIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
             var totalPurchases = monthlyPurchases.Sum(p => p.TotalPrice);
             var totalRents = monthlyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + totalEmployeePayments;
@@ -691,7 +691,7 @@ namespace backend.Services
                         Date = day,
                         DayOfMonth = dayOffset + 1,
                         Expenses = dayExpenses + dayInvoiceStockCostTotals.Cost,
-                        Incomes = dayIncomes + dayWorkSaleTotals.Revenue + dayArchivedInvoiceTotals.Total,
+                        Incomes = dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total,
                         Purchases = dayPurchases,
                         Rents = dayRents,
                         ArchivedInvoices = dayArchivedInvoiceTotals.Total,
@@ -699,7 +699,7 @@ namespace backend.Services
                         WorkSalesCost = dayWorkSaleTotals.Cost,
                         WorkSalesProfit = dayWorkSaleTotals.Profit,
                         InvoiceStockCost = dayInvoiceStockCostTotals.Cost,
-                        NetIncome = (dayIncomes + dayWorkSaleTotals.Revenue + dayArchivedInvoiceTotals.Total) -
+                        NetIncome = (dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total) -
                                     (dayExpenses + dayInvoiceStockCostTotals.Cost) -
                                     dayPurchases -
                                     dayRents
@@ -727,7 +727,7 @@ namespace backend.Services
                         StartDate = weekStart,
                         EndDate = weekEnd.AddDays(-1),
                         Expenses = weekExpenses + weekInvoiceStockCostTotals.Cost,
-                        Incomes = weekIncomes + weekWorkSaleTotals.Revenue + weekArchivedInvoiceTotals.Total,
+                        Incomes = weekIncomes + weekWorkSaleTotals.Profit + weekArchivedInvoiceTotals.Total,
                         Purchases = weekPurchases,
                         Rents = weekRents,
                         ArchivedInvoices = weekArchivedInvoiceTotals.Total,
@@ -735,7 +735,7 @@ namespace backend.Services
                         WorkSalesCost = weekWorkSaleTotals.Cost,
                         WorkSalesProfit = weekWorkSaleTotals.Profit,
                         InvoiceStockCost = weekInvoiceStockCostTotals.Cost,
-                        NetIncome = (weekIncomes + weekWorkSaleTotals.Revenue + weekArchivedInvoiceTotals.Total) -
+                        NetIncome = (weekIncomes + weekWorkSaleTotals.Profit + weekArchivedInvoiceTotals.Total) -
                                     (weekExpenses + weekInvoiceStockCostTotals.Cost) -
                                     weekPurchases -
                                     weekRents
@@ -833,7 +833,7 @@ namespace backend.Services
             var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfYear, endOfYear);
 
             var totalExpenses = annualExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = annualIncomes.Sum(i => i.Amount) + workSaleTotals.Revenue + archivedInvoiceTotals.Total;
+            var totalIncome = annualIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
             var totalPurchases = annualPurchases.Sum(p => p.TotalPrice);
             var totalRents = annualRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
@@ -856,7 +856,7 @@ namespace backend.Services
                         Month = month,
                         MonthName = new DateTime(targetYear, month, 1).ToString("MMMM"),
                         Expenses = monthExpenses + monthInvoiceStockCostTotals.Cost,
-                        Incomes = monthIncomes + monthWorkSaleTotals.Revenue + monthArchivedInvoiceTotals.Total,
+                        Incomes = monthIncomes + monthWorkSaleTotals.Profit + monthArchivedInvoiceTotals.Total,
                         Purchases = monthPurchases,
                         Rents = monthRents,
                         ArchivedInvoices = monthArchivedInvoiceTotals.Total,
@@ -864,7 +864,7 @@ namespace backend.Services
                         WorkSalesCost = monthWorkSaleTotals.Cost,
                         WorkSalesProfit = monthWorkSaleTotals.Profit,
                         InvoiceStockCost = monthInvoiceStockCostTotals.Cost,
-                        NetIncome = (monthIncomes + monthWorkSaleTotals.Revenue + monthArchivedInvoiceTotals.Total) -
+                        NetIncome = (monthIncomes + monthWorkSaleTotals.Profit + monthArchivedInvoiceTotals.Total) -
                                     (monthExpenses + monthInvoiceStockCostTotals.Cost) -
                                     monthPurchases -
                                     monthRents
@@ -891,7 +891,7 @@ namespace backend.Services
                         StartMonth = startMonth,
                         EndMonth = endMonth,
                         Expenses = quarterExpenses + quarterInvoiceStockCostTotals.Cost,
-                        Incomes = quarterIncomes + quarterWorkSaleTotals.Revenue + quarterArchivedInvoiceTotals.Total,
+                        Incomes = quarterIncomes + quarterWorkSaleTotals.Profit + quarterArchivedInvoiceTotals.Total,
                         Purchases = quarterPurchases,
                         Rents = quarterRents,
                         ArchivedInvoices = quarterArchivedInvoiceTotals.Total,
@@ -899,7 +899,7 @@ namespace backend.Services
                         WorkSalesCost = quarterWorkSaleTotals.Cost,
                         WorkSalesProfit = quarterWorkSaleTotals.Profit,
                         InvoiceStockCost = quarterInvoiceStockCostTotals.Cost,
-                        NetIncome = (quarterIncomes + quarterWorkSaleTotals.Revenue + quarterArchivedInvoiceTotals.Total) -
+                        NetIncome = (quarterIncomes + quarterWorkSaleTotals.Profit + quarterArchivedInvoiceTotals.Total) -
                                     (quarterExpenses + quarterInvoiceStockCostTotals.Cost) -
                                     quarterPurchases -
                                     quarterRents

@@ -16,11 +16,11 @@ const { Title } = Typography;
 const formatMoney = (value) => `${Number(value || 0).toFixed(2)} MKD`;
 
 const buildFallbackFileName = (invoiceNumber) => {
-  const safeInvoiceNumber = String(invoiceNumber || "invoice")
+  const safeInvoiceNumber = String(invoiceNumber || "fature")
     .replace(/[\\/:*?"<>|]+/g, "-")
     .trim();
 
-  return `ArchivedInvoice-${safeInvoiceNumber || "invoice"}.pdf`;
+  return `FatureArkivuar-${safeInvoiceNumber || "fature"}.pdf`;
 };
 
 const getFileName = (response, invoiceNumber) => {
@@ -49,6 +49,9 @@ const downloadBlob = (blob, fileName) => {
   window.URL.revokeObjectURL(url);
 };
 
+const getLanguageLabel = (language) =>
+  language === "Macedonian" ? "Maqedonisht" : language === "Albanian" ? "Shqip" : language;
+
 function InvoiceArchive() {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState([]);
@@ -62,7 +65,7 @@ function InvoiceArchive() {
       const response = await apiClient.get(API_ENDPOINTS.INVOICE_ARCHIVE);
       setInvoices(Array.isArray(response.data) ? response.data : []);
     } catch {
-      message.error("Archived invoices could not be loaded.");
+      message.error("Faturat e arkivuara nuk mund të ngarkoheshin.");
     } finally {
       setLoading(false);
     }
@@ -80,9 +83,9 @@ function InvoiceArchive() {
         { responseType: "blob" }
       );
       downloadBlob(response.data, getFileName(response, invoice.invoiceNumber));
-      message.success("PDF exported.");
+      message.success("PDF u eksportua.");
     } catch {
-      message.error("PDF export failed.");
+      message.error("Eksportimi i PDF dështoi.");
     } finally {
       setExportingId(null);
     }
@@ -117,9 +120,9 @@ function InvoiceArchive() {
         iframe.remove();
         window.URL.revokeObjectURL(url);
       }, 120000);
-      message.success("Print dialog opened.");
+      message.success("Dritarja e printimit u hap.");
     } catch {
-      message.error("Archived invoice could not be printed.");
+      message.error("Fatura e arkivuar nuk mund të printohej.");
     } finally {
       setPrintingId(null);
     }
@@ -135,30 +138,30 @@ function InvoiceArchive() {
 
   const columns = [
     {
-      title: "Invoice",
+      title: "Fatura",
       dataIndex: "invoiceNumber",
       key: "invoiceNumber",
       ellipsis: true,
     },
     {
-      title: "Customer",
+      title: "Klienti",
       dataIndex: "customerName",
       key: "customerName",
       ellipsis: true,
     },
     {
-      title: "Language",
+      title: "Gjuha",
       dataIndex: "language",
       key: "language",
       width: 130,
       render: (language) => (
         <Tag color={language === "Macedonian" ? "purple" : "blue"}>
-          {language}
+          {getLanguageLabel(language)}
         </Tag>
       ),
     },
     {
-      title: "Subtotal",
+      title: "Nëntotali",
       dataIndex: "subtotal",
       key: "subtotal",
       width: 130,
@@ -166,7 +169,7 @@ function InvoiceArchive() {
       render: formatMoney,
     },
     {
-      title: "Total",
+      title: "Totali",
       dataIndex: "total",
       key: "total",
       width: 130,
@@ -174,20 +177,20 @@ function InvoiceArchive() {
       render: formatMoney,
     },
     {
-      title: "Archived",
+      title: "Arkivuar",
       dataIndex: "createdAt",
       key: "createdAt",
       width: 170,
       render: (value) => (value ? dayjs(value).format("YYYY-MM-DD HH:mm") : "-"),
     },
     {
-      title: "Created by",
+      title: "Krijuar nga",
       dataIndex: "createdByFullName",
       key: "createdByFullName",
       ellipsis: true,
     },
     {
-      title: "Actions",
+      title: "Veprime",
       key: "actions",
       width: 260,
       render: (_, record) => (
@@ -197,7 +200,7 @@ function InvoiceArchive() {
             icon={<FolderOpenOutlined />}
             onClick={() => reopenInvoice(record)}
           >
-            Open
+            Hap
           </Button>
           <Button
             size="small"
@@ -205,7 +208,7 @@ function InvoiceArchive() {
             loading={printingId === record.id}
             onClick={() => printPdf(record)}
           >
-            Print
+            Printo
           </Button>
           <Button
             type="primary"
@@ -234,11 +237,11 @@ function InvoiceArchive() {
         <Space align="center" size={12}>
           <FilePdfOutlined className="text-2xl text-red-600" />
           <Title level={2} style={{ margin: 0 }}>
-            Archived Invoices
+            Faturat e Arkivuara
           </Title>
         </Space>
         <Button icon={<ReloadOutlined />} onClick={fetchInvoices}>
-          Refresh
+          Rifresko
         </Button>
       </div>
 
@@ -248,7 +251,7 @@ function InvoiceArchive() {
         columns={columns}
         dataSource={invoices}
         scroll={{ x: 980 }}
-        pagination={{ pageSize: 15, showTotal: (total) => `${total} invoices` }}
+        pagination={{ pageSize: 15, showTotal: (total) => `${total} fatura` }}
       />
     </div>
   );

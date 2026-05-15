@@ -78,7 +78,7 @@ export function WorkerSalarySummary({ compact = false }) {
     } catch (error) {
       setSalary(null);
       setErrorMessage(
-        getApiErrorMessage(error, "Failed to load your salary.")
+        getApiErrorMessage(error, "Dështoi të ngarkohet paga juaj.")
       );
     } finally {
       setLoading(false);
@@ -99,7 +99,7 @@ export function WorkerSalarySummary({ compact = false }) {
     ) : (
       <Result
         status="warning"
-        title="Salary unavailable"
+        title="Paga nuk është e disponueshme"
         subTitle={errorMessage}
       />
     );
@@ -117,10 +117,10 @@ export function WorkerSalarySummary({ compact = false }) {
             <DollarOutlined className="text-2xl text-green-600" />
             <div>
               <Title level={2} className="m-0">
-                My Salary
+                Paga Ime
               </Title>
               <Text type="secondary">
-                Current month: {currentMonth.format("MMMM YYYY")}
+                Muaji aktual: {currentMonth.format("MMMM YYYY")}
               </Text>
             </div>
           </Space>
@@ -129,35 +129,35 @@ export function WorkerSalarySummary({ compact = false }) {
 
       {compact && (
         <Text type="secondary">
-          Current month: {currentMonth.format("MMMM YYYY")}
+          Muaji aktual: {currentMonth.format("MMMM YYYY")}
         </Text>
       )}
 
       <Row gutter={[16, 16]} className={compact ? "mt-3" : ""}>
         <Col xs={24} md={compact ? 24 : 12} xl={compact ? 12 : 6}>
           <SalaryStatCard
-            title="Monthly salary"
+            title="Paga mujore"
             value={formatMoney(salary.monthlySalary, salary)}
             icon={<DollarOutlined className="text-green-600" />}
           />
         </Col>
         <Col xs={24} md={compact ? 24 : 12} xl={compact ? 12 : 6}>
           <SalaryStatCard
-            title="Absent days"
+            title="Ditët e munguara"
             value={Number(salary.absentDays) || 0}
             icon={<CalendarOutlined className="text-orange-500" />}
           />
         </Col>
         <Col xs={24} md={compact ? 24 : 12} xl={compact ? 12 : 6}>
           <SalaryStatCard
-            title="Daily deduction"
+            title="Zbritja ditore"
             value={formatMoney(salary.dailyDeduction, salary)}
             icon={<MinusCircleOutlined className="text-red-500" />}
           />
         </Col>
         <Col xs={24} md={compact ? 24 : 12} xl={compact ? 12 : 6}>
           <SalaryStatCard
-            title="Final salary"
+            title="Paga finale"
             value={formatMoney(salary.finalSalary, salary)}
             icon={<DollarOutlined className="text-blue-600" />}
             valueStyle={{ color: "#1677ff", fontWeight: 600 }}

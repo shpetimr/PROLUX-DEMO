@@ -611,7 +611,7 @@ function Employees() {
       position === "magazine" ||
       position === "Magazine" ||
       position === 0;
-    return isMagazine ? "Magazine" : "Terren";
+    return isMagazine ? "Magazinë" : "Terren";
   };
 
   const getLinkedWorkerAccountLabel = (employee) => {
@@ -622,7 +622,7 @@ function Employees() {
     }
 
     if (employee?.linkedUserId) {
-      return `User #${employee.linkedUserId}`;
+      return `Përdorues #${employee.linkedUserId}`;
     }
 
     return null;
@@ -634,7 +634,7 @@ function Employees() {
     if (!accountLabel) {
       return (
         <Text type="secondary" className="text-xs">
-          No linked Worker/User account
+          Nuk ka llogari Punëtor/Përdorues të lidhur
         </Text>
       );
     }
@@ -642,7 +642,7 @@ function Employees() {
     return (
       <Space size={4} wrap>
         <Tag color="green" className="m-0">
-          Worker/User
+          Punëtor/Përdorues
         </Tag>
         <Text code>{accountLabel}</Text>
       </Space>
@@ -653,10 +653,10 @@ function Employees() {
     const accountLabel = getLinkedWorkerAccountLabel(employee);
 
     if (accountLabel) {
-      return `Worker/User ${accountLabel} will be deactivated. Salary and attendance history stays attached.`;
+      return `Llogaria ${accountLabel} do të çaktivizohet. Historia e pagave dhe pranisë mbetet e lidhur.`;
     }
 
-    return "Salary and attendance history stays attached. Employee will be removed from the active list.";
+    return "Historia e pagave dhe pranisë mbetet e lidhur. Punëtori do të hiqet nga lista aktive.";
   };
 
   const getSalarySnapshot = (employee) => {
@@ -704,7 +704,7 @@ function Employees() {
   const openPrintWindow = (html) => {
     const win = window.open("", "", "height=900,width=1100");
     win.document.write(
-      `<!DOCTYPE html><html><head><title>Print</title><meta charset="utf-8"/>
+      `<!DOCTYPE html><html><head><title>Printo</title><meta charset="utf-8"/>
       <style>
         body { font-family: system-ui, sans-serif; margin: 24px; color: #111; }
         h1 { font-size: 20px; margin-bottom: 4px; }
@@ -810,12 +810,12 @@ function Employees() {
         const isMagazine = position === "magazine" || position === "Magazine" || position === 0;
         return (
           <Tag color={isMagazine ? "blue" : "green"}>
-            {isMagazine ? "Magazine" : "Terren"}
+            {isMagazine ? "Magazinë" : "Terren"}
           </Tag>
         );
       },
       filters: [
-        { text: "Magazine", value: "magazine" },
+        { text: "Magazinë", value: "magazine" },
         { text: "Terren", value: "terren" },
       ],
       onFilter: (value, record) => {
@@ -1084,7 +1084,7 @@ function Employees() {
           {editingEmployee && (
             <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
               <Text type="secondary" className="block text-xs mb-1">
-                Linked Worker/User account
+                Llogaria e lidhur Punëtor/Përdorues
               </Text>
               {renderLinkedWorkerAccount(editingEmployee)}
             </div>
@@ -1105,7 +1105,7 @@ function Employees() {
                 });
               }}
             >
-              <Option value="magazine">Magazine</Option>
+              <Option value="magazine">Magazinë</Option>
               <Option value="terren">Terren</Option>
             </Select>
           </Form.Item>
@@ -1362,7 +1362,7 @@ function Employees() {
                 </Col>
                 <Col span={8}>
                   <div className="text-center">
-                    <Text strong>Total Ditë</Text>
+                    <Text strong>Gjithsej Ditë</Text>
                     <div className="text-2xl text-blue-600">
                       {calendarDays.length}
                     </div>

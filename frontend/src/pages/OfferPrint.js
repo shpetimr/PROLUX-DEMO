@@ -15,12 +15,12 @@ import { computeInvoiceTotals, formatMkd } from "../utils/invoiceTotals";
 const { Title, Text } = Typography;
 
 const columns = [
-  { title: "ITEM", dataIndex: "item", width: 60 },
-  { title: "Name", dataIndex: "name" },
-  { title: "Materials", dataIndex: "materials" },
+  { title: "Nr.", dataIndex: "item", width: 60 },
+  { title: "Emri", dataIndex: "name" },
+  { title: "Materialet", dataIndex: "materials" },
   { title: "m2/pcs", dataIndex: "m2pcs", width: 80 },
-  { title: "Price", dataIndex: "price", width: 80 },
-  { title: "Total", dataIndex: "total", width: 80 },
+  { title: "Çmimi", dataIndex: "price", width: 80 },
+  { title: "Totali", dataIndex: "total", width: 80 },
 ];
 
 const initialRows = Array.from({ length: 8 }, (_, i) => ({
@@ -148,7 +148,7 @@ function OfferPrint() {
           />
           <div style={{ textAlign: "right", fontSize: 12 }}>
             <div>PROLUX Group - Superior Natural Surfaces</div>
-            <div>Address: 11 Noemvri br.52</div>
+            <div>Adresa: 11 Noemvri br.52</div>
             <div>Email: proluxceramics01@gmail.com</div>
             <div>Tel: 071/764/334</div>
           </div>
@@ -176,7 +176,7 @@ function OfferPrint() {
             letterSpacing: 1,
           }}
         >
-          OFERTË TREGTARE / COMMERCIAL OFFER
+          OFERTË TREGTARE
         </div>
         <div
           style={{
@@ -186,7 +186,7 @@ function OfferPrint() {
           }}
         >
           <Input
-            placeholder="Klienti / Customer"
+            placeholder="Klienti"
             value={header.customer}
             onChange={(e) => handleHeaderChange("customer", e.target.value)}
             style={{ width: 250 }}
@@ -231,7 +231,7 @@ function OfferPrint() {
           style={{ marginBottom: 12 }}
         />
         <div style={{ marginBottom: 12 }}>
-          <Card size="small" title={<b>Përshkrimi / Notes</b>} bordered={false}>
+          <Card size="small" title={<b>Përshkrimi / Shënime</b>} bordered={false}>
             {description.map((desc, idx) => (
               <div
                 key={idx}
@@ -293,7 +293,7 @@ function OfferPrint() {
             <Text strong>- {formatMkd(totals.discountAmount)}</Text>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Text>Total pas zbritjes</Text>
+            <Text>Totali pas zbritjes</Text>
             <Text strong>{formatMkd(totals.totalAfterDiscount)}</Text>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>

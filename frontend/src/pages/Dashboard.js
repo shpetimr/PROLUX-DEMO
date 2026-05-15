@@ -37,9 +37,9 @@ function WorkerDashboard() {
     <div>
       <div className="mb-6">
         <div>
-          <Title level={2}>My Dashboard</Title>
+          <Title level={2}>Ballina Ime</Title>
           <Text className="text-gray-600">
-            Welcome, {user?.fullName || user?.username || "User"}
+            Mirë se vini, {user?.fullName || user?.username || "Përdorues"}
           </Text>
         </div>
       </div>
@@ -194,7 +194,7 @@ function Dashboard() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <Title level={2}>Përmbledhja e Dashboard</Title>
+          <Title level={2}>Përmbledhja e Ballinës</Title>
           <Text className="text-gray-600">
             Mirë se vini në sistemin e menaxhimit të biznesit
             {isAdmin() && (
@@ -356,7 +356,7 @@ function Dashboard() {
                           {position === "magazine" ||
                           position === "Magazine" ||
                           position === 0
-                            ? "Magazine"
+                            ? "Magazinë"
                             : "Terren"}
                         </Tag>
                       ),

@@ -36,19 +36,19 @@ const { TextArea } = Input;
 const taskStatuses = [
   {
     value: "Waiting",
-    label: "Waiting",
+    label: "Në Pritje",
     color: "gold",
     icon: <ClockCircleOutlined />,
   },
   {
     value: "InProcess",
-    label: "In Process",
+    label: "Në Proces",
     color: "blue",
     icon: <SyncOutlined spin />,
   },
   {
     value: "Completed",
-    label: "Completed",
+    label: "Përfunduar",
     color: "green",
     icon: <CheckCircleOutlined />,
   },
@@ -57,7 +57,7 @@ const taskStatuses = [
 const getStatusMeta = (status) =>
   taskStatuses.find((option) => option.value === status) ?? {
     value: status,
-    label: status || "Unknown",
+    label: status || "E panjohur",
     color: "default",
   };
 
@@ -111,7 +111,7 @@ function WorkerTasks() {
       setTasks(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       message.error(
-        getApiErrorMessage(error, "Failed to load worker tasks.")
+        getApiErrorMessage(error, "Dështoi të ngarkohen detyrat e punëtorëve.")
       );
     } finally {
       setLoadingTasks(false);
@@ -124,7 +124,7 @@ function WorkerTasks() {
       const response = await apiClient.get(API_ENDPOINTS.WORKERS);
       setWorkers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      message.error(getApiErrorMessage(error, "Failed to load workers."));
+      message.error(getApiErrorMessage(error, "Dështoi të ngarkohen punëtorët."));
     } finally {
       setLoadingWorkers(false);
     }
@@ -191,16 +191,16 @@ function WorkerTasks() {
           API_ENDPOINTS.WORKER_TASK_BY_ID(editingTask.id),
           payload
         );
-        message.success("Task updated.");
+        message.success("Detyra u përditësua.");
       } else {
         await apiClient.post(API_ENDPOINTS.WORKER_TASKS, payload);
-        message.success("Task created.");
+        message.success("Detyra u krijua.");
       }
 
       closeModal();
       await fetchTasks();
     } catch (error) {
-      message.error(getApiErrorMessage(error, "Failed to save task."));
+      message.error(getApiErrorMessage(error, "Dështoi të ruhet detyra."));
     } finally {
       setSaving(false);
     }
@@ -209,10 +209,10 @@ function WorkerTasks() {
   const handleDelete = async (taskId) => {
     try {
       await apiClient.delete(API_ENDPOINTS.WORKER_TASK_BY_ID(taskId));
-      message.success("Task deleted.");
+      message.success("Detyra u fshi.");
       await fetchTasks();
     } catch (error) {
-      message.error(getApiErrorMessage(error, "Failed to delete task."));
+      message.error(getApiErrorMessage(error, "Dështoi të fshihet detyra."));
     }
   };
 
@@ -227,10 +227,10 @@ function WorkerTasks() {
           task.id === taskId ? { ...task, status } : task
         )
       );
-      message.success("Task status updated.");
+      message.success("Statusi i detyrës u përditësua.");
     } catch (error) {
       message.error(
-        getApiErrorMessage(error, "Failed to update task status.")
+        getApiErrorMessage(error, "Dështoi të përditësohet statusi i detyrës.")
       );
     } finally {
       setUpdatingStatusTaskId(null);
@@ -239,20 +239,20 @@ function WorkerTasks() {
 
   const columns = [
     {
-      title: "Title",
+      title: "Titulli",
       dataIndex: "title",
       key: "title",
       width: 220,
       sorter: (a, b) => (a.title || "").localeCompare(b.title || ""),
     },
     {
-      title: "Description",
+      title: "Përshkrimi",
       dataIndex: "description",
       key: "description",
       ellipsis: true,
     },
     {
-      title: "Assigned To",
+      title: "Caktuar për",
       dataIndex: "assignedUserFullName",
       key: "assignedUserFullName",
       width: 180,
@@ -269,7 +269,7 @@ function WorkerTasks() {
         ),
     },
     {
-      title: "Deadline",
+      title: "Afati",
       dataIndex: "deadline",
       key: "deadline",
       width: 140,
@@ -283,7 +283,7 @@ function WorkerTasks() {
       defaultSortOrder: "ascend",
     },
     {
-      title: "Status",
+      title: "Statusi",
       dataIndex: "status",
       key: "status",
       width: canManageTasks ? 140 : 180,
@@ -320,7 +320,7 @@ function WorkerTasks() {
       },
     },
     {
-      title: "Created By",
+      title: "Krijuar nga",
       dataIndex: "createdByFullName",
       key: "createdByFullName",
       width: 160,
@@ -328,13 +328,13 @@ function WorkerTasks() {
       render: (name) => name || "-",
     },
     {
-      title: "Actions",
+      title: "Veprime",
       key: "actions",
       width: 120,
       hidden: !canManageTasks,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="Edit">
+          <Tooltip title="Redakto">
             <Button
               type="text"
               size="small"
@@ -343,13 +343,13 @@ function WorkerTasks() {
             />
           </Tooltip>
           <Popconfirm
-            title="Delete this task?"
-            okText="Delete"
-            cancelText="Cancel"
+            title="Fshi këtë detyrë?"
+            okText="Fshi"
+            cancelText="Anulo"
             okButtonProps={{ danger: true }}
             onConfirm={() => handleDelete(record.id)}
           >
-            <Tooltip title="Delete">
+            <Tooltip title="Fshi">
               <Button
                 type="text"
                 size="small"
@@ -369,7 +369,7 @@ function WorkerTasks() {
         <Space align="center" size={12}>
           <CheckSquareOutlined className="text-2xl text-blue-600" />
           <Title level={2} className="m-0">
-            {canManageTasks ? "Worker Tasks" : "My Tasks"}
+            {canManageTasks ? "Detyrat e Punëtorëve" : "Detyrat e Mia"}
           </Title>
         </Space>
         {canManageTasks && (
@@ -378,7 +378,7 @@ function WorkerTasks() {
             icon={<PlusOutlined />}
             onClick={openCreateModal}
           >
-            New Task
+            Detyrë e Re
           </Button>
         )}
       </div>
@@ -392,13 +392,13 @@ function WorkerTasks() {
           pageSize: 10,
           showSizeChanger: true,
           showTotal: (total, range) =>
-            `${range[0]}-${range[1]} of ${total} tasks`,
+            `${range[0]}-${range[1]} nga ${total} detyra`,
         }}
         scroll={{ x: canManageTasks ? 1100 : 760 }}
       />
 
       <Modal
-        title={editingTask ? "Edit Task" : "New Task"}
+        title={editingTask ? "Redakto Detyrën" : "Detyrë e Re"}
         open={modalOpen}
         onCancel={closeModal}
         footer={null}
@@ -408,14 +408,14 @@ function WorkerTasks() {
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             name="title"
-            label="Title"
+            label="Titulli"
             rules={[
-              { required: true, message: "Title is required." },
-              { max: 200, message: "Title cannot exceed 200 characters." },
+              { required: true, message: "Titulli është i detyrueshëm." },
+              { max: 200, message: "Titulli nuk mund të kalojë 200 karaktere." },
               {
                 transform: (value) => value?.trim(),
                 whitespace: true,
-                message: "Title is required.",
+                message: "Titulli është i detyrueshëm.",
               },
             ]}
           >
@@ -424,17 +424,17 @@ function WorkerTasks() {
 
           <Form.Item
             name="description"
-            label="Description"
+            label="Përshkrimi"
             rules={[
-              { required: true, message: "Description is required." },
+              { required: true, message: "Përshkrimi është i detyrueshëm." },
               {
                 max: 1000,
-                message: "Description cannot exceed 1000 characters.",
+                message: "Përshkrimi nuk mund të kalojë 1000 karaktere.",
               },
               {
                 transform: (value) => value?.trim(),
                 whitespace: true,
-                message: "Description is required.",
+                message: "Përshkrimi është i detyrueshëm.",
               },
             ]}
           >
@@ -443,9 +443,9 @@ function WorkerTasks() {
 
           <Form.Item
             name="assignedUserId"
-            label="Assigned worker"
+            label="Punëtori i caktuar"
             rules={[
-              { required: true, message: "Assigned worker is required." },
+              { required: true, message: "Punëtori i caktuar është i detyrueshëm." },
             ]}
           >
             <Select
@@ -453,36 +453,36 @@ function WorkerTasks() {
               loading={loadingWorkers}
               options={workerOptions}
               optionFilterProp="label"
-              placeholder="Select worker"
+              placeholder="Zgjidh punëtorin"
             />
           </Form.Item>
 
           <Form.Item
             name="deadline"
-            label="Deadline"
-            rules={[{ required: true, message: "Deadline is required." }]}
+            label="Afati"
+            rules={[{ required: true, message: "Afati është i detyrueshëm." }]}
           >
             <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
           </Form.Item>
 
           <Form.Item
             name="status"
-            label="Status"
-            rules={[{ required: true, message: "Status is required." }]}
+            label="Statusi"
+            rules={[{ required: true, message: "Statusi është i detyrueshëm." }]}
           >
             <Select options={taskStatuses.map(({ value, label }) => ({ value, label }))} />
           </Form.Item>
 
           <Form.Item className="mb-0">
             <div className="flex justify-end gap-2">
-              <Button onClick={closeModal}>Cancel</Button>
+              <Button onClick={closeModal}>Anulo</Button>
               <Button
                 type="primary"
                 htmlType="submit"
                 loading={saving}
                 disabled={loadingWorkers}
               >
-                {editingTask ? "Update" : "Create"}
+                {editingTask ? "Përditëso" : "Krijo"}
               </Button>
             </div>
           </Form.Item>

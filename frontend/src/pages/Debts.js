@@ -386,7 +386,7 @@ function Debts() {
           <Col xs={24} sm={12} md={6}>
             <Card className="bg-white border-0 shadow-lg">
               <Statistic
-                title="Total Borxhe ndaj Firmës"
+                title="Gjithsej Borxhe ndaj Firmës"
                 value={summary.totalOwedToCompany || 0}
                 precision={2}
                 valueStyle={{ color: "#cf1322" }}
@@ -398,7 +398,7 @@ function Debts() {
           <Col xs={24} sm={12} md={6}>
             <Card className="bg-white border-0 shadow-lg">
               <Statistic
-                title="Total Borxhe që ka Firma"
+                title="Gjithsej Borxhe që ka Firma"
                 value={summary.totalCompanyOwes || 0}
                 precision={2}
                 valueStyle={{ color: "#3f8600" }}

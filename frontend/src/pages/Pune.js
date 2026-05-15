@@ -4,12 +4,12 @@ import WorkSales from "./WorkSales";
 function Pune() {
   return (
     <WorkSales
-      title="Pune"
-      addButtonLabel="Add Work"
-      itemLabel="work"
-      itemLabelPlural="works"
-      deleteConfirmTitle="Delete this work?"
-      worksStatTitle="Works"
+      title="Punë"
+      addButtonLabel="Shto Punë"
+      itemLabel="punë"
+      itemLabelPlural="punë"
+      deleteConfirmTitle="Fshi këtë punë?"
+      worksStatTitle="Punë"
     />
   );
 }

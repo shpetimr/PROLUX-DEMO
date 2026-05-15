@@ -244,7 +244,7 @@ function Reports() {
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="Salary"
+                    title="Pagat"
                     value={monthlyTotals.totalSalaries}
                     precision={2}
                     valueStyle={{ color: "#fa8c16" }}
@@ -288,7 +288,7 @@ function Reports() {
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="Archived Invoices"
+                    title="Faturat e Arkivuara"
                     value={monthlyTotals.totalArchivedInvoices}
                     precision={2}
                     valueStyle={{ color: "#13c2c2" }}
@@ -296,14 +296,14 @@ function Reports() {
                     suffix="DEN"
                   />
                   <Text type="secondary">
-                    {monthlyTotals.archivedInvoicesCount} invoices
+                    {monthlyTotals.archivedInvoicesCount} fatura
                   </Text>
                 </Card>
               </Col>
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="WorkSales Revenue"
+                    title="Qarkullimi nga Punët"
                     value={monthlyTotals.totalWorkSalesRevenue}
                     precision={2}
                     valueStyle={{ color: "#52c41a" }}
@@ -311,14 +311,14 @@ function Reports() {
                     suffix="DEN"
                   />
                   <Text type="secondary">
-                    {monthlyTotals.workSalesCount} work sales
+                    {monthlyTotals.workSalesCount} punë
                   </Text>
                 </Card>
               </Col>
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="WorkSales Cost"
+                    title="Kosto nga Punët"
                     value={monthlyTotals.totalWorkSalesCost}
                     precision={2}
                     valueStyle={{ color: "#ff4d4f" }}
@@ -330,7 +330,7 @@ function Reports() {
               <Col xs={24} sm={12} md={6}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="WorkSales Profit"
+                    title="Fitimi nga Punët"
                     value={monthlyTotals.totalWorkSalesProfit}
                     precision={2}
                     valueStyle={{
@@ -350,32 +350,32 @@ function Reports() {
               <Col xs={24} md={12}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="Material Stock"
+                    title="Stoku i Materialeve"
                     value={monthlyTotals.stockSplit.material.currentQuantity}
                     precision={2}
                     valueStyle={{ color: "#1677ff" }}
                     prefix={<AppstoreOutlined />}
-                    suffix="qty"
+                    suffix="sasi"
                   />
                   <Text type="secondary">
-                    {monthlyTotals.stockSplit.material.itemCount} items,{" "}
-                    {monthlyTotals.stockSplit.material.quantityOut.toFixed(2)} used this month
+                    {monthlyTotals.stockSplit.material.itemCount} artikuj,{" "}
+                    {monthlyTotals.stockSplit.material.quantityOut.toFixed(2)} të përdorura këtë muaj
                   </Text>
                 </Card>
               </Col>
               <Col xs={24} md={12}>
                 <Card className="shadow-md hover:shadow-lg transition-shadow">
                   <Statistic
-                    title="Product Stock"
+                    title="Stoku i Produkteve"
                     value={monthlyTotals.stockSplit.product.currentQuantity}
                     precision={2}
                     valueStyle={{ color: "#722ed1" }}
                     prefix={<AppstoreOutlined />}
-                    suffix="qty"
+                    suffix="sasi"
                   />
                   <Text type="secondary">
-                    {monthlyTotals.stockSplit.product.itemCount} items,{" "}
-                    {monthlyTotals.stockSplit.product.quantityOut.toFixed(2)} used this month
+                    {monthlyTotals.stockSplit.product.itemCount} artikuj,{" "}
+                    {monthlyTotals.stockSplit.product.quantityOut.toFixed(2)} të përdorura këtë muaj
                   </Text>
                 </Card>
               </Col>
@@ -415,7 +415,7 @@ function Reports() {
                     selectedMonthDisplay?.albanianName
                   } ${
                     selectedMonth.split("-")[0]
-                  }. Te dhenat vijne nga backend dhe perfshijne salary, archived invoices, WorkSales dhe stock split Material/Product.`}
+                  }. Të dhënat vijnë nga backend dhe përfshijnë pagat, faturat e arkivuara, punët dhe ndarjen e stokut Material/Produkt.`}
                   type="info"
                   showIcon
                   className="shadow-sm"

@@ -49,7 +49,7 @@ function Layout() {
       {
         key: "/",
         icon: <DashboardOutlined />,
-        label: "Dashboard",
+        label: "Ballina",
         requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_DASHBOARD,
       },
       {
@@ -67,7 +67,7 @@ function Layout() {
       {
         key: "/invoice-archive",
         icon: <FileTextOutlined />,
-        label: "Archived Invoices",
+        label: "Faturat e Arkivuara",
         requiredPermission: PERMISSIONS.INVOICE_ARCHIVE_MANAGE,
       },
       {
@@ -121,28 +121,28 @@ function Layout() {
       {
         key: "/pune",
         icon: <DollarOutlined />,
-        label: "Pune",
+        label: "Punët",
         adminOnly: true,
         requiredPermission: PERMISSIONS.WORK_SALES_MANAGE,
       },
       {
         key: "/stock/material",
         icon: <InboxOutlined />,
-        label: "Material Stock",
+        label: "Stoku i Materialeve",
         adminOnly: true,
         requiredPermission: PERMISSIONS.STOCK_MANAGE,
       },
       {
         key: "/stock/product",
         icon: <InboxOutlined />,
-        label: "Product Stock",
+        label: "Stoku i Produkteve",
         adminOnly: true,
         requiredPermission: PERMISSIONS.STOCK_MANAGE,
       },
       {
         key: "/worker-tasks",
         icon: <CheckSquareOutlined />,
-        label: isAdmin() ? "Worker Tasks" : "My Tasks",
+        label: isAdmin() ? "Detyrat e Punëtorëve" : "Detyrat e Mia",
         requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_TASKS,
       },
       ...(!isAdmin()
@@ -150,7 +150,7 @@ function Layout() {
             {
               key: "/my-salary",
               icon: <DollarOutlined />,
-              label: "My Salary",
+              label: "Paga Ime",
               requiredPermission: PERMISSIONS.WORKERS_VIEW_OWN_SALARY,
             },
           ]
@@ -158,7 +158,7 @@ function Layout() {
       {
         key: "/users",
         icon: <UserAddOutlined />,
-        label: "Users",
+        label: "Përdoruesit",
         requiredPermission: PERMISSIONS.USERS_MANAGE,
       },
     ];
@@ -208,7 +208,7 @@ function Layout() {
         <Header className="bg-white px-6 flex items-center justify-between border-b border-gray-200/50 shadow-sm">
           <div className="flex items-center">
             <Title level={4} className="m-0 text-gray-800 font-semibold">
-              PROLUX Group Management
+              Menaxhimi i PROLUX Group
             </Title>
           </div>
           <div className="flex items-center gap-4">
@@ -216,7 +216,7 @@ function Layout() {
               <Avatar icon={<UserOutlined />} className="bg-blue-500" />
               <div className="flex flex-col">
                 <span className="text-gray-700 font-medium text-sm">
-                  {user?.username || user?.fullName || "User"}
+                  {user?.username || user?.fullName || "Përdorues"}
                 </span>
                 <div className="flex items-center gap-1">
                   {isAdmin() ? (
@@ -225,11 +225,11 @@ function Layout() {
                       icon={<CrownOutlined />}
                       className="text-xs"
                     >
-                      Admin
+                      Administrator
                     </Tag>
                   ) : (
                     <Tag color="blue" className="text-xs">
-                      User
+                      Përdorues
                     </Tag>
                   )}
                 </div>

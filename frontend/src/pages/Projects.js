@@ -287,7 +287,7 @@ const Projects = () => {
       ),
     },
     {
-      title: "Data Start",
+      title: "Fillimi",
       dataIndex: "startDate",
       key: "startDate",
       width: 120,
@@ -299,7 +299,7 @@ const Projects = () => {
       ),
     },
     {
-      title: "Finish",
+      title: "Përfundimi",
       dataIndex: "endDate",
       key: "endDate",
       width: 120,
@@ -486,7 +486,7 @@ const Projects = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Total Projekte"
+              title="Gjithsej Projekte"
               value={stats.total}
               prefix={
                 <Badge
@@ -520,7 +520,7 @@ const Projects = () => {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Total Promet"
+              title="Prometi Gjithsej"
               value={stats.totalPromet}
               precision={2}
               valueStyle={{ color: "#52c41a" }}

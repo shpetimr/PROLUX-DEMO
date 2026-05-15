@@ -218,7 +218,7 @@ function App() {
                     requiredRole={ROLES.ADMIN}
                     requiredPermission={PERMISSIONS.STOCK_MANAGE}
                   >
-                    <Stock stockType="Material" title="Material Stock" />
+                    <Stock stockType="Material" title="Stoku i Materialeve" />
                   </ProtectedRoute>
                 }
               />
@@ -229,7 +229,7 @@ function App() {
                     requiredRole={ROLES.ADMIN}
                     requiredPermission={PERMISSIONS.STOCK_MANAGE}
                   >
-                    <Stock stockType="Product" title="Product Stock" />
+                    <Stock stockType="Product" title="Stoku i Produkteve" />
                   </ProtectedRoute>
                 }
               />

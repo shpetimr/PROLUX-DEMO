@@ -37,12 +37,12 @@ const formatInputMoney = (value) => {
 const parseInputMoney = (value) => (value || "").replace(/MKD\s?|,/g, "");
 
 function WorkSales({
-  title = "Work Sales",
-  addButtonLabel = "Add Work Sale",
-  itemLabel = "work sale",
-  itemLabelPlural = "work sales",
-  deleteConfirmTitle = "Delete this work sale?",
-  worksStatTitle = "Works",
+  title = "Punët",
+  addButtonLabel = "Shto Punë",
+  itemLabel = "punë",
+  itemLabelPlural = "punë",
+  deleteConfirmTitle = "Fshi këtë punë?",
+  worksStatTitle = "Punë",
 }) {
   const [workSales, setWorkSales] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +57,7 @@ function WorkSales({
       const response = await apiClient.get(API_ENDPOINTS.WORK_SALES);
       setWorkSales(response.data);
     } catch (error) {
-      message.error(`Failed to fetch ${itemLabelPlural}`);
+      message.error(`Dështoi të merren ${itemLabelPlural}`);
     } finally {
       setLoading(false);
     }
@@ -90,11 +90,11 @@ function WorkSales({
   const handleDelete = async (id) => {
     try {
       await apiClient.delete(API_ENDPOINTS.WORK_SALE_BY_ID(id));
-      message.success(`${capitalizeLabel(itemLabel)} deleted successfully`);
+      message.success(`${capitalizeLabel(itemLabel)} u fshi me sukses`);
       fetchWorkSales();
       notifyDataChanged();
     } catch (error) {
-      message.error(`Failed to delete ${itemLabel}`);
+      message.error(`Dështoi të fshihet ${itemLabel}`);
     }
   };
 
@@ -111,17 +111,17 @@ function WorkSales({
 
       if (editingWorkSale) {
         await apiClient.put(API_ENDPOINTS.WORK_SALE_BY_ID(editingWorkSale.id), data);
-        message.success(`${capitalizeLabel(itemLabel)} updated successfully`);
+        message.success(`${capitalizeLabel(itemLabel)} u përditësua me sukses`);
       } else {
         await apiClient.post(API_ENDPOINTS.WORK_SALES, data);
-        message.success(`${capitalizeLabel(itemLabel)} created successfully`);
+        message.success(`${capitalizeLabel(itemLabel)} u krijua me sukses`);
       }
 
       setModalVisible(false);
       fetchWorkSales();
       notifyDataChanged();
     } catch (error) {
-      message.error(`Failed to save ${itemLabel}`);
+      message.error(`Dështoi të ruhet ${itemLabel}`);
     }
   };
 
@@ -140,7 +140,7 @@ function WorkSales({
 
   const columns = [
     {
-      title: "Work Name",
+      title: "Emri i Punës",
       dataIndex: "workName",
       key: "workName",
       fixed: "left",
@@ -148,7 +148,7 @@ function WorkSales({
       sorter: (a, b) => a.workName.localeCompare(b.workName),
     },
     {
-      title: "Date",
+      title: "Data",
       dataIndex: "date",
       key: "date",
       width: 130,
@@ -156,7 +156,7 @@ function WorkSales({
       sorter: (a, b) => dayjs(a.date).unix() - dayjs(b.date).unix(),
     },
     {
-      title: "Total Work M2",
+      title: "M2 Gjithsej",
       dataIndex: "totalWorkM2",
       key: "totalWorkM2",
       width: 140,
@@ -164,7 +164,7 @@ function WorkSales({
       sorter: (a, b) => a.totalWorkM2 - b.totalWorkM2,
     },
     {
-      title: "Client / M2",
+      title: "Çmimi Klient / M2",
       dataIndex: "clientPricePerM2",
       key: "clientPricePerM2",
       width: 140,
@@ -172,7 +172,7 @@ function WorkSales({
       sorter: (a, b) => a.clientPricePerM2 - b.clientPricePerM2,
     },
     {
-      title: "Subcontractor / M2",
+      title: "Nënkontraktori / M2",
       dataIndex: "subcontractorPricePerM2",
       key: "subcontractorPricePerM2",
       width: 170,
@@ -180,7 +180,7 @@ function WorkSales({
       sorter: (a, b) => a.subcontractorPricePerM2 - b.subcontractorPricePerM2,
     },
     {
-      title: "Total Revenue",
+      title: "Qarkullimi Gjithsej",
       dataIndex: "totalRevenue",
       key: "totalRevenue",
       width: 150,
@@ -188,7 +188,7 @@ function WorkSales({
       sorter: (a, b) => a.totalRevenue - b.totalRevenue,
     },
     {
-      title: "Total Cost",
+      title: "Kosto Gjithsej",
       dataIndex: "totalCost",
       key: "totalCost",
       width: 140,
@@ -196,7 +196,7 @@ function WorkSales({
       sorter: (a, b) => a.totalCost - b.totalCost,
     },
     {
-      title: "Profit",
+      title: "Fitimi",
       dataIndex: "profit",
       key: "profit",
       width: 130,
@@ -208,14 +208,14 @@ function WorkSales({
       sorter: (a, b) => a.profit - b.profit,
     },
     {
-      title: "Notes",
+      title: "Shënime",
       dataIndex: "notes",
       key: "notes",
       ellipsis: true,
       width: 220,
     },
     {
-      title: "Actions",
+      title: "Veprime",
       key: "actions",
       fixed: "right",
       width: 170,
@@ -226,16 +226,16 @@ function WorkSales({
             size="small"
             onClick={() => handleEdit(record)}
           >
-            Edit
+            Redakto
           </Button>
           <Popconfirm
             title={deleteConfirmTitle}
             onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
+            okText="Po"
+            cancelText="Jo"
           >
             <Button icon={<DeleteOutlined />} size="small" danger>
-              Delete
+              Fshi
             </Button>
           </Popconfirm>
         </Space>
@@ -256,7 +256,7 @@ function WorkSales({
         <Col xs={24} sm={12} md={8} lg={6}>
           <Card className="bg-white border-0 shadow-lg">
             <Statistic
-              title="Total Revenue"
+              title="Qarkullimi Gjithsej"
               value={totalRevenue}
               precision={2}
               suffix="MKD"
@@ -266,7 +266,7 @@ function WorkSales({
         <Col xs={24} sm={12} md={8} lg={6}>
           <Card className="bg-white border-0 shadow-lg">
             <Statistic
-              title="Total Cost"
+              title="Kosto Gjithsej"
               value={totalCost}
               precision={2}
               suffix="MKD"
@@ -276,7 +276,7 @@ function WorkSales({
         <Col xs={24} sm={12} md={8} lg={6}>
           <Card className="bg-white border-0 shadow-lg">
             <Statistic
-              title="Profit"
+              title="Fitimi"
               value={totalProfit}
               precision={2}
               suffix="MKD"
@@ -303,13 +303,13 @@ function WorkSales({
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} ${itemLabelPlural}`,
+              `${range[0]}-${range[1]} nga ${total} ${itemLabelPlural}`,
           }}
         />
       </Card>
 
       <Modal
-        title={editingWorkSale ? `Edit ${capitalizeLabel(itemLabel)}` : addButtonLabel}
+        title={editingWorkSale ? `Redakto ${itemLabel}` : addButtonLabel}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
         footer={null}
@@ -318,16 +318,16 @@ function WorkSales({
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             name="workName"
-            label="Work Name"
-            rules={[{ required: true, message: "Please enter work name" }]}
+            label="Emri i Punës"
+            rules={[{ required: true, message: "Shkruani emrin e punës" }]}
           >
-            <Input placeholder="Work name" />
+            <Input placeholder="Emri i punës" />
           </Form.Item>
 
           <Form.Item
             name="totalWorkM2"
-            label="Total Work M2"
-            rules={[{ required: true, message: "Please enter total work M2" }]}
+            label="M2 Gjithsej"
+            rules={[{ required: true, message: "Shkruani M2 gjithsej" }]}
           >
             <InputNumber
               style={{ width: "100%" }}
@@ -340,9 +340,9 @@ function WorkSales({
 
           <Form.Item
             name="clientPricePerM2"
-            label="Client Price Per M2"
+            label="Çmimi i Klientit për M2"
             rules={[
-              { required: true, message: "Please enter client price per M2" },
+              { required: true, message: "Shkruani çmimin e klientit për M2" },
             ]}
           >
             <InputNumber
@@ -358,11 +358,11 @@ function WorkSales({
 
           <Form.Item
             name="subcontractorPricePerM2"
-            label="Subcontractor Price Per M2"
+            label="Çmimi i Nënkontraktorit për M2"
             rules={[
               {
                 required: true,
-                message: "Please enter subcontractor price per M2",
+                message: "Shkruani çmimin e nënkontraktorit për M2",
               },
             ]}
           >
@@ -379,26 +379,26 @@ function WorkSales({
 
           <Form.Item
             name="date"
-            label="Date"
-            rules={[{ required: true, message: "Please select date" }]}
+            label="Data"
+            rules={[{ required: true, message: "Zgjidhni datën" }]}
           >
             <DatePicker
               style={{ width: "100%" }}
               format="YYYY-MM-DD"
-              placeholder="Select date"
+              placeholder="Zgjidh datën"
             />
           </Form.Item>
 
-          <Form.Item name="notes" label="Notes">
-            <TextArea rows={3} placeholder="Notes" />
+          <Form.Item name="notes" label="Shënime">
+            <TextArea rows={3} placeholder="Shënime" />
           </Form.Item>
 
           <Form.Item className="mb-0">
             <Space>
               <Button type="primary" htmlType="submit">
-                {editingWorkSale ? "Update" : "Create"}
+                {editingWorkSale ? "Përditëso" : "Krijo"}
               </Button>
-              <Button onClick={() => setModalVisible(false)}>Cancel</Button>
+              <Button onClick={() => setModalVisible(false)}>Anulo</Button>
             </Space>
           </Form.Item>
         </Form>

@@ -45,7 +45,7 @@ function Purchases() {
       const response = await apiClient.get(API_ENDPOINTS.PURCHASES);
       setPurchases(response.data);
     } catch (error) {
-      message.error("Failed to fetch purchases");
+      message.error("Dështoi të merren blerjet");
     } finally {
       setLoading(false);
     }
@@ -148,7 +148,7 @@ function Purchases() {
       sorter: (a, b) => a.unitPrice - b.unitPrice,
     },
     {
-      title: "Çmimi Total",
+      title: "Çmimi Gjithsej",
       dataIndex: "totalPrice",
       key: "totalPrice",
       render: (price) => <Tag color="blue">{(price || 0).toFixed(2)} ден</Tag>,
@@ -263,7 +263,7 @@ function Purchases() {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} purchases`,
+              `${range[0]}-${range[1]} nga ${total} blerje`,
           }}
         />
       </Card>

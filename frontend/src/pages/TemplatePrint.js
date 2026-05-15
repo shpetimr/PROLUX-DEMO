@@ -368,30 +368,30 @@ const INVOICE_PRINT_STYLES = `
 
 const TEXT = {
   Albanian: {
-    print: "Print",
+    print: "Printo",
     saveArchive: "Ruaj n\u00EB arkiv",
     language: "Gjuha",
-    title: "INVOICE / FLET\u00CBFATUR\u00CB",
-    customerPlaceholder: "Customer Name",
-    datePlaceholder: "Date",
-    invoicePlaceholder: "Invoice No.",
-    description: "Description",
+    title: "FLET\u00CBFATUR\u00CB",
+    customerPlaceholder: "Emri i klientit",
+    datePlaceholder: "Data",
+    invoicePlaceholder: "Nr. fature",
+    description: "P\u00EBrshkrimi",
     discount: "Zbritja (%)",
     advance: "Avans / Parapagim (MKD)",
     subtotal: "N\u00EBntotali (shuma e rreshtave)",
     discountRow: (percent) => `Zbritja (${percent}%)`,
-    totalAfterDiscount: "Total pas zbritjes",
+    totalAfterDiscount: "Totali pas zbritjes",
     advanceRow: "Avans i klientit",
     balanceDue: "P\u00EBr t\u00EB paguar",
     currency: "MKD",
-    footer: "For any further information you can contact us:",
+    footer: "P\u00EBr \u00E7do informacion shtes\u00EB mund t\u00EB na kontaktoni:",
     columns: {
-      item: "ITEM",
-      name: "Name",
-      materials: "Materials",
+      item: "Nr.",
+      name: "Emri",
+      materials: "Materialet",
       quantity: "m2/pcs",
-      price: "Price",
-      total: "Total",
+      price: "\u00C7mimi",
+      total: "Totali",
     },
     archiveRequired: "Plot\u00EBsoni klientin para arkivimit.",
     archiveSaved: "Fatura u ruajt n\u00EB arkiv.",
@@ -695,7 +695,7 @@ function TemplatePrint() {
         if (!cancelled) {
           setStockItems([]);
           message.warning(
-            "Stock suggestions could not be loaded. Manual item entry still works."
+            "Sugjerimet e stokut nuk mund t\u00EB ngarkoheshin. Vendosja manuale e artikujve funksionon ende."
           );
         }
       }
@@ -1057,7 +1057,7 @@ function TemplatePrint() {
 
     logPrintDiagnostic("printWindow:open:success", { closed: win.closed });
     win.document.open();
-    win.document.write("<html><head><title>Print</title></head><body></body></html>");
+    win.document.write("<html><head><title>Printo</title></head><body></body></html>");
     win.document.close();
     win.focus();
     logPrintDiagnostic("printWindow:placeholderWritten", { closed: win.closed });
@@ -1095,7 +1095,7 @@ function TemplatePrint() {
 
     logPrintDiagnostic("printWindow:write:start", { closed: win.closed });
     win.document.open();
-    win.document.write("<html><head><title>Print</title>");
+    win.document.write("<html><head><title>Printo</title>");
     win.document.write(
       '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/4.16.13/antd.min.css" />'
     );

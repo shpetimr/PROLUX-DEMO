@@ -26,12 +26,12 @@ import { useDataChange } from "../contexts/DataChangeContext";
 const { Title, Text } = Typography;
 
 const roleOptions = [
-  { value: ROLES.USER, label: "Worker" },
-  { value: ROLES.ADMIN, label: "Admin" },
+  { value: ROLES.USER, label: "Punëtor" },
+  { value: ROLES.ADMIN, label: "Administrator" },
 ];
 
 const positionOptions = [
-  { value: "magazine", label: "Magazine" },
+  { value: "magazine", label: "Magazinë" },
   { value: "terren", label: "Terren" },
 ];
 
@@ -61,7 +61,7 @@ const getApiErrorMessage = (error) => {
     return data;
   }
 
-  return "Failed to create user account.";
+  return "Dështoi të krijohet llogaria e përdoruesit.";
 };
 
 const countPasswordGroups = (password) => {
@@ -120,14 +120,14 @@ function Users() {
 
     if (value.length < 12) {
       return Promise.reject(
-        new Error("Password must be at least 12 characters long.")
+        new Error("Fjalëkalimi duhet të ketë të paktën 12 karaktere.")
       );
     }
 
     if (countPasswordGroups(value) < 3) {
       return Promise.reject(
         new Error(
-          "Use at least three groups: uppercase, lowercase, numbers, symbols."
+          "Përdorni të paktën tre grupe: shkronja të mëdha, të vogla, numra, simbole."
         )
       );
     }
@@ -138,7 +138,7 @@ function Users() {
       value.toLowerCase().includes(username.toLowerCase())
     ) {
       return Promise.reject(
-        new Error("Password must not contain the username.")
+        new Error("Fjalëkalimi nuk duhet të përmbajë emrin e përdoruesit.")
       );
     }
 
@@ -154,7 +154,7 @@ function Users() {
       )
     ) {
       return Promise.reject(
-        new Error("Password must not contain the user's name.")
+        new Error("Fjalëkalimi nuk duhet të përmbajë emrin e personit.")
       );
     }
 
@@ -201,7 +201,7 @@ function Users() {
       await fetchEmployees();
       notifyDataChanged();
 
-      message.success("User account created.");
+      message.success("Llogaria e përdoruesit u krijua.");
       form.resetFields();
       form.setFieldsValue({
         role: ROLES.USER,
@@ -222,11 +222,11 @@ function Users() {
         <Space align="center" size={12}>
           <UserAddOutlined className="text-2xl text-blue-600" />
           <Title level={2} className="m-0">
-            Users
+            Përdoruesit
           </Title>
         </Space>
         <div className="mt-2">
-          <Text type="secondary">Create staff sign-in accounts.</Text>
+          <Text type="secondary">Krijo llogari hyrjeje për stafin.</Text>
         </div>
       </div>
 
@@ -244,66 +244,66 @@ function Users() {
           autoComplete="off"
         >
           <Form.Item
-            label="Username"
+            label="Emri i përdoruesit"
             name="username"
             rules={[
-              { required: true, message: "Username is required." },
-              { max: 50, message: "Username cannot exceed 50 characters." },
+              { required: true, message: "Emri i përdoruesit është i detyrueshëm." },
+              { max: 50, message: "Emri i përdoruesit nuk mund të kalojë 50 karaktere." },
               {
                 transform: (value) => value?.trim(),
                 whitespace: true,
-                message: "Username is required.",
+                message: "Emri i përdoruesit është i detyrueshëm.",
               },
             ]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="username"
+              placeholder="emri i përdoruesit"
               autoComplete="off"
             />
           </Form.Item>
 
           <Form.Item
-            label="Full name"
+            label="Emri i plotë"
             name="fullName"
             rules={[
-              { required: true, message: "Full name is required." },
-              { max: 100, message: "Full name cannot exceed 100 characters." },
+              { required: true, message: "Emri i plotë është i detyrueshëm." },
+              { max: 100, message: "Emri i plotë nuk mund të kalojë 100 karaktere." },
               {
                 transform: (value) => value?.trim(),
                 whitespace: true,
-                message: "Full name is required.",
+                message: "Emri i plotë është i detyrueshëm.",
               },
             ]}
           >
             <Input
               prefix={<IdcardOutlined />}
-              placeholder="Full name"
+              placeholder="Emri i plotë"
               autoComplete="off"
             />
           </Form.Item>
 
           <Form.Item
-            label="Password"
+            label="Fjalëkalimi"
             name="password"
             dependencies={["username", "fullName"]}
             rules={[
-              { required: true, message: "Password is required." },
-              { max: 512, message: "Password cannot exceed 512 characters." },
+              { required: true, message: "Fjalëkalimi është i detyrueshëm." },
+              { max: 512, message: "Fjalëkalimi nuk mund të kalojë 512 karaktere." },
               { validator: validatePassword },
             ]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="Password"
+              placeholder="Fjalëkalimi"
               autoComplete="new-password"
             />
           </Form.Item>
 
           <Form.Item
-            label="Role"
+            label="Roli"
             name="role"
-            rules={[{ required: true, message: "Role is required." }]}
+            rules={[{ required: true, message: "Roli është i detyrueshëm." }]}
           >
             <Select
               options={roleOptions}
@@ -324,14 +324,14 @@ function Users() {
 
           {currentRole === ROLES.USER && (
             <>
-              <Form.Item label="Employee record" name="employeeId">
+              <Form.Item label="Dosja e punëtorit" name="employeeId">
                 <Select
                   allowClear
                   showSearch
                   loading={loadingEmployees}
                   options={employeeOptions}
                   optionFilterProp="label"
-                  placeholder="Create new employee"
+                  placeholder="Krijo punëtor të ri"
                   onChange={(employeeId) => {
                     const employee = employees.find(
                       (item) => item.id === employeeId
@@ -346,12 +346,12 @@ function Users() {
               {shouldCollectEmployeeDetails && (
                 <>
                   <Form.Item
-                    label="Employee position"
+                    label="Pozicioni i punëtorit"
                     name="employeePosition"
                     rules={[
                       {
                         required: true,
-                        message: "Employee position is required.",
+                        message: "Pozicioni i punëtorit është i detyrueshëm.",
                       },
                     ]}
                   >
@@ -366,24 +366,24 @@ function Users() {
                   </Form.Item>
 
                   <Form.Item
-                    label="Hire date"
+                    label="Data e punësimit"
                     name="hireDate"
                     rules={[
-                      { required: true, message: "Hire date is required." },
+                      { required: true, message: "Data e punësimit është e detyrueshme." },
                     ]}
                   >
                     <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
                   </Form.Item>
 
                   <Form.Item
-                    label="Daily wage"
+                    label="Paga ditore"
                     name="dailyWage"
                     rules={[
-                      { required: true, message: "Daily wage is required." },
+                      { required: true, message: "Paga ditore është e detyrueshme." },
                       {
                         type: "number",
                         min: 0,
-                        message: "Daily wage must be 0 or greater.",
+                        message: "Paga ditore duhet të jetë 0 ose më e madhe.",
                       },
                     ]}
                   >
@@ -401,7 +401,7 @@ function Users() {
               icon={<UserAddOutlined />}
               loading={saving}
             >
-              Create User
+              Krijo Përdorues
             </Button>
           </Form.Item>
         </Form>
@@ -411,7 +411,7 @@ function Users() {
             className="mt-6"
             type="success"
             showIcon
-            message="Created user"
+            message="Përdoruesi u krijua"
             description={`${createdUser.fullName} (${createdUser.username}) - ${createdUser.role}`}
           />
         )}

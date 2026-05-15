@@ -44,7 +44,7 @@ function Incomes() {
       setIncomes(response.data);
     } catch (error) {
       console.error("Incomes page: Error fetching incomes:", error);
-      message.error("Failed to fetch incomes");
+      message.error("Dështoi të merren të ardhurat");
     } finally {
       setLoading(false);
     }
@@ -242,7 +242,7 @@ function Incomes() {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} incomes`,
+              `${range[0]}-${range[1]} nga ${total} të ardhura`,
           }}
         />
       </Card>

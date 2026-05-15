@@ -40,7 +40,7 @@ function Rents() {
       const response = await apiClient.get(API_ENDPOINTS.RENTS);
       setRents(response.data);
     } catch (error) {
-      message.error("Failed to fetch rents");
+      message.error("Dështoi të merren qiratë");
     } finally {
       setLoading(false);
     }
@@ -173,7 +173,7 @@ function Rents() {
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} rents`,
+              `${range[0]}-${range[1]} nga ${total} qira`,
           }}
         />
       </Card>

@@ -25,7 +25,7 @@ function LoginPage() {
       const { token, ...userData } = response.data ?? {};
 
       if (!token) {
-        message.error("Login failed: No authentication token received");
+        message.error("Hyrja dështoi: nuk u pranua token autentikimi");
         return;
       }
 
@@ -35,19 +35,19 @@ function LoginPage() {
         username: userData.username ?? username,
       });
 
-      message.success("Login successful!");
+      message.success("Hyrja u krye me sukses!");
       navigate("/");
     } catch (err) {
       if (err.response) {
         const errorMessage =
           err.response.data?.message ||
           err.response.data?.error ||
-          "Invalid username or password";
-        message.error(`Login failed: ${errorMessage}`);
+          "Emri i përdoruesit ose fjalëkalimi nuk është i saktë";
+        message.error(`Hyrja dështoi: ${errorMessage}`);
       } else if (err.request) {
-        message.error("Login failed: Unable to reach the authentication server");
+        message.error("Hyrja dështoi: serveri i autentikimit nuk është i arritshëm");
       } else {
-        message.error("Login failed: Invalid credentials or server error");
+        message.error("Hyrja dështoi: të dhëna të pasakta ose gabim në server");
       }
     } finally {
       setLoading(false);
@@ -120,22 +120,22 @@ function LoginPage() {
         >
           <Form.Item
             name="username"
-            rules={[{ required: true, message: "Please enter your username!" }]}
+            rules={[{ required: true, message: "Shkruani emrin e përdoruesit!" }]}
           >
             <Input
               prefix={<UserOutlined />}
-              placeholder="Username"
+              placeholder="Emri i përdoruesit"
               size="large"
               autoComplete="username"
             />
           </Form.Item>
           <Form.Item
             name="password"
-            rules={[{ required: true, message: "Please enter your password!" }]}
+            rules={[{ required: true, message: "Shkruani fjalëkalimin!" }]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="Password"
+              placeholder="Fjalëkalimi"
               size="large"
               autoComplete="current-password"
             />
@@ -149,7 +149,7 @@ function LoginPage() {
               loading={loading}
               style={{ borderRadius: 8, fontWeight: 600 }}
             >
-              Log In
+              Hyr
             </Button>
           </Form.Item>
         </Form>

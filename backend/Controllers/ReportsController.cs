@@ -406,7 +406,7 @@ namespace backend.Controllers
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
                 var invoiceStockCost = periodReport.TotalInvoiceStockCost;
                 var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
-                var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
+                var incomes = baseIncomes + workSalesProfit + archivedInvoiceRevenue;
                 var expenses = baseExpenses + invoiceStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
@@ -811,7 +811,7 @@ namespace backend.Controllers
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
                 var invoiceStockCost = periodReport.TotalInvoiceStockCost;
                 var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
-                var incomes = baseIncomes + workSalesRevenue + archivedInvoiceRevenue;
+                var incomes = baseIncomes + workSalesProfit + archivedInvoiceRevenue;
                 var expenses = baseExpenses + invoiceStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
@@ -870,14 +870,14 @@ namespace backend.Controllers
                     .Take(5)
                     .ToListAsync();
 
-                if (workSalesCount > 0 || workSalesRevenue > 0)
+                if (workSalesCount > 0 || workSalesProfit != 0)
                 {
                     topIncomeSources.Add(new
                     {
-                        Source = "Work Sales Revenue",
-                        Total = workSalesRevenue,
+                        Source = "Work Sales Profit",
+                        Total = workSalesProfit,
                         Count = workSalesCount,
-                        Percentage = incomes > 0 ? (workSalesRevenue / incomes) * 100 : 0
+                        Percentage = incomes > 0 ? (workSalesProfit / incomes) * 100 : 0
                     });
 
                     topIncomeSources = topIncomeSources

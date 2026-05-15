@@ -43,8 +43,8 @@ const stockTypeOptions = [
 ];
 
 const stockPageTitles = {
-  [STOCK_TYPES.Material]: "Material Stock",
-  [STOCK_TYPES.Product]: "Product Stock",
+  [STOCK_TYPES.Material]: "Stoku i Materialeve",
+  [STOCK_TYPES.Product]: "Stoku i Produkteve",
 };
 
 const normalizeStockType = (value) =>

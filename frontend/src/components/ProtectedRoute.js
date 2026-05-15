@@ -43,10 +43,10 @@ const ProtectedRoute = ({
         <Result
           status="403"
           title="403"
-          subTitle="Sorry, you are not authorized to access this page."
+          subTitle="Nuk jeni të autorizuar të hyni në këtë faqe."
           extra={
             <Button type="primary" onClick={() => window.history.back()}>
-              Go Back
+              Kthehu
             </Button>
           }
         />
@@ -60,10 +60,10 @@ const ProtectedRoute = ({
         <Result
           status="403"
           title="403"
-          subTitle="Sorry, you are not authorized to access this page."
+          subTitle="Nuk jeni të autorizuar të hyni në këtë faqe."
           extra={
             <Button type="primary" onClick={() => window.history.back()}>
-              Go Back
+              Kthehu
             </Button>
           }
         />
@@ -77,10 +77,10 @@ const ProtectedRoute = ({
       <Result
         status="403"
         title="403"
-        subTitle="Sorry, you don't have permission to access this resource."
+        subTitle="Nuk keni të drejta për këtë burim."
         extra={
           <Button type="primary" onClick={() => window.history.back()}>
-            Go Back
+            Kthehu
           </Button>
         }
       />
