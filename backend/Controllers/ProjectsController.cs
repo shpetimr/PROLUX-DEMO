@@ -6,6 +6,7 @@ using backend.Data;
 using backend.DTOs;
 using backend.Models;
 using backend.Services;
+using backend.Utilities;
 using System.Security.Claims;
 
 namespace backend.Controllers
@@ -114,8 +115,8 @@ namespace backend.Controllers
             var project = new Project
             {
                 Name = createProjectDto.Name,
-                StartDate = createProjectDto.StartDate,
-                EndDate = createProjectDto.EndDate,
+                StartDate = DateTimeUtc.Date(createProjectDto.StartDate),
+                EndDate = DateTimeUtc.Date(createProjectDto.EndDate),
                 Content = createProjectDto.Content,
                 Promet = createProjectDto.Promet,
                 Description = createProjectDto.Description,
@@ -167,8 +168,8 @@ namespace backend.Controllers
             }
 
             project.Name = updateProjectDto.Name;
-            project.StartDate = updateProjectDto.StartDate;
-            project.EndDate = updateProjectDto.EndDate;
+            project.StartDate = DateTimeUtc.Date(updateProjectDto.StartDate);
+            project.EndDate = DateTimeUtc.Date(updateProjectDto.EndDate);
             project.Content = updateProjectDto.Content;
             project.Promet = updateProjectDto.Promet;
             project.Description = updateProjectDto.Description;

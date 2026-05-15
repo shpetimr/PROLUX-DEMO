@@ -6,6 +6,7 @@ using backend.Data;
 using backend.Models;
 using backend.DTOs;
 using backend.Services;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
@@ -98,6 +99,7 @@ namespace backend.Controllers
             {
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
+            paymentDate = DateTimeUtc.Date(paymentDate);
             
             var rent = new Rent
             {
@@ -152,7 +154,7 @@ namespace backend.Controllers
                 // Parse the date string to DateTime
                 if (DateTime.TryParse(updateDto.PaymentDate, out DateTime newPaymentDate))
                 {
-                    rent.PaymentDate = newPaymentDate;
+                    rent.PaymentDate = DateTimeUtc.Date(newPaymentDate);
                 }
                 else
                 {

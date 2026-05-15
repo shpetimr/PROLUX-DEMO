@@ -6,6 +6,7 @@ using backend.Data;
 using backend.Models;
 using backend.DTOs;
 using backend.Services;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
@@ -110,13 +111,14 @@ namespace backend.Controllers
             {
                 return BadRequest("Invalid date format. Expected YYYY-MM-DD");
             }
+            dueDate = DateTimeUtc.Date(dueDate);
             
             var debt = new Debt
             {
                 DebtorName = createDto.debtorName,
                 Type = createDto.type,
                 Amount = createDto.amount,
-                DueDate = dueDate, // Use parsed date
+                DueDate = dueDate,
                 Description = createDto.description,
                 CreatedAt = DateTime.UtcNow,
                 CreatedById = _currentUserService.GetCurrentUserId()
@@ -175,7 +177,7 @@ namespace backend.Controllers
                 // Parse the date string to DateTime
                 if (DateTime.TryParse(updateDto.dueDate, out DateTime newDueDate))
                 {
-                    debt.DueDate = newDueDate;
+                    debt.DueDate = DateTimeUtc.Date(newDueDate);
                 }
                 else
                 {
@@ -196,7 +198,7 @@ namespace backend.Controllers
                     {
                         if (DateTime.TryParse(updateDto.paidDate, out DateTime paidDate))
                         {
-                            debt.PaidDate = paidDate;
+                            debt.PaidDate = DateTimeUtc.Date(paidDate);
                         }
                         else
                         {
@@ -270,7 +272,8 @@ namespace backend.Controllers
                 var totalDebts = await debtsQuery.CountAsync();
                 var paidDebts = await debtsQuery.CountAsync(d => d.IsPaid);
                 var unpaidDebts = await debtsQuery.CountAsync(d => !d.IsPaid);
-                var overdueDebts = await debtsQuery.CountAsync(d => !d.IsPaid && d.DueDate < DateTime.Today);
+                var today = DateTimeUtc.Today();
+                var overdueDebts = await debtsQuery.CountAsync(d => !d.IsPaid && d.DueDate < today);
 
                 var summary = new DebtSummaryDto
                 {
@@ -307,6 +310,7 @@ namespace backend.Controllers
                 }
 
                 var debts = await debtsQuery.ToListAsync();
+                var today = DateTimeUtc.Today();
                 var breakdown = debts
                     .GroupBy(d => d.Type)
                     .Select(g => new DebtTypeBreakdownDto
@@ -316,7 +320,7 @@ namespace backend.Controllers
                         count = g.Count(),
                         paidCount = g.Count(d => d.IsPaid),
                         unpaidCount = g.Count(d => !d.IsPaid),
-                        overdueCount = g.Count(d => !d.IsPaid && d.DueDate < DateTime.Today),
+                        overdueCount = g.Count(d => !d.IsPaid && d.DueDate < today),
                         currencyCode = "MKD",
                         currencySymbol = "MKD"
                     })
@@ -334,8 +338,9 @@ namespace backend.Controllers
         [Authorize]
         public async Task<ActionResult<IEnumerable<DebtResponseDto>>> GetOverdueDebts()
         {
+            var today = DateTimeUtc.Today();
             IQueryable<Debt> debtsQuery = _context.Debts
-                .Where(d => !d.IsPaid && d.DueDate < DateTime.Today);
+                .Where(d => !d.IsPaid && d.DueDate < today);
             
             if (!_currentUserService.IsAdmin())
             {
