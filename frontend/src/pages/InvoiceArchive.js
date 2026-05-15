@@ -10,6 +10,7 @@ import {
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 import apiClient, { API_ENDPOINTS } from "../config/api";
+import { formatEur, formatEurFromBase } from "../utils/invoiceTotals";
 
 const { Title } = Typography;
 
@@ -177,6 +178,17 @@ function InvoiceArchive() {
       render: formatMoney,
     },
     {
+      title: "Totali n\u00EB EUR",
+      dataIndex: "total",
+      key: "totalEur",
+      width: 140,
+      align: "right",
+      render: (_, record) =>
+        record.totalEur !== undefined && record.totalEur !== null
+          ? formatEur(record.totalEur)
+          : formatEurFromBase(record.total, record.eurExchangeRate),
+    },
+    {
       title: "Arkivuar",
       dataIndex: "createdAt",
       key: "createdAt",
@@ -250,7 +262,7 @@ function InvoiceArchive() {
         loading={loading}
         columns={columns}
         dataSource={invoices}
-        scroll={{ x: 980 }}
+        scroll={{ x: 1120 }}
         pagination={{ pageSize: 15, showTotal: (total) => `${total} fatura` }}
       />
     </div>

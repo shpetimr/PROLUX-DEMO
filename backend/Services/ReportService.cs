@@ -488,7 +488,9 @@ namespace backend.Services
                                        .Sum(GetInvoiceStockMovementCost),
                         Incomes = dailyIncomes.Where(i => i.Date.Hour == hour).Sum(i => i.Amount) +
                                   dailyWorkSales.Where(workSale => workSale.Date.Hour == hour).Sum(workSale => workSale.Profit) +
-                                  dailyArchivedInvoices.Where(invoice => invoice.CreatedAt.Hour == hour).Sum(invoice => invoice.Total),
+                                  dailyArchivedInvoices
+                                      .Where(invoice => invoice.CreatedAt.Hour == hour)
+                                      .Sum(InvoiceArchiveFinancials.GetRevenueTotal),
                         Count = dailyExpenses.Count(e => e.Date.Hour == hour) + 
                                dailyIncomes.Count(i => i.Date.Hour == hour) +
                                dailyWorkSales.Count(workSale => workSale.Date.Hour == hour) +
@@ -1717,14 +1719,11 @@ namespace backend.Services
 
         private async Task<ArchivedInvoiceFinancialTotals> GetArchivedInvoiceFinancialTotalsAsync(DateTime? startDate, DateTime? endExclusive)
         {
-            var archivedInvoices = GetArchivedInvoicesForPeriod(startDate, endExclusive);
+            var archivedInvoices = await GetArchivedInvoicesForPeriod(startDate, endExclusive)
+                .AsNoTracking()
+                .ToListAsync();
 
-            return new ArchivedInvoiceFinancialTotals
-            {
-                Subtotal = await archivedInvoices.SumAsync(invoice => (decimal?)invoice.Subtotal) ?? 0m,
-                Total = await archivedInvoices.SumAsync(invoice => (decimal?)invoice.Total) ?? 0m,
-                Count = await archivedInvoices.CountAsync()
-            };
+            return GetArchivedInvoiceFinancialTotals(archivedInvoices);
         }
 
         private static ArchivedInvoiceFinancialTotals GetArchivedInvoiceFinancialTotals(IEnumerable<InvoiceArchive> archivedInvoices)
@@ -1734,7 +1733,7 @@ namespace backend.Services
             return new ArchivedInvoiceFinancialTotals
             {
                 Subtotal = invoiceList.Sum(invoice => invoice.Subtotal),
-                Total = invoiceList.Sum(invoice => invoice.Total),
+                Total = invoiceList.Sum(InvoiceArchiveFinancials.GetRevenueTotal),
                 Count = invoiceList.Count
             };
         }

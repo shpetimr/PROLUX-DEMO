@@ -206,6 +206,7 @@ export const API_ENDPOINTS = {
 
   DASHBOARD_STATS: "/reports/dashboard",
   DASHBOARD_COMPREHENSIVE: "/reports/dashboard/comprehensive",
+  CURRENCY: "/currency",
 
   EXPENSES: "/expenses",
   INCOMES: "/incomes",

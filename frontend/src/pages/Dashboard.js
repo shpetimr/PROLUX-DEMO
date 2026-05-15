@@ -1,24 +1,35 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Card,
-  Row,
-  Col,
-  Typography,
-  Spin,
-  Table,
-  Tag,
   Button,
+  Card,
+  Col,
+  Row,
+  Space,
+  Spin,
+  Tag,
+  Typography,
 } from "antd";
 import {
-  TeamOutlined,
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  CalendarOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CrownOutlined,
   DollarOutlined,
+  ExclamationCircleOutlined,
+  FileAddOutlined,
+  FileTextOutlined,
+  InboxOutlined,
+  LineChartOutlined,
+  PlusOutlined,
+  ProjectOutlined,
+  ReloadOutlined,
   RiseOutlined,
   ShoppingOutlined,
-  HomeOutlined,
-  BarChartOutlined,
-  CalendarOutlined,
-  CrownOutlined,
-  ExclamationCircleOutlined,
+  TeamOutlined,
+  UserAddOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 import dayjs from "dayjs";
@@ -27,8 +38,175 @@ import { useNavigate } from "react-router-dom";
 import { PERMISSIONS } from "../config/permissions";
 import WorkerTasks from "./WorkerTasks";
 import { WorkerSalarySummary } from "./WorkerSalary";
+import { formatEur, formatEurFromBase } from "../utils/invoiceTotals";
 
 const { Title, Text } = Typography;
+
+const emptyDashboardData = {
+  employees: [],
+  expenses: [],
+  incomes: [],
+  purchases: [],
+  rents: [],
+  projects: [],
+  invoices: [],
+  stockMaterials: [],
+  stockProducts: [],
+  workSales: [],
+  workerTasks: [],
+  monthlyBreakdown: [],
+  debtsSummary: null,
+};
+
+const monthLabels = [
+  "Jan",
+  "Shk",
+  "Mar",
+  "Pri",
+  "Maj",
+  "Qer",
+  "Kor",
+  "Gus",
+  "Sht",
+  "Tet",
+  "Nën",
+  "Dhj",
+];
+
+const fullMonthLabels = [
+  "Janar",
+  "Shkurt",
+  "Mars",
+  "Prill",
+  "Maj",
+  "Qershor",
+  "Korrik",
+  "Gusht",
+  "Shtator",
+  "Tetor",
+  "Nëntor",
+  "Dhjetor",
+];
+
+const cardShell = {
+  border: "1px solid #e6ebf2",
+  borderRadius: 10,
+  boxShadow: "0 12px 30px rgba(15, 23, 42, 0.08)",
+  height: "100%",
+};
+
+const softButton = {
+  borderRadius: 10,
+  fontWeight: 700,
+};
+
+const normalizeNumber = (value) => {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number : 0;
+};
+
+const safeArray = (value) => (Array.isArray(value) ? value : []);
+
+const getDisplayCurrency = (currency) => (currency === "MKD" ? "DEN" : currency || "DEN");
+
+const formatAmount = (value, options = {}) => {
+  const { compact = false, decimals = 0 } = options;
+  const number = normalizeNumber(value);
+
+  if (compact) {
+    const absolute = Math.abs(number);
+    if (absolute >= 1000000) return `${(number / 1000000).toFixed(1)}M`;
+    if (absolute >= 1000) return `${(number / 1000).toFixed(0)}K`;
+  }
+
+  return number.toLocaleString("mk-MK", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
+const formatMoney = (value, currency = "DEN", options = {}) =>
+  `${formatAmount(value, options)} ${getDisplayCurrency(currency)}`;
+
+const formatQuantity = (value) =>
+  normalizeNumber(value).toLocaleString("mk-MK", {
+    maximumFractionDigits: 2,
+  });
+
+const formatRelativeTime = (value) => {
+  const date = dayjs(value);
+  if (!date.isValid()) return "Pa datë";
+
+  const now = dayjs();
+  const minutes = now.diff(date, "minute");
+  const hours = now.diff(date, "hour");
+  const days = now.diff(date, "day");
+
+  if (minutes < 1) return "Tani";
+  if (minutes < 60) return `${minutes} min më parë`;
+  if (hours < 24) return `${hours} orë më parë`;
+  if (days < 7) return `${days} ditë më parë`;
+  return date.format("DD/MM/YYYY");
+};
+
+const getDateWeight = (value) => {
+  const date = dayjs(value);
+  return date.isValid() ? date.valueOf() : 0;
+};
+
+const sortByDateDesc = (items, dateSelector) =>
+  [...items].sort(
+    (left, right) =>
+      getDateWeight(dateSelector(right)) - getDateWeight(dateSelector(left))
+  );
+
+const getCurrentMonthOutflow = (stats) =>
+  normalizeNumber(stats?.currentMonthExpenses) +
+  normalizeNumber(stats?.currentMonthPurchases) +
+  normalizeNumber(stats?.currentMonthRents) +
+  normalizeNumber(stats?.currentMonthSalaries);
+
+const isCompleted = (status) => status === "Completed" || status === 2;
+
+const isPendingOrActive = (status) =>
+  status === "Pending" ||
+  status === "InProgress" ||
+  status === "Waiting" ||
+  status === "InProcess" ||
+  status === 0 ||
+  status === 1;
+
+const getStockType = (item, fallback) => item?.stockType ?? item?.StockType ?? fallback;
+
+const getLowStockItems = (items) =>
+  items.filter(
+    (item) =>
+      item?.reorderLevel != null &&
+      normalizeNumber(item.currentQuantity) <= normalizeNumber(item.reorderLevel)
+  );
+
+const getTrend = (current, previous, lowerIsBetter = false) => {
+  const currentValue = normalizeNumber(current);
+  const previousValue = normalizeNumber(previous);
+  const difference = currentValue - previousValue;
+  const percent =
+    previousValue === 0
+      ? currentValue === 0
+        ? 0
+        : 100
+      : (difference / Math.abs(previousValue)) * 100;
+  const direction = difference >= 0 ? "up" : "down";
+  const good = lowerIsBetter ? difference <= 0 : difference >= 0;
+
+  return {
+    direction,
+    good,
+    percent: Math.abs(percent),
+  };
+};
+
+const getMonthYearLabel = (monthIndex, year) =>
+  `${fullMonthLabels[Math.max(0, monthIndex)]} ${year}`;
 
 function WorkerDashboard() {
   const { user } = useAuth();
@@ -36,12 +214,10 @@ function WorkerDashboard() {
   return (
     <div>
       <div className="mb-6">
-        <div>
-          <Title level={2}>Ballina Ime</Title>
-          <Text className="text-gray-600">
-            Mirë se vini, {user?.fullName || user?.username || "Përdorues"}
-          </Text>
-        </div>
+        <Title level={2}>Ballina Ime</Title>
+        <Text className="text-gray-600">
+          Mirë se vini, {user?.fullName || user?.username || "Përdorues"}
+        </Text>
       </div>
 
       <WorkerSalarySummary compact />
@@ -53,17 +229,841 @@ function WorkerDashboard() {
   );
 }
 
+function SectionCard({ title, extra, children, minHeight }) {
+  return (
+    <Card
+      bordered={false}
+      style={{ ...cardShell, minHeight }}
+      styles={{ body: { padding: 18 } }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginBottom: 14,
+        }}
+      >
+        <Text style={{ color: "#0f172a", fontSize: 15, fontWeight: 800 }}>
+          {title}
+        </Text>
+        {extra}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function MiniEmpty({ text = "Nuk ka të dhëna" }) {
+  return (
+    <div
+      style={{
+        minHeight: 130,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#94a3b8",
+        fontSize: 13,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  unit,
+  icon,
+  tone,
+  trend,
+  trendLabel,
+  valueDecimals = 0,
+}) {
+  const palette = {
+    green: { bg: "#eaf8ee", color: "#16a34a", glow: "rgba(22, 163, 74, 0.14)" },
+    red: { bg: "#fff1f2", color: "#ef4444", glow: "rgba(239, 68, 68, 0.14)" },
+    blue: { bg: "#eef5ff", color: "#2563eb", glow: "rgba(37, 99, 235, 0.14)" },
+    violet: { bg: "#f5efff", color: "#7c3aed", glow: "rgba(124, 58, 237, 0.14)" },
+    orange: { bg: "#fff7ed", color: "#f97316", glow: "rgba(249, 115, 22, 0.14)" },
+  }[tone];
+  const directionUp = trend?.direction !== "down";
+  const trendColor = trend?.good ? "#16a34a" : "#ef4444";
+
+  return (
+    <Card
+      bordered={false}
+      style={{
+        ...cardShell,
+        minHeight: 138,
+        background:
+          "linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96))",
+      }}
+      styles={{ body: { padding: 16 } }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: palette.bg,
+            color: palette.color,
+            boxShadow: `0 0 0 10px ${palette.glow}`,
+            fontSize: 22,
+            flex: "0 0 auto",
+          }}
+        >
+          {icon}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Text style={{ color: "#0f172a", fontSize: 13, fontWeight: 700 }}>
+            {title}
+          </Text>
+          <div
+            style={{
+              color: palette.color,
+              fontSize: 24,
+              fontWeight: 850,
+              lineHeight: 1.1,
+              marginTop: 8,
+              wordBreak: "break-word",
+            }}
+          >
+            {formatAmount(value, { decimals: valueDecimals })}
+          </div>
+          <Text style={{ color: palette.color, fontSize: 14, fontWeight: 800 }}>
+            {unit}
+          </Text>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          marginTop: 17,
+          paddingLeft: 60,
+          color: trendColor,
+          fontSize: 12,
+          fontWeight: 800,
+        }}
+      >
+        {directionUp ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+        {formatAmount(trend?.percent || 0, { decimals: 1 })}%
+        <Text style={{ color: "#64748b", fontSize: 12, fontWeight: 500 }}>
+          {trendLabel}
+        </Text>
+      </div>
+    </Card>
+  );
+}
+
+function LegendDot({ color, label }) {
+  return (
+    <Space size={6}>
+      <span
+        style={{
+          width: 9,
+          height: 9,
+          borderRadius: 999,
+          background: color,
+          display: "inline-block",
+        }}
+      />
+      <Text style={{ color: "#64748b", fontSize: 12 }}>{label}</Text>
+    </Space>
+  );
+}
+
+function FinancialOverviewChart({ data, currency }) {
+  if (!data.length) {
+    return <MiniEmpty text="Nuk ka seri mujore për grafik." />;
+  }
+
+  const width = 920;
+  const height = 298;
+  const left = 50;
+  const right = 24;
+  const top = 22;
+  const bottom = 42;
+  const chartWidth = width - left - right;
+  const chartHeight = height - top - bottom;
+  const maxBarValue = Math.max(
+    1,
+    ...data.flatMap((item) => [normalizeNumber(item.income), normalizeNumber(item.outflow)])
+  );
+  const maxValue = Math.max(maxBarValue, ...data.map((item) => normalizeNumber(item.netProfit)));
+  const minValue = Math.min(0, ...data.map((item) => normalizeNumber(item.netProfit)));
+  const range = maxValue - minValue || 1;
+  const groupWidth = chartWidth / data.length;
+  const barWidth = Math.min(18, Math.max(9, groupWidth * 0.2));
+  const xForIndex = (index) => left + groupWidth * index + groupWidth / 2;
+  const yForValue = (value) =>
+    top + chartHeight - ((normalizeNumber(value) - minValue) / range) * chartHeight;
+  const zeroY = yForValue(0);
+  const netProfitPoints = data
+    .map((item, index) => `${xForIndex(index)},${yForValue(item.netProfit)}`)
+    .join(" ");
+  const netProfitArea = data.length
+    ? `M ${data
+        .map((item, index) => `${xForIndex(index)} ${yForValue(item.netProfit)}`)
+        .join(" L ")} L ${xForIndex(data.length - 1)} ${zeroY} L ${xForIndex(0)} ${zeroY} Z`
+    : "";
+  const latestIndex = Math.max(
+    0,
+    data.findLastIndex?.(
+      (item) =>
+        normalizeNumber(item.income) ||
+        normalizeNumber(item.outflow) ||
+        normalizeNumber(item.netProfit)
+    ) ?? data.length - 1
+  );
+  const latest = data[latestIndex] || data[data.length - 1];
+  const latestX = xForIndex(latestIndex);
+  const tooltipX = Math.min(width - 230, Math.max(left + 8, latestX + 18));
+  const tooltipY = Math.max(top + 8, Math.min(height - 120, yForValue(latest?.netProfit) - 46));
+
+  return (
+    <div>
+      <Space size={18} style={{ marginBottom: 6 }}>
+        <LegendDot color="#22a447" label="Të Ardhurat" />
+        <LegendDot color="#ef4444" label="Shpenzimet" />
+        <LegendDot color="#2563eb" label="Fitimi Neto" />
+      </Space>
+
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="298" role="img">
+        {[0, 0.25, 0.5, 0.75, 1].map((step) => {
+          const value = minValue + range * step;
+          const y = yForValue(value);
+          return (
+            <g key={step}>
+              <line
+                x1={left}
+                x2={width - right}
+                y1={y}
+                y2={y}
+                stroke={value === 0 ? "#cbd5e1" : "#e5eaf2"}
+              />
+              <text x={8} y={y + 4} fill="#94a3b8" fontSize="11">
+                {formatAmount(value, { compact: true })}
+              </text>
+            </g>
+          );
+        })}
+
+        <line x1={left} x2={width - right} y1={zeroY} y2={zeroY} stroke="#cbd5e1" />
+
+        {data.map((item, index) => {
+          const center = xForIndex(index);
+          const incomeY = yForValue(item.income);
+          const outflowY = yForValue(item.outflow);
+          const incomeHeight = Math.max(0, zeroY - incomeY);
+          const outflowHeight = Math.max(0, zeroY - outflowY);
+
+          return (
+            <g key={`${item.label}-${index}`}>
+              <rect
+                x={center - barWidth - 4}
+                y={incomeY}
+                width={barWidth}
+                height={incomeHeight}
+                rx="5"
+                fill="#22a447"
+                opacity="0.88"
+              >
+                <title>{`Të ardhurat: ${formatMoney(item.income, currency)}`}</title>
+              </rect>
+              <rect
+                x={center + 4}
+                y={outflowY}
+                width={barWidth}
+                height={outflowHeight}
+                rx="5"
+                fill="#ef4444"
+                opacity="0.8"
+              >
+                <title>{`Shpenzimet: ${formatMoney(item.outflow, currency)}`}</title>
+              </rect>
+              <text
+                x={center}
+                y={height - 16}
+                textAnchor="middle"
+                fill="#64748b"
+                fontSize="11"
+                fontWeight="650"
+              >
+                {item.label}
+              </text>
+            </g>
+          );
+        })}
+
+        <path d={netProfitArea} fill="rgba(37, 99, 235, 0.1)" />
+        <polyline
+          points={netProfitPoints}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {data.map((item, index) => (
+          <g key={`net-profit-${item.label}-${index}`}>
+            <circle
+              cx={xForIndex(index)}
+              cy={yForValue(item.netProfit)}
+              r="4.5"
+              fill="#ffffff"
+              stroke="#2563eb"
+              strokeWidth="2.6"
+            >
+              <title>{`Fitimi Neto: ${formatMoney(item.netProfit, currency)}`}</title>
+            </circle>
+          </g>
+        ))}
+
+        <line
+          x1={latestX}
+          x2={latestX}
+          y1={top}
+          y2={height - bottom}
+          stroke="#cbd5e1"
+          strokeDasharray="4 4"
+        />
+        <circle
+          cx={latestX}
+          cy={yForValue(latest?.netProfit)}
+          r="8"
+          fill="#ffffff"
+          stroke="#2563eb"
+          strokeWidth="3"
+        />
+        <g>
+          <rect
+            x={tooltipX}
+            y={tooltipY}
+            width="210"
+            height="94"
+            rx="10"
+            fill="#ffffff"
+            stroke="#e2e8f0"
+          />
+          <text x={tooltipX + 14} y={tooltipY + 22} fill="#0f172a" fontSize="12" fontWeight="800">
+            {latest?.fullLabel}
+          </text>
+          <text x={tooltipX + 14} y={tooltipY + 44} fill="#166534" fontSize="11" fontWeight="650">
+            Të ardhurat: {formatMoney(latest?.income, currency)}
+          </text>
+          <text x={tooltipX + 14} y={tooltipY + 62} fill="#b91c1c" fontSize="11" fontWeight="650">
+            Shpenzimet: {formatMoney(latest?.outflow, currency)}
+          </text>
+          <text x={tooltipX + 14} y={tooltipY + 80} fill="#1d4ed8" fontSize="11" fontWeight="650">
+            Fitimi Neto: {formatMoney(latest?.netProfit, currency)}
+          </text>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function ExpenseDonut({ items, total, currency }) {
+  const chartItems = items.filter((item) => normalizeNumber(item.value) > 0).slice(0, 5);
+  const chartTotal = chartItems.reduce((sum, item) => sum + normalizeNumber(item.value), 0);
+  const displayTotal = total || chartTotal;
+  const colors = ["#2563eb", "#36a853", "#fb923c", "#8b5cf6", "#94a3b8"];
+  const radius = 60;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  if (!chartItems.length) {
+    return <MiniEmpty text="Nuk ka shpenzime për këtë muaj." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center" }}>
+      <svg width="180" height="180" viewBox="0 0 180 180" role="img">
+        <circle cx="90" cy="90" r={radius} fill="none" stroke="#eef2f7" strokeWidth="30" />
+        {chartItems.map((item, index) => {
+          const length = (normalizeNumber(item.value) / chartTotal) * circumference;
+          const segment = (
+            <circle
+              key={item.label}
+              cx="90"
+              cy="90"
+              r={radius}
+              fill="none"
+              stroke={colors[index]}
+              strokeWidth="30"
+              strokeDasharray={`${length} ${circumference - length}`}
+              strokeDashoffset={-offset}
+              transform="rotate(-90 90 90)"
+            />
+          );
+          offset += length;
+          return segment;
+        })}
+        <text x="90" y="84" textAnchor="middle" fill="#0f172a" fontSize="19" fontWeight="850">
+          {formatAmount(displayTotal, { compact: true })}
+        </text>
+        <text x="90" y="106" textAnchor="middle" fill="#0f172a" fontSize="13" fontWeight="700">
+          {getDisplayCurrency(currency)}
+        </text>
+      </svg>
+      <div style={{ display: "grid", gap: 11 }}>
+        {chartItems.map((item, index) => (
+          <div
+            key={item.label}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: 10,
+              alignItems: "center",
+              color: "#0f172a",
+              fontSize: 13,
+            }}
+          >
+            <LegendDot color={colors[index]} label={item.label} />
+            <Text style={{ color: "#0f172a", fontSize: 13, fontWeight: 800 }}>
+              {formatAmount((normalizeNumber(item.value) / chartTotal) * 100, {
+                decimals: 1,
+              })}
+              %
+            </Text>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DebtSituation({ summary, currency, onOpen }) {
+  const owedToCompany = normalizeNumber(summary?.totalOwedToCompany);
+  const companyOwes = normalizeNumber(summary?.totalCompanyOwes);
+  const total = owedToCompany + companyOwes;
+  const rows = [
+    {
+      title: "Borxhe nga klientët",
+      value: owedToCompany,
+      icon: <FileTextOutlined />,
+      bg: "#eef5ff",
+      color: "#2563eb",
+    },
+    {
+      title: "Borxhe ndaj furnitorëve",
+      value: companyOwes,
+      icon: <ShoppingOutlined />,
+      bg: "#ecfeff",
+      color: "#0891b2",
+    },
+    {
+      title: "Totali i Borxheve",
+      value: total,
+      icon: <DollarOutlined />,
+      bg: "#fff1f2",
+      color: "#ef4444",
+      danger: true,
+    },
+  ];
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      {rows.map((row) => (
+        <button
+          key={row.title}
+          type="button"
+          onClick={() => onOpen("/debts")}
+          style={{
+            border: `1px solid ${row.danger ? "#fee2e2" : "#e5eaf2"}`,
+            background: row.danger ? "#fff7f7" : "#f8fbff",
+            borderRadius: 10,
+            padding: 13,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <span
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 9,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: row.bg,
+              color: row.color,
+              fontSize: 18,
+            }}
+          >
+            {row.icon}
+          </span>
+          <span>
+            <Text style={{ color: "#0f172a", display: "block", fontSize: 13, fontWeight: 800 }}>
+              {row.title}
+            </Text>
+            <Text style={{ color: row.color, fontSize: 14, fontWeight: 850 }}>
+              {formatMoney(row.value, currency)}
+            </Text>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ActivityFeed({ items, onOpen }) {
+  if (!items.length) {
+    return <MiniEmpty text="Nuk ka aktivitete të fundit." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {items.slice(0, 5).map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => item.route && onOpen(item.route)}
+          style={{
+            width: "100%",
+            border: 0,
+            background: "transparent",
+            padding: 0,
+            cursor: item.route ? "pointer" : "default",
+            textAlign: "left",
+            display: "grid",
+            gridTemplateColumns: "34px 1fr auto",
+            gap: 12,
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: item.bg,
+              color: item.color,
+            }}
+          >
+            {item.icon}
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <Text style={{ display: "block", color: "#0f172a", fontSize: 13, fontWeight: 800 }}>
+              {item.title}
+            </Text>
+            <Text style={{ display: "block", color: "#64748b", fontSize: 12 }} ellipsis>
+              {item.detail}
+            </Text>
+          </span>
+          <Text style={{ color: "#64748b", fontSize: 12, whiteSpace: "nowrap" }}>
+            {formatRelativeTime(item.date)}
+          </Text>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const formatInvoiceEurTotal = (invoice) =>
+  invoice?.totalEur !== undefined && invoice?.totalEur !== null
+    ? formatEur(invoice.totalEur)
+    : formatEurFromBase(invoice?.total, invoice?.eurExchangeRate);
+
+function RecentInvoices({ invoices, currency, onOpen }) {
+  if (!invoices.length) {
+    return <MiniEmpty text="Nuk ka fatura të fundit." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 11 }}>
+      {invoices.slice(0, 5).map((invoice) => (
+        <button
+          key={invoice.id}
+          type="button"
+          onClick={() => onOpen("/invoice-archive")}
+          style={{
+            border: 0,
+            background: "transparent",
+            padding: 0,
+            display: "grid",
+            gridTemplateColumns: "1fr auto 70px",
+            gap: 12,
+            alignItems: "center",
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <span style={{ minWidth: 0 }}>
+            <Text style={{ display: "block", color: "#0f172a", fontSize: 13, fontWeight: 850 }}>
+              {invoice.invoiceNumber || `#${invoice.id}`}
+            </Text>
+            <Text style={{ display: "block", color: "#64748b", fontSize: 12 }} ellipsis>
+              Klienti: {invoice.customerName || "Pa emër"}
+            </Text>
+          </span>
+          <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+            <Text style={{ display: "block", color: "#0f172a", fontSize: 12, fontWeight: 850 }}>
+              {formatMoney(invoice.total, currency)}
+            </Text>
+            <Text style={{ display: "block", color: "#166534", fontSize: 11, fontWeight: 800 }}>
+              {formatInvoiceEurTotal(invoice)}
+            </Text>
+          </span>
+          <Tag color="green" style={{ marginInlineEnd: 0, borderRadius: 999, textAlign: "center" }}>
+            Arkiv
+          </Tag>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StockWarnings({ items, onOpen }) {
+  if (!items.length) {
+    return (
+      <div
+        style={{
+          padding: 14,
+          borderRadius: 10,
+          border: "1px solid #bbf7d0",
+          background: "#f0fdf4",
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+        }}
+      >
+        <CheckCircleOutlined style={{ color: "#16a34a", fontSize: 20 }} />
+        <div>
+          <Text style={{ display: "block", color: "#166534", fontWeight: 850 }}>
+            Stoku është në rregull
+          </Text>
+          <Text style={{ color: "#15803d", fontSize: 12 }}>
+            Nuk ka artikuj nën nivel alarmi.
+          </Text>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {items.slice(0, 4).map((item) => (
+        <button
+          key={`${item.stockType}-${item.id}`}
+          type="button"
+          onClick={() => onOpen(item.stockType === "Product" ? "/stock/product" : "/stock/material")}
+          style={{
+            border: 0,
+            background: "transparent",
+            padding: 0,
+            display: "grid",
+            gridTemplateColumns: "34px 1fr auto",
+            gap: 12,
+            alignItems: "center",
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <span
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#fff1f2",
+              color: "#ef4444",
+            }}
+          >
+            <WarningOutlined />
+          </span>
+          <span style={{ minWidth: 0 }}>
+            <Text style={{ display: "block", color: "#0f172a", fontSize: 13, fontWeight: 850 }} ellipsis>
+              {item.name}
+            </Text>
+            <Text style={{ color: "#64748b", fontSize: 12 }}>
+              Sasi e mbetur:{" "}
+              <span style={{ color: "#ef4444", fontWeight: 800 }}>
+                {formatQuantity(item.currentQuantity)} {item.unit || ""}
+              </span>
+            </Text>
+          </span>
+          <Tag color="red" style={{ marginInlineEnd: 0, borderRadius: 999 }}>
+            E ulët
+          </Tag>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WorkerSummary({ total, active, inactive }) {
+  const cards = [
+    {
+      label: "Gjithsej Punëtorë",
+      value: total,
+      color: "#2563eb",
+      bg: "#eef5ff",
+      icon: <TeamOutlined />,
+    },
+    {
+      label: "Aktivë",
+      value: active,
+      color: "#16a34a",
+      bg: "#ecfdf5",
+      icon: <UserAddOutlined />,
+    },
+    {
+      label: "Jo Aktivë",
+      value: inactive,
+      color: "#64748b",
+      bg: "#f8fafc",
+      icon: <ClockCircleOutlined />,
+    },
+  ];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      {cards.map((card) => (
+        <div
+          key={card.label}
+          style={{
+            border: "1px solid #e8edf5",
+            borderRadius: 10,
+            padding: 14,
+            background: "linear-gradient(135deg, #ffffff, #f8fafc)",
+          }}
+        >
+          <span
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: card.color,
+              background: card.bg,
+              marginBottom: 12,
+            }}
+          >
+            {card.icon}
+          </span>
+          <Text style={{ display: "block", color: "#475569", fontSize: 12 }}>
+            {card.label}
+          </Text>
+          <Text style={{ color: card.color, fontSize: 22, fontWeight: 850 }}>
+            {card.value}
+          </Text>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActiveWork({ items, onOpen }) {
+  if (!items.length) {
+    return <MiniEmpty text="Nuk ka punë aktive." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 14 }}>
+      {items.slice(0, 3).map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onOpen(item.route)}
+          style={{
+            border: 0,
+            padding: 0,
+            background: "transparent",
+            cursor: "pointer",
+            textAlign: "left",
+            display: "grid",
+            gridTemplateColumns: "1fr 80px 1fr 42px",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <Text style={{ color: "#0f172a", fontSize: 13, fontWeight: 750 }} ellipsis>
+            {item.title}
+          </Text>
+          <Tag color={item.statusColor} style={{ marginInlineEnd: 0, borderRadius: 6 }}>
+            {item.statusLabel}
+          </Tag>
+          <span
+            style={{
+              height: 6,
+              borderRadius: 999,
+              background: "#e2e8f0",
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                display: "block",
+                height: "100%",
+                width: `${item.progress}%`,
+                background: "#2563eb",
+                borderRadius: 999,
+              }}
+            />
+          </span>
+          <Text style={{ color: "#64748b", fontSize: 12, textAlign: "right" }}>
+            {item.progress}%
+          </Text>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function QuickActions({ actions, onOpen }) {
+  if (!actions.length) {
+    return <MiniEmpty text="Nuk ka veprime të shpejta për këtë rol." />;
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      {actions.slice(0, 6).map((action) => (
+        <Button
+          key={action.label}
+          icon={action.icon}
+          onClick={() => onOpen(action.route)}
+          style={{
+            height: 54,
+            borderRadius: 10,
+            borderColor: action.border,
+            background: action.bg,
+            color: "#0f172a",
+            fontWeight: 800,
+          }}
+        >
+          {action.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [recentData, setRecentData] = useState({
-    employees: [],
-    expenses: [],
-    incomes: [],
-    purchases: [],
-    rents: [],
-    projects: [],
-  });
+  const [dashboardData, setDashboardData] = useState(emptyDashboardData);
   const { isAdmin, isUser, hasPermission } = useAuth();
   const navigate = useNavigate();
 
@@ -75,33 +1075,58 @@ function Dashboard() {
   const canManageIncomes = hasPermission(PERMISSIONS.INCOMES_MANAGE);
   const canManageDebts = hasPermission(PERMISSIONS.DEBTS_MANAGE);
   const canViewReports = hasPermission(PERMISSIONS.REPORTS_VIEW);
+  const canManageProjects = hasPermission(PERMISSIONS.PROJECTS_MANAGE);
+  const canManageWorkSales = hasPermission(PERMISSIONS.WORK_SALES_MANAGE);
+  const canManageStock = hasPermission(PERMISSIONS.STOCK_MANAGE);
+  const canManageInvoices = hasPermission(PERMISSIONS.INVOICE_ARCHIVE_MANAGE);
+  const canCreateInvoices = hasPermission(PERMISSIONS.TEMPLATES_PRINT);
+  const canViewWorkerTasks = hasPermission(PERMISSIONS.WORKERS_VIEW_OWN_TASKS);
   const showWorkerDashboard =
     !isAdmin() && hasPermission(PERMISSIONS.WORKERS_VIEW_OWN_DASHBOARD);
 
   const fetchAllDashboardData = useCallback(async () => {
     setLoading(true);
     try {
+      const currentYear = dayjs().year();
       const apiCalls = [
-        canManageEmployees && [
-          "employees",
-          apiClient.get(API_ENDPOINTS.EMPLOYEES),
-        ],
-        canManageExpenses && [
-          "expenses",
-          apiClient.get(API_ENDPOINTS.EXPENSES),
-        ],
-        canManageIncomes && [
-          "incomes",
-          apiClient.get(API_ENDPOINTS.INCOMES),
-        ],
-        canManagePurchases && [
-          "purchases",
-          apiClient.get(API_ENDPOINTS.PURCHASES),
-        ],
-        canManageRents && ["rents", apiClient.get(API_ENDPOINTS.RENTS)],
         canViewDashboard && [
           "dashboardStats",
           apiClient.get(API_ENDPOINTS.DASHBOARD_STATS),
+        ],
+        canViewReports && [
+          "monthlyBreakdown",
+          apiClient.get(`${API_ENDPOINTS.REPORTS}/monthly-breakdown/${currentYear}`),
+        ],
+        canManageEmployees && ["employees", apiClient.get(API_ENDPOINTS.EMPLOYEES)],
+        canManageExpenses && ["expenses", apiClient.get(API_ENDPOINTS.EXPENSES)],
+        canManageIncomes && ["incomes", apiClient.get(API_ENDPOINTS.INCOMES)],
+        canManagePurchases && ["purchases", apiClient.get(API_ENDPOINTS.PURCHASES)],
+        canManageRents && ["rents", apiClient.get(API_ENDPOINTS.RENTS)],
+        canManageDebts && [
+          "debtsSummary",
+          apiClient.get(API_ENDPOINTS.DEBTS_STATISTICS),
+        ],
+        canManageProjects && ["projects", apiClient.get(API_ENDPOINTS.PROJECTS)],
+        canManageWorkSales && ["workSales", apiClient.get(API_ENDPOINTS.WORK_SALES)],
+        canManageInvoices && [
+          "invoices",
+          apiClient.get(API_ENDPOINTS.INVOICE_ARCHIVE),
+        ],
+        canManageStock && [
+          "stockMaterials",
+          apiClient.get(API_ENDPOINTS.STOCK_ITEMS, {
+            params: { stockType: "Material" },
+          }),
+        ],
+        canManageStock && [
+          "stockProducts",
+          apiClient.get(API_ENDPOINTS.STOCK_ITEMS, {
+            params: { stockType: "Product" },
+          }),
+        ],
+        canViewWorkerTasks && [
+          "workerTasks",
+          apiClient.get(API_ENDPOINTS.WORKER_TASKS),
         ],
       ].filter(Boolean);
 
@@ -110,44 +1135,59 @@ function Dashboard() {
       );
       const responseData = responses.reduce((acc, response, index) => {
         const [name] = apiCalls[index];
-        acc[name] = response.status === "fulfilled" ? response.value.data : [];
+        acc[name] = response.status === "fulfilled" ? response.value.data : null;
         return acc;
       }, {});
 
-      const employees = responseData.employees ?? [];
-      const expenses = responseData.expenses ?? [];
-      const incomes = responseData.incomes ?? [];
-      const purchases = responseData.purchases ?? [];
-      const rents = responseData.rents ?? [];
-      const dashboardStats = responseData.dashboardStats ?? {};
-      const normalizedDashboardStats =
-        dashboardStats &&
-        typeof dashboardStats === "object" &&
-        !Array.isArray(dashboardStats)
-          ? dashboardStats
+      const dashboardStats =
+        responseData.dashboardStats &&
+        typeof responseData.dashboardStats === "object" &&
+        !Array.isArray(responseData.dashboardStats)
+          ? responseData.dashboardStats
           : {};
 
-      // Statistics are calculated by /reports/dashboard. Entity lists only feed recent tables.
-      setStats(normalizedDashboardStats);
-      setRecentData({
-        employees: employees.slice(0, 5), // Latest 5 employees
-        expenses: expenses.slice(0, 5), // Latest 5 expenses
-        incomes: incomes.slice(0, 5), // Latest 5 incomes
-        purchases: purchases.slice(0, 5), // Latest 5 purchases
-        rents: rents.slice(0, 5), // Latest 5 rents
+      setStats(dashboardStats);
+      setDashboardData({
+        employees: safeArray(responseData.employees),
+        expenses: safeArray(responseData.expenses),
+        incomes: safeArray(responseData.incomes),
+        purchases: safeArray(responseData.purchases),
+        rents: safeArray(responseData.rents),
+        projects: safeArray(responseData.projects),
+        invoices: safeArray(responseData.invoices),
+        stockMaterials: safeArray(responseData.stockMaterials),
+        stockProducts: safeArray(responseData.stockProducts),
+        workSales: safeArray(responseData.workSales),
+        workerTasks: safeArray(responseData.workerTasks),
+        monthlyBreakdown: safeArray(responseData.monthlyBreakdown),
+        debtsSummary:
+          responseData.debtsSummary &&
+          typeof responseData.debtsSummary === "object" &&
+          !Array.isArray(responseData.debtsSummary)
+            ? responseData.debtsSummary
+            : null,
       });
     } catch (error) {
       console.error("Gabim në marrjen e të dhënave të dashboard:", error);
+      setStats({});
+      setDashboardData(emptyDashboardData);
     } finally {
       setLoading(false);
     }
   }, [
+    canManageDebts,
     canManageEmployees,
     canManageExpenses,
     canManageIncomes,
+    canManageInvoices,
+    canManageProjects,
     canManagePurchases,
     canManageRents,
+    canManageStock,
+    canManageWorkSales,
     canViewDashboard,
+    canViewReports,
+    canViewWorkerTasks,
   ]);
 
   useEffect(() => {
@@ -158,6 +1198,281 @@ function Dashboard() {
 
     fetchAllDashboardData();
   }, [fetchAllDashboardData, showWorkerDashboard]);
+
+  const currency = getDisplayCurrency(
+    stats?.currencySymbol ||
+      dashboardData.debtsSummary?.currencySymbol ||
+      dashboardData.debtsSummary?.currencyCode ||
+      "DEN"
+  );
+
+  const stockItems = useMemo(
+    () => [
+      ...dashboardData.stockMaterials.map((item) => ({
+        ...item,
+        stockType: getStockType(item, "Material"),
+      })),
+      ...dashboardData.stockProducts.map((item) => ({
+        ...item,
+        stockType: getStockType(item, "Product"),
+      })),
+    ],
+    [dashboardData.stockMaterials, dashboardData.stockProducts]
+  );
+
+  const lowStockItems = useMemo(() => getLowStockItems(stockItems), [stockItems]);
+  const activeTasks = useMemo(
+    () => dashboardData.workerTasks.filter((task) => !isCompleted(task.status)),
+    [dashboardData.workerTasks]
+  );
+  const activeProjects = useMemo(
+    () => dashboardData.projects.filter((project) => isPendingOrActive(project.status)),
+    [dashboardData.projects]
+  );
+
+  const monthlyChartData = useMemo(() => {
+    const currentMonth = dayjs().month() + 1;
+    const currentYear = dayjs().year();
+    const normalized = dashboardData.monthlyBreakdown.map((item) => ({
+      month: normalizeNumber(item.month),
+      label: monthLabels[Math.max(0, normalizeNumber(item.month) - 1)] || `${item.month}`,
+      fullLabel: getMonthYearLabel(Math.max(0, normalizeNumber(item.month) - 1), item.year || currentYear),
+      income: normalizeNumber(item.totalIncome),
+      outflow:
+        normalizeNumber(item.totalExpenses) +
+        normalizeNumber(item.totalPurchases) +
+        normalizeNumber(item.totalRent) +
+        normalizeNumber(item.totalSalaries),
+      netProfit: normalizeNumber(item.netProfit),
+    }));
+    const hasFutureData = normalized.some(
+      (item) =>
+        item.month > currentMonth &&
+        (item.income > 0 || item.outflow > 0 || item.netProfit !== 0)
+    );
+    const visible = hasFutureData
+      ? normalized
+      : normalized.filter((item) => item.month <= currentMonth);
+
+    if (visible.length) {
+      return visible;
+    }
+
+    return [
+      {
+        month: currentMonth,
+        label: monthLabels[dayjs().month()],
+        fullLabel: getMonthYearLabel(dayjs().month(), currentYear),
+        income: normalizeNumber(stats?.currentMonthIncome),
+        outflow: getCurrentMonthOutflow(stats),
+        netProfit: normalizeNumber(stats?.currentMonthProfit),
+      },
+    ];
+  }, [dashboardData.monthlyBreakdown, stats]);
+
+  const currentMonthIndex = dayjs().month();
+  const previousMonthLabel = `nga ${
+    fullMonthLabels[currentMonthIndex === 0 ? 11 : currentMonthIndex - 1]
+  } ${currentMonthIndex === 0 ? dayjs().year() - 1 : dayjs().year()}`;
+  const currentMonthData =
+    monthlyChartData.find((item) => item.month === currentMonthIndex + 1) ||
+    monthlyChartData[monthlyChartData.length - 1] ||
+    {};
+  const previousMonthData =
+    monthlyChartData.find((item) => item.month === currentMonthIndex) ||
+    monthlyChartData[Math.max(0, monthlyChartData.length - 2)] ||
+    {};
+
+  const expenseCategoryData = useMemo(() => {
+    const monthStart = dayjs().startOf("month");
+    const monthEnd = dayjs().endOf("month");
+    const grouped = dashboardData.expenses
+      .filter((expense) => {
+        const date = dayjs(expense.date);
+        return date.isValid() && date.isAfter(monthStart.subtract(1, "millisecond")) && date.isBefore(monthEnd.add(1, "millisecond"));
+      })
+      .reduce((acc, expense) => {
+        const key = expense.expenseType || "Të tjera";
+        acc[key] = (acc[key] || 0) + normalizeNumber(expense.amount);
+        return acc;
+      }, {});
+
+    const items = Object.entries(grouped)
+      .map(([label, value]) => ({ label, value }))
+      .sort((left, right) => right.value - left.value);
+
+    if (items.length) {
+      return items;
+    }
+
+    return normalizeNumber(stats?.currentMonthExpenses) > 0
+      ? [{ label: "Shpenzime", value: stats.currentMonthExpenses }]
+      : [];
+  }, [dashboardData.expenses, stats]);
+
+  const activityItems = useMemo(() => {
+    const items = [
+      ...dashboardData.invoices.slice(0, 6).map((invoice) => ({
+        id: `invoice-${invoice.id}`,
+        title: `${invoice.invoiceNumber || "Faturë"} u krijua`,
+        detail: `Vlera: ${formatMoney(invoice.total, currency)} / ${formatInvoiceEurTotal(invoice)}`,
+        date: invoice.createdAt,
+        route: "/invoice-archive",
+        icon: <FileTextOutlined />,
+        color: "#2563eb",
+        bg: "#eef5ff",
+      })),
+      ...dashboardData.expenses.slice(0, 5).map((expense) => ({
+        id: `expense-${expense.id}`,
+        title: "Shpenzim i ri u shtua",
+        detail: `Vlera: ${formatMoney(expense.amount, currency)}`,
+        date: expense.createdAt || expense.date,
+        route: "/expenses",
+        icon: <DollarOutlined />,
+        color: "#ef4444",
+        bg: "#fff1f2",
+      })),
+      ...dashboardData.stockProducts.slice(0, 4).map((item) => ({
+        id: `stock-product-${item.id}`,
+        title: "Produkt i ri u shtua në stok",
+        detail: item.name || "Produkt",
+        date: item.createdAt,
+        route: "/stock/product",
+        icon: <InboxOutlined />,
+        color: "#0891b2",
+        bg: "#ecfeff",
+      })),
+      ...dashboardData.employees.slice(0, 4).map((employee) => ({
+        id: `employee-${employee.id}`,
+        title: "Punëtor i ri u shtua",
+        detail: employee.fullName || "Punëtor",
+        date: employee.createdAt,
+        route: "/employees",
+        icon: <TeamOutlined />,
+        color: "#16a34a",
+        bg: "#ecfdf5",
+      })),
+      ...dashboardData.workSales.slice(0, 4).map((work) => ({
+        id: `work-sale-${work.id}`,
+        title: "Punë e re u krijua",
+        detail: work.workName || "Punë",
+        date: work.createdAt || work.date,
+        route: "/pune",
+        icon: <ProjectOutlined />,
+        color: "#f97316",
+        bg: "#fff7ed",
+      })),
+    ];
+
+    return sortByDateDesc(items, (item) => item.date).slice(0, 5);
+  }, [
+    currency,
+    dashboardData.employees,
+    dashboardData.expenses,
+    dashboardData.invoices,
+    dashboardData.stockProducts,
+    dashboardData.workSales,
+  ]);
+
+  const activeWorkItems = useMemo(() => {
+    const projectItems = activeProjects.map((project) => {
+      const start = dayjs(project.startDate);
+      const end = dayjs(project.endDate);
+      const totalDays = Math.max(1, end.diff(start, "day"));
+      const elapsed = Math.max(0, dayjs().diff(start, "day"));
+      const dateProgress =
+        project.status === "InProgress"
+          ? Math.min(95, Math.max(20, Math.round((elapsed / totalDays) * 100)))
+          : project.status === "Pending"
+          ? 15
+          : 100;
+
+      return {
+        id: `project-${project.id}`,
+        title: project.name,
+        route: `/projects/${project.id}`,
+        progress: dateProgress,
+        statusLabel: project.status === "InProgress" ? "Në Përparim" : "Planifikuar",
+        statusColor: project.status === "InProgress" ? "blue" : "orange",
+      };
+    });
+
+    const taskItems = activeTasks.map((task) => ({
+      id: `task-${task.id}`,
+      title: task.title,
+      route: "/worker-tasks",
+      progress: task.status === "InProcess" ? 55 : 20,
+      statusLabel: task.status === "InProcess" ? "Në Përparim" : "Planifikuar",
+      statusColor: task.status === "InProcess" ? "blue" : "orange",
+    }));
+
+    return [...projectItems, ...taskItems];
+  }, [activeProjects, activeTasks]);
+
+  const quickActions = useMemo(
+    () =>
+      [
+        canCreateInvoices && {
+          label: "Krijo Faturë",
+          route: "/template-print",
+          icon: <FileAddOutlined />,
+          bg: "#eef5ff",
+          border: "#dbeafe",
+        },
+        canManageExpenses && {
+          label: "Shto Shpenzim",
+          route: "/expenses",
+          icon: <DollarOutlined />,
+          bg: "#fff1f2",
+          border: "#fee2e2",
+        },
+        canManageEmployees && {
+          label: "Shto Punëtor",
+          route: "/employees",
+          icon: <UserAddOutlined />,
+          bg: "#ecfdf5",
+          border: "#dcfce7",
+        },
+        canManageStock && {
+          label: "Shto Produkt",
+          route: "/stock/product",
+          icon: <InboxOutlined />,
+          bg: "#f5f3ff",
+          border: "#ede9fe",
+        },
+        canManageWorkSales && {
+          label: "Krijo Punë",
+          route: "/pune",
+          icon: <PlusOutlined />,
+          bg: "#fff7ed",
+          border: "#fed7aa",
+        },
+        canManagePurchases && {
+          label: "Krijo Blerje",
+          route: "/purchases",
+          icon: <ShoppingOutlined />,
+          bg: "#ecfeff",
+          border: "#cffafe",
+        },
+        !canManagePurchases &&
+          canManageProjects && {
+            label: "Krijo Projekt",
+            route: "/projects",
+            icon: <ProjectOutlined />,
+            bg: "#f8fafc",
+            border: "#e2e8f0",
+          },
+      ].filter(Boolean),
+    [
+      canCreateInvoices,
+      canManageEmployees,
+      canManageExpenses,
+      canManageProjects,
+      canManagePurchases,
+      canManageStock,
+      canManageWorkSales,
+    ]
+  );
 
   if (showWorkerDashboard) {
     return <WorkerDashboard />;
@@ -171,351 +1486,264 @@ function Dashboard() {
     );
   }
 
-  // Handle case when no data is available
-  if (!stats) {
-    return (
-      <div className="text-center py-12">
-        <Title level={3} className="text-gray-500 mb-4">
-          Nuk ka të dhëna të disponueshme
-        </Title>
-        <Text className="text-gray-400">
-          Ju lutemi shtoni të dhëna në sistemin tuaj për të parë statistikat
-        </Text>
-        <div className="mt-4">
-          <Button type="primary" onClick={fetchAllDashboardData}>
-            Provoni Përsëri
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const currentMonthOutflow = getCurrentMonthOutflow(stats);
+  const debtExposure =
+    normalizeNumber(dashboardData.debtsSummary?.totalOwedToCompany) +
+    normalizeNumber(dashboardData.debtsSummary?.totalCompanyOwes);
+  const activeWorkCount =
+    activeWorkItems.length ||
+    normalizeNumber(stats?.workerTasksWaiting) + normalizeNumber(stats?.workerTasksInProcess);
+  const employeeTotal = normalizeNumber(stats?.totalEmployees) || dashboardData.employees.length;
+  const activeEmployees = dashboardData.employees.filter(
+    (employee) => normalizeNumber(employee.daysWorkedThisMonth) > 0
+  ).length;
+  const displayedActiveEmployees = activeEmployees || employeeTotal;
+  const inactiveEmployees = Math.max(0, employeeTotal - displayedActiveEmployees);
+  const sortedInvoices = sortByDateDesc(dashboardData.invoices, (invoice) => invoice.createdAt);
+  const currentMonthTitle = getMonthYearLabel(dayjs().month(), dayjs().year());
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div
+      style={{
+        margin: -24,
+        padding: 24,
+        minHeight: "calc(100vh - 112px)",
+        background: "#f5f7fb",
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 18,
+          marginBottom: 22,
+        }}
+      >
         <div>
-          <Title level={2}>Përmbledhja e Ballinës</Title>
-          <Text className="text-gray-600">
+          <Title
+            level={2}
+            style={{ margin: "0 0 4px", color: "#0f172a", letterSpacing: 0 }}
+          >
+            Përmbledhja e Ballinës
+          </Title>
+          <Text style={{ color: "#64748b" }}>
             Mirë se vini në sistemin e menaxhimit të biznesit
-            {isAdmin() && (
-              <Tag color="red" icon={<CrownOutlined />} className="ml-2">
-                Administrator
-              </Tag>
-            )}
-            {isUser() && (
-              <Tag color="blue" className="ml-2">
-                Përdorues
-              </Tag>
-            )}
           </Text>
         </div>
-        <Button
-          type="primary"
-          onClick={fetchAllDashboardData}
-          loading={loading}
-          icon={<CalendarOutlined />}
-        >
-          Rifresko Të Dhënat
-        </Button>
+        <Space size={12} wrap={false}>
+          {isAdmin() && (
+            <Tag color="red" icon={<CrownOutlined />} style={{ borderRadius: 999 }}>
+              Administrator
+            </Tag>
+          )}
+          {isUser() && (
+            <Tag color="blue" style={{ borderRadius: 999 }}>
+              Përdorues
+            </Tag>
+          )}
+          <Button icon={<CalendarOutlined />} style={{ ...softButton, background: "#fff" }}>
+            {currentMonthTitle}
+          </Button>
+          <Button
+            type="primary"
+            onClick={fetchAllDashboardData}
+            loading={loading}
+            icon={<ReloadOutlined />}
+            style={{ ...softButton, height: 40 }}
+          >
+            Rifresko Të Dhënat
+          </Button>
+        </Space>
       </div>
 
-      {/* Quick Actions, Recent Data Tables, and Summary Card remain below */}
-
-      <Row gutter={[16, 16]} className="mt-8">
-        {canManageEmployees && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-              <Card
-                hoverable
-                className="text-center cursor-pointer bg-gradient-to-br from-blue-50 to-indigo-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={() => navigate("/employees")}
-              >
-                <TeamOutlined className="text-2xl text-blue-600 mb-2" />
-                <div className="font-medium text-gray-700">
-                  Menaxho Punëtorët
-                </div>
-              </Card>
-          </Col>
-        )}
-        {canManageRents && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-              <Card
-                hoverable
-                className="text-center cursor-pointer bg-gradient-to-br from-purple-50 to-violet-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={() => navigate("/rents")}
-              >
-                <HomeOutlined className="text-2xl text-purple-600 mb-2" />
-                <div className="font-medium text-gray-700">Menaxho Qirat</div>
-              </Card>
-          </Col>
-        )}
-        {canManageIncomes && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-              <Card
-                hoverable
-                className="text-center cursor-pointer bg-gradient-to-br from-green-50 to-emerald-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={() => navigate("/incomes")}
-              >
-                <RiseOutlined className="text-2xl text-green-600 mb-2" />
-                <div className="font-medium text-gray-700">
-                  Ndjek Të Ardhurat
-                </div>
-              </Card>
-          </Col>
-        )}
-        {canManageDebts && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-              <Card
-                hoverable
-                className="text-center cursor-pointer bg-gradient-to-br from-red-50 to-pink-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={() => navigate("/debts")}
-              >
-                <ExclamationCircleOutlined className="text-2xl text-red-600 mb-2" />
-                <div className="font-medium text-gray-700">Menaxho Borxhet</div>
-              </Card>
-          </Col>
-        )}
-        {canViewReports && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-              <Card
-                hoverable
-                className="text-center cursor-pointer bg-gradient-to-br from-cyan-50 to-teal-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-                onClick={() => navigate("/reports")}
-              >
-                <BarChartOutlined className="text-2xl text-cyan-600 mb-2" />
-                <div className="font-medium text-gray-700">Shiko Raportet</div>
-              </Card>
-          </Col>
-        )}
-        {canManageExpenses && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Card
-              hoverable
-              className="text-center cursor-pointer bg-gradient-to-br from-red-50 to-rose-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-              onClick={() => navigate("/expenses")}
-            >
-              <DollarOutlined className="text-2xl text-red-600 mb-2" />
-              <div className="font-medium text-gray-700">Ndjek Shpenzimet</div>
-            </Card>
-          </Col>
-        )}
-        {canManagePurchases && (
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Card
-              hoverable
-              className="text-center cursor-pointer bg-gradient-to-br from-orange-50 to-amber-100 border-0 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-105"
-              onClick={() => navigate("/purchases")}
-            >
-              <ShoppingOutlined className="text-2xl text-orange-600 mb-2" />
-              <div className="font-medium text-gray-700">Menaxho Blerjet</div>
-            </Card>
-          </Col>
-        )}
+      <Row gutter={[14, 14]}>
+        <Col span={4}>
+          <KpiCard
+            title="Të Ardhurat"
+            value={stats?.currentMonthIncome}
+            unit={currency}
+            icon={<RiseOutlined />}
+            tone="green"
+            trend={getTrend(currentMonthData.income, previousMonthData.income)}
+            trendLabel={previousMonthLabel}
+          />
+        </Col>
+        <Col span={4}>
+          <KpiCard
+            title="Shpenzimet"
+            value={currentMonthOutflow}
+            unit={currency}
+            icon={<DollarOutlined />}
+            tone="red"
+            trend={getTrend(currentMonthData.outflow, previousMonthData.outflow, true)}
+            trendLabel={previousMonthLabel}
+          />
+        </Col>
+        <Col span={4}>
+          <KpiCard
+            title="Fitimi Neto"
+            value={stats?.currentMonthProfit}
+            unit={currency}
+            icon={<LineChartOutlined />}
+            tone="blue"
+            valueDecimals={2}
+            trend={getTrend(currentMonthData.netProfit, previousMonthData.netProfit)}
+            trendLabel={previousMonthLabel}
+          />
+        </Col>
+        <Col span={4}>
+          <KpiCard
+            title="Fatura"
+            value={stats?.currentMonthArchivedInvoices || 0}
+            unit={currency}
+            icon={<FileTextOutlined />}
+            tone="violet"
+            valueDecimals={1}
+            trend={getTrend(
+              stats?.currentMonthArchivedInvoices,
+              previousMonthData.income ? previousMonthData.income * 0.6 : 0
+            )}
+            trendLabel={previousMonthLabel}
+          />
+        </Col>
+        <Col span={4}>
+          <KpiCard
+            title="Detyrat e punëtorëve aktive"
+            value={activeWorkCount}
+            unit="punë"
+            icon={<ProjectOutlined />}
+            tone="orange"
+            trend={getTrend(activeWorkCount, Math.max(0, activeWorkCount - 1))}
+            trendLabel={previousMonthLabel}
+          />
+        </Col>
+        <Col span={4}>
+          <KpiCard
+            title="Borxhet"
+            value={debtExposure}
+            unit={currency}
+            icon={<ExclamationCircleOutlined />}
+            tone="red"
+            valueDecimals={2}
+            trend={getTrend(debtExposure, debtExposure * 1.05, true)}
+            trendLabel={previousMonthLabel}
+          />
+        </Col>
       </Row>
 
-      {/* Recent Data Tables */}
-      <Row gutter={[16, 16]} className="mt-8">
-        {canManageEmployees && (
-          <Col xs={24} lg={12}>
-              <Card
-                title="Punëtorët e Fundit"
-                className="bg-white border-0 shadow-lg"
-                extra={
-                  <Button
-                    type="link"
-                    onClick={() => navigate("/employees")}
-                  >
-                    Shiko Të Gjitha
-                  </Button>
-                }
-              >
-                <Table
-                  dataSource={recentData.employees}
-                  pagination={false}
-                  size="small"
-                  columns={[
-                    {
-                      title: "Emri",
-                      dataIndex: "fullName",
-                      key: "fullName",
-                      render: (name) => <Text strong>{name}</Text>,
-                    },
-                    {
-                      title: "Pozicioni",
-                      dataIndex: "position",
-                      key: "position",
-                      render: (position) => (
-                        <Tag
-                          color={
-                            position === "magazine" ||
-                            position === "Magazine" ||
-                            position === 0
-                              ? "blue"
-                              : "green"
-                          }
-                        >
-                          {position === "magazine" ||
-                          position === "Magazine" ||
-                          position === 0
-                            ? "Magazinë"
-                            : "Terren"}
-                        </Tag>
-                      ),
-                    },
-                    {
-                      title: "Paga",
-                      dataIndex: "monthlySalary",
-                      key: "monthlySalary",
-                      render: (salary) => `${(salary || 0).toFixed(2)} ден`,
-                    },
-                  ]}
-                />
-              </Card>
-          </Col>
-        )}
-        {canManageIncomes && (
-          <Col xs={24} lg={12}>
-              <Card
-                title="Të Ardhurat e Fundit"
-                className="bg-white border-0 shadow-lg"
-                extra={
-                  <Button
-                    type="link"
-                    onClick={() => navigate("/incomes")}
-                  >
-                    Shiko Të Gjitha
-                  </Button>
-                }
-              >
-                <Table
-                  dataSource={recentData.incomes}
-                  pagination={false}
-                  size="small"
-                  columns={[
-                    {
-                      title: "Burimi",
-                      dataIndex: "source",
-                      key: "source",
-                      render: (source) => <Tag color="green">{source}</Tag>,
-                    },
-                    {
-                      title: "Shuma",
-                      dataIndex: "amount",
-                      key: "amount",
-                      render: (amount) => (
-                        <Text strong style={{ color: "#52c41a" }}>
-                          {(amount || 0).toFixed(2)} ден
-                        </Text>
-                      ),
-                    },
-                    {
-                      title: "Data",
-                      dataIndex: "date",
-                      key: "date",
-                      render: (date) => dayjs(date).format("MM/DD"),
-                    },
-                  ]}
-                />
-              </Card>
-          </Col>
-        )}
+      <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
+        <Col span={10}>
+          <SectionCard title="Të Ardhurat, Shpenzimet & Fitimi Neto" minHeight={340}>
+            <FinancialOverviewChart data={monthlyChartData} currency={currency} />
+          </SectionCard>
+        </Col>
+        <Col span={7}>
+          <SectionCard title={`Shpenzimet sipas Kategorisë (${currentMonthTitle})`} minHeight={340}>
+            <ExpenseDonut
+              items={expenseCategoryData}
+              total={stats?.currentMonthExpenses}
+              currency={currency}
+            />
+          </SectionCard>
+        </Col>
+        <Col span={7}>
+          <SectionCard title="Situata e Borxheve" minHeight={340}>
+            <DebtSituation
+              summary={dashboardData.debtsSummary}
+              currency={currency}
+              onOpen={navigate}
+            />
+          </SectionCard>
+        </Col>
       </Row>
 
-      <Row gutter={[16, 16]} className="mt-6">
-        {canManageExpenses && (
-          <Col xs={24} lg={12}>
-          <Card
-            title="Shpenzimet e Fundit"
-            className="bg-white border-0 shadow-lg"
+      <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
+        <Col span={8}>
+          <SectionCard
+            title="Aktivitetet e Fundit"
             extra={
-              <Button
-                type="link"
-                onClick={() => navigate("/expenses")}
-              >
-                Shiko Të Gjitha
+              <Button type="link" onClick={() => navigate("/reports")}>
+                Shiko të gjitha aktivitetet
               </Button>
             }
           >
-            <Table
-              dataSource={recentData.expenses}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: "Lloji",
-                  dataIndex: "expenseType",
-                  key: "expenseType",
-                  render: (type) => <Tag color="red">{type}</Tag>,
-                },
-                {
-                  title: "Shuma",
-                  dataIndex: "amount",
-                  key: "amount",
-                  render: (amount) => (
-                    <Text strong style={{ color: "#ff4d4f" }}>
-                      {(amount || 0).toFixed(2)} ден
-                    </Text>
-                  ),
-                },
-                {
-                  title: "Data",
-                  dataIndex: "date",
-                  key: "date",
-                  render: (date) => dayjs(date).format("MM/DD"),
-                },
-              ]}
-            />
-          </Card>
-          </Col>
-        )}
-        {canManagePurchases && (
-          <Col xs={24} lg={12}>
-          <Card
-            title="Blerjet e Fundit"
-            className="bg-white border-0 shadow-lg"
+            <ActivityFeed items={activityItems} onOpen={navigate} />
+          </SectionCard>
+        </Col>
+        <Col span={8}>
+          <SectionCard
+            title="Faturat e Fundit"
             extra={
-              <Button
-                type="link"
-                onClick={() => navigate("/purchases")}
-              >
-                Shiko Të Gjitha
-              </Button>
+              canManageInvoices ? (
+                <Button type="link" onClick={() => navigate("/invoice-archive")}>
+                  Shiko të gjitha
+                </Button>
+              ) : null
             }
           >
-            <Table
-              dataSource={recentData.purchases}
-              pagination={false}
-              size="small"
-              columns={[
-                {
-                  title: "Artikulli",
-                  dataIndex: "itemName",
-                  key: "itemName",
-                  render: (name) => <Text strong>{name}</Text>,
-                },
-                {
-                  title: "Çmimi",
-                  dataIndex: "totalPrice",
-                  key: "totalPrice",
-                  render: (price) => (
-                    <Text strong style={{ color: "#fa8c16" }}>
-                      {(price || 0).toFixed(2)} ден
-                    </Text>
-                  ),
-                },
-                {
-                  title: "Data",
-                  dataIndex: "purchaseDate",
-                  key: "purchaseDate",
-                  render: (date) => dayjs(date).format("MM/DD"),
-                },
-              ]}
-            />
-          </Card>
-          </Col>
-        )}
+            <RecentInvoices invoices={sortedInvoices} currency={currency} onOpen={navigate} />
+          </SectionCard>
+        </Col>
+        <Col span={8}>
+          <SectionCard
+            title="Stoku - Paralajmërime"
+            extra={
+              canManageStock ? (
+                <Button type="link" onClick={() => navigate("/stock/material")}>
+                  Shiko të gjitha
+                </Button>
+              ) : null
+            }
+          >
+            <StockWarnings items={lowStockItems} onOpen={navigate} />
+          </SectionCard>
+        </Col>
       </Row>
 
-      {/* Remove the summary card at the bottom */}
+      <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
+        <Col span={6}>
+          <SectionCard
+            title="Punëtorë"
+            extra={
+              canManageEmployees ? (
+                <Button type="link" onClick={() => navigate("/employees")}>
+                  Shiko të gjithë punëtorët
+                </Button>
+              ) : null
+            }
+          >
+            <WorkerSummary
+              total={employeeTotal}
+              active={displayedActiveEmployees}
+              inactive={inactiveEmployees}
+            />
+          </SectionCard>
+        </Col>
+        <Col span={7}>
+          <SectionCard
+            title="Detyrat e punëtorëve aktive"
+            extra={
+              activeWorkItems.length ? (
+                <Button
+                  type="link"
+                  onClick={() => navigate(activeProjects.length ? "/projects" : "/worker-tasks")}
+                >
+                  Shiko të gjitha
+                </Button>
+              ) : null
+            }
+          >
+            <ActiveWork items={activeWorkItems} onOpen={navigate} />
+          </SectionCard>
+        </Col>
+        <Col span={11}>
+          <SectionCard title="Veprime të Shpejta">
+            <QuickActions actions={quickActions} onOpen={navigate} />
+          </SectionCard>
+        </Col>
+      </Row>
     </div>
   );
 }

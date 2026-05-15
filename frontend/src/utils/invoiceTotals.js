@@ -2,6 +2,20 @@
  * Line subtotal = sum of row line totals. Discount % applies only to that subtotal.
  * Advance is a fixed amount in main currency (MKD). Balance due cannot go below zero for display.
  */
+export const DEFAULT_EUR_EXCHANGE_RATE = 61.67;
+
+export function parsePositiveExchangeRate(
+  value,
+  fallback = DEFAULT_EUR_EXCHANGE_RATE
+) {
+  const rate = Number(String(value || "").trim().replace(",", "."));
+  return Number.isFinite(rate) && rate > 0 ? rate : fallback;
+}
+
+export const EUR_EXCHANGE_RATE = parsePositiveExchangeRate(
+  process.env.REACT_APP_EUR_TO_MKD_RATE
+);
+
 export function parseInvoiceNumberInput(value) {
   if (value === null || value === undefined) {
     return NaN;
@@ -67,4 +81,22 @@ export function computeInvoiceTotals(rows, discountPercentStr, advanceStr) {
 export function formatMkd(value) {
   const n = Number(value) || 0;
   return `${n.toFixed(2)} ден`;
+}
+
+export function convertBaseTotalToEur(value, exchangeRate = EUR_EXCHANGE_RATE) {
+  const amount = Number(value) || 0;
+  const rate = Number(exchangeRate);
+  return rate > 0 ? amount / rate : 0;
+}
+
+export function formatEur(value) {
+  const n = Number(value) || 0;
+  return `${n.toLocaleString("mk-MK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} \u20AC`;
+}
+
+export function formatEurFromBase(value, exchangeRate = EUR_EXCHANGE_RATE) {
+  return formatEur(convertBaseTotalToEur(value, exchangeRate));
 }

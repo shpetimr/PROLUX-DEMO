@@ -344,6 +344,7 @@ namespace backend.Services
             var discountPercent = totals?.DiscountPercent ?? 0;
             var discountAmount = totals?.DiscountAmount ?? 0;
             var totalAfterDiscount = totals?.TotalAfterDiscount;
+            var eurExchangeRate = totals?.EurExchangeRate;
             var advance = totals?.Advance ?? 0;
             var balanceDue = totals?.BalanceDue ?? invoice.Total;
             var hasDiscount = discountPercent > 0 || discountAmount > 0;
@@ -375,6 +376,7 @@ namespace backend.Services
 
                 col.Item().PaddingBottom(4).BorderBottom(1).BorderColor("#DEDEDE").Text(labels.Total).Bold().FontSize(9);
 
+                var hasEurTotalRow = false;
                 AddRow(labels.Subtotal, FormatMoney(lineSubtotal));
 
                 if (hasDiscount)
@@ -385,6 +387,8 @@ namespace backend.Services
                 if (totalAfterDiscount.HasValue && hasBreakdown)
                 {
                     AddRow(labels.TotalAfterDiscount, FormatMoney(totalAfterDiscount.Value));
+                    AddRow(labels.TotalInEur, FormatEuroFromBaseCurrency(totalAfterDiscount.Value, eurExchangeRate));
+                    hasEurTotalRow = true;
                 }
 
                 if (hasAdvance)
@@ -398,6 +402,11 @@ namespace backend.Services
                     row.RelativeItem().Text(totalLabel).Bold();
                     row.ConstantItem(90).AlignRight().Text(FormatMoney(balanceDue)).Bold().FontSize(12);
                 });
+
+                if (!hasEurTotalRow)
+                {
+                    AddRow(labels.TotalInEur, FormatEuroFromBaseCurrency(balanceDue, eurExchangeRate));
+                }
             });
         }
 
@@ -495,6 +504,8 @@ namespace backend.Services
                 TryReadPropertyAsDecimal(totalsElement, "discountPercent"),
                 TryReadPropertyAsDecimal(totalsElement, "discountAmount"),
                 TryReadPropertyAsDecimal(totalsElement, "totalAfterDiscount"),
+                TryReadPropertyAsDecimal(totalsElement, "eurExchangeRate")
+                    ?? TryReadPropertyAsDecimal(totalsElement, "eurExchangeRateInput"),
                 TryReadPropertyAsDecimal(totalsElement, "advance"),
                 TryReadPropertyAsDecimal(totalsElement, "balanceDue"));
         }
@@ -604,6 +615,15 @@ namespace backend.Services
             return $"{value:0.00} MKD";
         }
 
+        static string FormatEuroFromBaseCurrency(decimal value, decimal? exchangeRate = null)
+        {
+            var rate = exchangeRate.HasValue && exchangeRate.Value > 0m
+                ? exchangeRate.Value
+                : CurrencyConfig.Conversion.EUR_TO_MKD_RATE;
+            var eurValue = rate > 0m ? value / rate : 0m;
+            return $"{eurValue:0.00} \u20AC";
+        }
+
         sealed record ArchivedInvoiceSnapshot(
             IReadOnlyList<ArchivedInvoiceItem> Items,
             string? InvoiceDate,
@@ -623,6 +643,7 @@ namespace backend.Services
             decimal? DiscountPercent,
             decimal? DiscountAmount,
             decimal? TotalAfterDiscount,
+            decimal? EurExchangeRate,
             decimal? Advance,
             decimal? BalanceDue);
 
@@ -645,6 +666,7 @@ namespace backend.Services
             string Subtotal,
             string Discount,
             string TotalAfterDiscount,
+            string TotalInEur,
             string Advance,
             string BalanceDue,
             string Total,
@@ -672,6 +694,7 @@ namespace backend.Services
                         "\u041C\u0435\u0453\u0443\u0437\u0431\u0438\u0440",
                         "\u041F\u043E\u043F\u0443\u0441\u0442",
                         "\u0412\u043A\u0443\u043F\u043D\u043E \u043F\u043E \u043F\u043E\u043F\u0443\u0441\u0442",
+                        "\u0412\u043A\u0443\u043F\u043D\u043E \u0432\u043E EUR",
                         "\u0410\u0432\u0430\u043D\u0441",
                         "\u0417\u0430 \u043F\u043B\u0430\u045C\u0430\u045A\u0435",
                         "\u0412\u043A\u0443\u043F\u043D\u043E",
@@ -695,6 +718,7 @@ namespace backend.Services
                         "N\u00EBntotali",
                         "Zbritja",
                         "Total pas zbritjes",
+                        "Totali n\u00EB EUR",
                         "Avans",
                         "P\u00EBr t\u00EB paguar",
                         "Totali",

@@ -48,6 +48,8 @@ namespace backend.DTOs
         public string ItemsJson { get; set; } = string.Empty;
         public decimal Subtotal { get; set; }
         public decimal Total { get; set; }
+        public decimal TotalEur { get; set; }
+        public decimal EurExchangeRate { get; set; }
         public string? Notes { get; set; }
         public DateTime CreatedAt { get; set; }
         public int CreatedById { get; set; }

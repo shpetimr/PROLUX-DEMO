@@ -8,6 +8,7 @@ using backend.Data;
 using backend.DTOs;
 using backend.Models;
 using backend.Services;
+using backend.Utilities;
 
 namespace backend.Controllers
 {
@@ -45,25 +46,9 @@ namespace backend.Controllers
                 .Include(invoice => invoice.CreatedBy)
                 .OrderByDescending(invoice => invoice.CreatedAt)
                 .ThenByDescending(invoice => invoice.Id)
-                .Select(invoice => new InvoiceArchiveResponseDto
-                {
-                    Id = invoice.Id,
-                    InvoiceNumber = invoice.InvoiceNumber,
-                    CustomerName = invoice.CustomerName,
-                    CustomerAddress = invoice.CustomerAddress,
-                    CustomerPhone = invoice.CustomerPhone,
-                    Language = invoice.Language,
-                    ItemsJson = invoice.ItemsJson,
-                    Subtotal = invoice.Subtotal,
-                    Total = invoice.Total,
-                    Notes = invoice.Notes,
-                    CreatedAt = invoice.CreatedAt,
-                    CreatedById = invoice.CreatedById,
-                    CreatedByFullName = invoice.CreatedBy.FullName
-                })
                 .ToListAsync();
 
-            return Ok(invoices);
+            return Ok(invoices.Select(ToDto).ToList());
         }
 
         [HttpGet("{id:int}")]
@@ -195,7 +180,7 @@ namespace backend.Controllers
                 Language = dto.Language!.Value,
                 ItemsJson = dto.ItemsJson,
                 Subtotal = dto.Subtotal,
-                Total = dto.Total,
+                Total = InvoiceArchiveFinancials.GetRevenueTotal(dto.ItemsJson, dto.Total),
                 Notes = NormalizeOptional(dto.Notes),
                 CreatedAt = DateTime.UtcNow,
                 CreatedById = currentUser.Id,
@@ -270,7 +255,7 @@ namespace backend.Controllers
                     Language = dto.Language!.Value,
                     ItemsJson = dto.ItemsJson,
                     Subtotal = dto.Subtotal,
-                    Total = dto.Total,
+                    Total = InvoiceArchiveFinancials.GetRevenueTotal(dto.ItemsJson, dto.Total),
                     Notes = NormalizeOptional(dto.Notes),
                     CreatedAt = createdAt,
                     CreatedById = currentUser.Id
@@ -354,6 +339,8 @@ namespace backend.Controllers
                 ItemsJson = invoice.ItemsJson,
                 Subtotal = invoice.Subtotal,
                 Total = invoice.Total,
+                TotalEur = InvoiceArchiveFinancials.GetTotalEur(invoice),
+                EurExchangeRate = InvoiceArchiveFinancials.GetEurExchangeRate(invoice),
                 Notes = invoice.Notes,
                 CreatedAt = invoice.CreatedAt,
                 CreatedById = invoice.CreatedById,

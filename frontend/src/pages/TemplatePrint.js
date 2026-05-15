@@ -14,7 +14,10 @@ import { PrinterOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
 import {
   computeInvoiceTotals,
+  EUR_EXCHANGE_RATE,
+  formatEurFromBase,
   formatInvoiceLineTotal,
+  parsePositiveExchangeRate,
 } from "../utils/invoiceTotals";
 import apiClient, { API_ENDPOINTS } from "../config/api";
 
@@ -294,6 +297,14 @@ const INVOICE_PRINT_STYLES = `
     font-weight: 700;
   }
 
+  .invoice-eur-total {
+    color: #475569;
+  }
+
+  .invoice-eur-total .invoice-total-value {
+    color: #166534;
+  }
+
   .invoice-footer {
     display: flex;
     justify-content: space-between;
@@ -378,9 +389,11 @@ const TEXT = {
     description: "P\u00EBrshkrimi",
     discount: "Zbritja (%)",
     advance: "Avans / Parapagim (MKD)",
+    eurRate: "Kursi EUR/MKD",
     subtotal: "N\u00EBntotali (shuma e rreshtave)",
     discountRow: (percent) => `Zbritja (${percent}%)`,
     totalAfterDiscount: "Totali pas zbritjes",
+    totalInEur: "Totali n\u00EB EUR",
     advanceRow: "Avans i klientit",
     balanceDue: "P\u00EBr t\u00EB paguar",
     currency: "MKD",
@@ -415,11 +428,14 @@ const TEXT = {
     description: "\u041E\u043F\u0438\u0441",
     discount: "\u041F\u043E\u043F\u0443\u0441\u0442 (%)",
     advance: "\u0410\u0432\u0430\u043D\u0441 / \u043F\u0440\u0435\u0442\u043F\u043B\u0430\u0442\u0430 (MKD)",
+    eurRate: "\u041A\u0443\u0440\u0441 EUR/MKD",
     subtotal:
       "\u041C\u0435\u0453\u0443\u0437\u0431\u0438\u0440 (\u0441\u0443\u043C\u0430 \u043D\u0430 \u0440\u0435\u0434\u043E\u0432\u0438)",
     discountRow: (percent) => `\u041F\u043E\u043F\u0443\u0441\u0442 (${percent}%)`,
     totalAfterDiscount:
       "\u0412\u043A\u0443\u043F\u043D\u043E \u043F\u043E \u043F\u043E\u043F\u0443\u0441\u0442",
+    totalInEur:
+      "\u0412\u043A\u0443\u043F\u043D\u043E \u0432\u043E EUR",
     advanceRow:
       "\u0410\u0432\u0430\u043D\u0441 \u043E\u0434 \u043A\u043B\u0438\u0435\u043D\u0442",
     balanceDue:
@@ -612,6 +628,11 @@ const readIssuedInvoiceNumber = (response) =>
 const getInvoiceNumberMode = (invoiceNumber) =>
   invoiceNumber ? "provided" : "auto";
 
+const formatExchangeRateInput = (value) => {
+  const rate = Number(value);
+  return Number.isFinite(rate) && rate > 0 ? String(rate) : String(EUR_EXCHANGE_RATE);
+};
+
 const PRINT_DIAGNOSTIC_PREFIX = "[TemplatePrint:print]";
 
 const logPrintDiagnostic = (step, details = {}) => {
@@ -651,18 +672,27 @@ function TemplatePrint() {
     Array.from({ length: DESCRIPTION_LINE_COUNT }, () => "")
   );
   const [stockItems, setStockItems] = useState([]);
+  const [eurExchangeRateInput, setEurExchangeRateInput] = useState(
+    formatExchangeRateInput(EUR_EXCHANGE_RATE)
+  );
   const [archivedSnapshotDirty, setArchivedSnapshotDirty] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
   const printRef = useRef();
   const issuedInvoiceSignatureRef = useRef(null);
   const invoiceRequestIdRef = useRef(createClientRequestId());
   const printInProgressRef = useRef(false);
+  const eurExchangeRateEditedRef = useRef(false);
 
   const labels = TEXT[language] || TEXT.Albanian;
 
   const totals = useMemo(
     () => computeInvoiceTotals(rows, discountPercent, advancePayment),
     [rows, discountPercent, advancePayment]
+  );
+
+  const eurExchangeRate = useMemo(
+    () => parsePositiveExchangeRate(eurExchangeRateInput, EUR_EXCHANGE_RATE),
+    [eurExchangeRateInput]
   );
 
   const columns = useMemo(
@@ -679,6 +709,23 @@ function TemplatePrint() {
 
   useEffect(() => {
     let cancelled = false;
+
+    const fetchCurrency = async () => {
+      try {
+        const response = await apiClient.get(API_ENDPOINTS.CURRENCY);
+        const rate = Number(response.data?.conversion?.eurToMkdRate);
+        if (
+          !cancelled &&
+          !eurExchangeRateEditedRef.current &&
+          Number.isFinite(rate) &&
+          rate > 0
+        ) {
+          setEurExchangeRateInput(formatExchangeRateInput(rate));
+        }
+      } catch {
+        // Keep the local fallback rate; invoice calculations remain in base currency.
+      }
+    };
 
     const fetchStockItems = async () => {
       try {
@@ -701,6 +748,7 @@ function TemplatePrint() {
       }
     };
 
+    fetchCurrency();
     fetchStockItems();
 
     return () => {
@@ -741,6 +789,16 @@ function TemplatePrint() {
           readProperty(snapshotTotals, ["advance"])
       )
     );
+    setEurExchangeRateInput(
+      textValue(
+        readProperty(snapshotTotals, ["eurExchangeRateInput"]) ??
+          readProperty(snapshotTotals, ["eurExchangeRate"]) ??
+          archivedInvoice.eurExchangeRate ??
+          archivedInvoice.EurExchangeRate ??
+          EUR_EXCHANGE_RATE
+      )
+    );
+    eurExchangeRateEditedRef.current = false;
     setArchivedSnapshotDirty(false);
     issuedInvoiceSignatureRef.current = null;
   }, [location.state]);
@@ -847,6 +905,12 @@ function TemplatePrint() {
     });
   };
 
+  const handleEurExchangeRateChange = (value) => {
+    eurExchangeRateEditedRef.current = true;
+    markInvoiceEdited();
+    setEurExchangeRateInput(value);
+  };
+
   const buildArchivePayload = () => ({
     invoiceNumber: header.invoice.trim(),
     clientRequestId: invoiceRequestIdRef.current,
@@ -875,13 +939,15 @@ function TemplatePrint() {
         discountPercentInput: discountPercent,
         discountAmount: totals.discountAmount,
         totalAfterDiscount: totals.totalAfterDiscount,
+        eurExchangeRate,
+        eurExchangeRateInput,
         advance: totals.advance,
         advanceInput: advancePayment,
         balanceDue: totals.balanceDue,
       },
     }),
     subtotal: totals.lineSubtotal,
-    total: totals.balanceDue,
+    total: totals.totalAfterDiscount,
     notes: null,
   });
 
@@ -1410,6 +1476,16 @@ function TemplatePrint() {
               />
             </div>
             <div className="invoice-total-row">
+              <span className="invoice-total-label">{labels.eurRate}</span>
+              <Input
+                className="invoice-adjustment-input"
+                placeholder={formatExchangeRateInput(EUR_EXCHANGE_RATE)}
+                value={eurExchangeRateInput}
+                onChange={(e) => handleEurExchangeRateChange(e.target.value)}
+                bordered={false}
+              />
+            </div>
+            <div className="invoice-total-row">
               <span className="invoice-total-label">{labels.subtotal}</span>
               <span className="invoice-total-value">
                 {formatCurrency(totals.lineSubtotal)}
@@ -1429,6 +1505,12 @@ function TemplatePrint() {
               </span>
               <span className="invoice-total-value">
                 {formatCurrency(totals.totalAfterDiscount)}
+              </span>
+            </div>
+            <div className="invoice-total-row invoice-eur-total">
+              <span className="invoice-total-label">{labels.totalInEur}</span>
+              <span className="invoice-total-value">
+                {formatEurFromBase(totals.totalAfterDiscount, eurExchangeRate)}
               </span>
             </div>
             <div className="invoice-total-row">

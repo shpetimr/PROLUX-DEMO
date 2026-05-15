@@ -28,6 +28,7 @@ import apiClient, { API_ENDPOINTS } from "../config/api";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import { useDataChange } from "../contexts/DataChangeContext";
+import { EUR_EXCHANGE_RATE, formatEurFromBase } from "../utils/invoiceTotals";
 
 dayjs.extend(utc);
 
@@ -74,6 +75,7 @@ function Reports() {
     },
     netProfit: 0,
     margin: 0,
+    eurExchangeRate: EUR_EXCHANGE_RATE,
   });
   const { dataChanged } = useDataChange();
 
@@ -114,11 +116,21 @@ function Reports() {
     setLoading(true);
     try {
       const [year, month] = selectedMonth.split("-").map(Number);
-      const response = await apiClient.get(
-        API_ENDPOINTS.FINANCIAL_CALCULATIONS.MONTHLY,
-        { params: { year, month } }
-      );
+      const [response, currencyResponse] = await Promise.all([
+        apiClient.get(
+          API_ENDPOINTS.FINANCIAL_CALCULATIONS.MONTHLY,
+          { params: { year, month } }
+        ),
+        apiClient.get(API_ENDPOINTS.CURRENCY).catch(() => null),
+      ]);
       const summary = response.data?.financialSummary || {};
+      const configuredEurExchangeRate = Number(
+        currencyResponse?.data?.conversion?.eurToMkdRate
+      );
+      const eurExchangeRate =
+        Number.isFinite(configuredEurExchangeRate) && configuredEurExchangeRate > 0
+          ? configuredEurExchangeRate
+          : EUR_EXCHANGE_RATE;
       const totalIncome = Number(summary.totalIncome || 0);
       const totalExpenses = Number(summary.totalExpenses || 0);
       const totalPurchases = Number(summary.totalPurchases || 0);
@@ -158,6 +170,7 @@ function Reports() {
         },
         netProfit,
         margin,
+        eurExchangeRate,
       });
     } catch (error) {
       console.error("Error fetching financial data:", error);
@@ -296,7 +309,11 @@ function Reports() {
                     suffix="DEN"
                   />
                   <Text type="secondary">
-                    {monthlyTotals.archivedInvoicesCount} fatura
+                    {monthlyTotals.archivedInvoicesCount} fatura{" \u00B7 "}
+                    {formatEurFromBase(
+                      monthlyTotals.totalArchivedInvoices,
+                      monthlyTotals.eurExchangeRate
+                    )}
                   </Text>
                 </Card>
               </Col>
