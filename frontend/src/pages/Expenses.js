@@ -229,9 +229,9 @@ function Expenses() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="responsive-page-header flex justify-between items-center mb-6">
         <Title level={2}>Menaxhimi i Shpenzimeve</Title>
-        <Space>
+        <Space wrap>
           {canViewReports && (
             <Button
               type="default"
@@ -302,6 +302,7 @@ function Expenses() {
           dataSource={expenses}
           rowKey="id"
           loading={loading}
+          scroll={{ x: "max-content" }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,

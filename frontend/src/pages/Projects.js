@@ -464,7 +464,7 @@ const Projects = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="responsive-page-header flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
             Objektet e Rradhës 2025/26
@@ -482,8 +482,8 @@ const Projects = () => {
       </div>
 
       {/* Statistics Cards */}
-      <Row gutter={16}>
-        <Col span={6}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
               title="Gjithsej Projekte"
@@ -497,7 +497,7 @@ const Projects = () => {
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
               title="Në Progres"
@@ -507,7 +507,7 @@ const Projects = () => {
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
               title="Përfunduar"
@@ -517,7 +517,7 @@ const Projects = () => {
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
               title="Prometi Gjithsej"
@@ -532,8 +532,8 @@ const Projects = () => {
 
       {/* Status Filter */}
       <Card>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-2">
+        <div className="responsive-page-header flex justify-between items-center mb-4">
+          <div className="flex flex-wrap gap-2">
             <Button
               type={statusFilter === "all" ? "primary" : "default"}
               onClick={() => setStatusFilter("all")}
@@ -600,8 +600,8 @@ const Projects = () => {
             status: "Pending",
           }}
         >
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="name"
                 label="Emri i Objektit"
@@ -615,7 +615,7 @@ const Projects = () => {
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="content"
                 label="Permbajtja"
@@ -628,8 +628,8 @@ const Projects = () => {
             </Col>
           </Row>
 
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="startDate"
                 label="Data e Fillimit"
@@ -647,7 +647,7 @@ const Projects = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="endDate"
                 label="Data e Përfundimit"
@@ -667,8 +667,8 @@ const Projects = () => {
             </Col>
           </Row>
 
-          <Row gutter={16}>
-            <Col span={8}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="promet"
                 label="Totali (MKD)"
@@ -679,12 +679,12 @@ const Projects = () => {
                 <Input type="number" placeholder="0.00" addonAfter="MKD" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="expenses" label="Harxhimet (MKD)">
                 <Input type="number" placeholder="0.00" addonAfter="MKD" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item label="Fitimi (MKD)">
                 <Input
                   disabled

@@ -364,7 +364,7 @@ function Debts() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="responsive-page-header flex justify-between items-center mb-6">
         <Title level={2}>Menaxhimi i Borxheve</Title>
         <Button
           type="primary"

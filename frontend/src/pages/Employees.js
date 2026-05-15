@@ -978,7 +978,7 @@ function Employees() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="responsive-page-header flex justify-between items-center mb-6">
         <Title level={2}>Menaxhimi i Punëtorëve</Title>
         <Space wrap>
           <DatePicker
@@ -1203,7 +1203,7 @@ function Employees() {
           <div>
             <div className="mb-4">
               <Row gutter={16} align="middle">
-                <Col span={6}>
+                <Col xs={24} sm={12} lg={6}>
                   <Form.Item label="Muaji">
                     <DatePicker
                       picker="month"
@@ -1215,21 +1215,21 @@ function Employees() {
                     />
                   </Form.Item>
                 </Col>
-                <Col span={6}>
+                <Col xs={24} sm={12} lg={6}>
                   <div className="text-center">
                     <Text strong>
                       Punëtori: {selectedEmployeeForAttendance.fullName}
                     </Text>
                   </div>
                 </Col>
-                <Col span={6}>
+                <Col xs={24} sm={12} lg={6}>
                   <div className="text-center">
                     <Text strong>
                       Ditët e Munguara: {calendarDays.filter(d => !d.isPresent).length}
                     </Text>
                   </div>
                 </Col>
-                <Col span={6}>
+                <Col xs={24} sm={12} lg={6}>
                   <div className="text-center">
                     <Text strong>
                       Ditët e Punuara: {calendarDays.filter(d => d.isPresent).length}
@@ -1344,7 +1344,7 @@ function Employees() {
             {/* Attendance Summary */}
             <Card title="Përmbledhje e Pranisë" className="mt-4">
               <Row gutter={16}>
-                <Col span={8}>
+                <Col xs={24} sm={8}>
                   <div className="text-center">
                     <Text strong>Ditët e Punuara</Text>
                     <div className="text-2xl text-green-600">
@@ -1352,7 +1352,7 @@ function Employees() {
                     </div>
                   </div>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={8}>
                   <div className="text-center">
                     <Text strong>Ditët e Munguara</Text>
                     <div className="text-2xl text-red-600">
@@ -1360,7 +1360,7 @@ function Employees() {
                     </div>
                   </div>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={8}>
                   <div className="text-center">
                     <Text strong>Gjithsej Ditë</Text>
                     <div className="text-2xl text-blue-600">
@@ -1386,7 +1386,7 @@ function Employees() {
                     return (
                       <>
                         <Row gutter={[16, 16]}>
-                          <Col span={8}>
+                          <Col xs={24} sm={12} lg={8}>
                             <div className="text-center">
                               <Text>Ditët e Munguara</Text>
                               <div className="text-lg font-semibold text-red-600">
@@ -1394,7 +1394,7 @@ function Employees() {
                               </div>
                             </div>
                           </Col>
-                          <Col span={8}>
+                          <Col xs={24} sm={12} lg={8}>
                             <div className="text-center">
                               <Text>Paga Ditore</Text>
                               <div className="text-lg font-semibold text-blue-600">
@@ -1402,7 +1402,7 @@ function Employees() {
                               </div>
                             </div>
                           </Col>
-                          <Col span={8}>
+                          <Col xs={24} sm={12} lg={8}>
                             <div className="text-center">
                               <Text>Paga Mujore</Text>
                               <div className="text-lg font-semibold text-purple-600">
@@ -1410,7 +1410,7 @@ function Employees() {
                               </div>
                             </div>
                           </Col>
-                          <Col span={8}>
+                          <Col xs={24} sm={12} lg={8}>
                             <div className="text-center">
                               <Text>Bonuset</Text>
                               <div className="text-lg font-semibold text-green-600">
@@ -1418,7 +1418,7 @@ function Employees() {
                               </div>
                             </div>
                           </Col>
-                          <Col span={8}>
+                          <Col xs={24} sm={12} lg={8}>
                             <div className="text-center">
                               <Text>Gjobat</Text>
                               <div className="text-lg font-semibold text-red-600">
@@ -1426,7 +1426,7 @@ function Employees() {
                               </div>
                             </div>
                           </Col>
-                          <Col span={8}>
+                          <Col xs={24} sm={12} lg={8}>
                             <div className="text-center">
                               <Text strong>Paga Finale</Text>
                               <div className="text-xl font-bold text-green-700">

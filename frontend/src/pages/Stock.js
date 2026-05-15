@@ -384,6 +384,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
   return (
     <div>
       <div
+        className="responsive-page-header"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -411,6 +412,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
         loading={loading}
         columns={columns}
         dataSource={visibleItems}
+        scroll={{ x: activeStockType === STOCK_TYPES.Product ? 1320 : 1040 }}
         pagination={{ pageSize: 15, showTotal: (t) => `${t} artikuj` }}
       />
 
@@ -581,6 +583,7 @@ function Stock({ stockType = STOCK_TYPES.Material, title }) {
           rowKey="id"
           dataSource={movements}
           pagination={false}
+          scroll={{ x: 620 }}
           columns={[
             {
               title: "Data",

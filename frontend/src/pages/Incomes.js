@@ -190,7 +190,7 @@ function Incomes() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="responsive-page-header flex justify-between items-center mb-6">
         <Title level={2}>Menaxhimi i Të Ardhurave</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           Shto Të Ardhur
@@ -237,6 +237,7 @@ function Incomes() {
           dataSource={incomes}
           rowKey="id"
           loading={loading}
+          scroll={{ x: "max-content" }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,

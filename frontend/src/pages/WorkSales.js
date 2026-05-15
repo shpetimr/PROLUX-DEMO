@@ -245,7 +245,7 @@ function WorkSales({
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="responsive-page-header flex justify-between items-center mb-6">
         <Title level={2}>{title}</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
           {addButtonLabel}

@@ -232,6 +232,7 @@ function WorkerDashboard() {
 function SectionCard({ title, extra, children, minHeight }) {
   return (
     <Card
+      className="dashboard-section-card"
       bordered={false}
       style={{ ...cardShell, minHeight }}
       styles={{ body: { padding: 18 } }}
@@ -241,6 +242,7 @@ function SectionCard({ title, extra, children, minHeight }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          flexWrap: "wrap",
           gap: 12,
           marginBottom: 14,
         }}
@@ -294,6 +296,7 @@ function KpiCard({
 
   return (
     <Card
+      className="dashboard-kpi-card"
       bordered={false}
       style={{
         ...cardShell,
@@ -431,7 +434,7 @@ function FinancialOverviewChart({ data, currency }) {
   const tooltipY = Math.max(top + 8, Math.min(height - 120, yForValue(latest?.netProfit) - 46));
 
   return (
-    <div>
+    <div className="dashboard-chart-scroll">
       <Space size={18} style={{ marginBottom: 6 }}>
         <LegendDot color="#22a447" label="Të Ardhurat" />
         <LegendDot color="#ef4444" label="Shpenzimet" />
@@ -588,7 +591,10 @@ function ExpenseDonut({ items, total, currency }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center" }}>
+    <div
+      className="dashboard-donut"
+      style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center" }}
+    >
       <svg width="180" height="180" viewBox="0 0 180 180" role="img">
         <circle cx="90" cy="90" r={radius} fill="none" stroke="#eef2f7" strokeWidth="30" />
         {chartItems.map((item, index) => {
@@ -677,6 +683,7 @@ function DebtSituation({ summary, currency, onOpen }) {
     <div style={{ display: "grid", gap: 12 }}>
       {rows.map((row) => (
         <button
+          className="dashboard-debt-row"
           key={row.title}
           type="button"
           onClick={() => onOpen("/debts")}
@@ -730,6 +737,7 @@ function ActivityFeed({ items, onOpen }) {
     <div style={{ display: "grid", gap: 10 }}>
       {items.slice(0, 5).map((item) => (
         <button
+          className="dashboard-list-row"
           key={item.id}
           type="button"
           onClick={() => item.route && onOpen(item.route)}
@@ -791,6 +799,7 @@ function RecentInvoices({ invoices, currency, onOpen }) {
     <div style={{ display: "grid", gap: 11 }}>
       {invoices.slice(0, 5).map((invoice) => (
         <button
+          className="dashboard-invoice-row"
           key={invoice.id}
           type="button"
           onClick={() => onOpen("/invoice-archive")}
@@ -862,6 +871,7 @@ function StockWarnings({ items, onOpen }) {
     <div style={{ display: "grid", gap: 10 }}>
       {items.slice(0, 4).map((item) => (
         <button
+          className="dashboard-list-row"
           key={`${item.stockType}-${item.id}`}
           type="button"
           onClick={() => onOpen(item.stockType === "Product" ? "/stock/product" : "/stock/material")}
@@ -937,7 +947,10 @@ function WorkerSummary({ total, active, inactive }) {
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+    <div
+      className="dashboard-worker-summary"
+      style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(118px, 1fr))", gap: 12 }}
+    >
       {cards.map((card) => (
         <div
           key={card.label}
@@ -984,6 +997,7 @@ function ActiveWork({ items, onOpen }) {
     <div style={{ display: "grid", gap: 14 }}>
       {items.slice(0, 3).map((item) => (
         <button
+          className="dashboard-active-work-item"
           key={item.id}
           type="button"
           onClick={() => onOpen(item.route)}
@@ -1038,7 +1052,10 @@ function QuickActions({ actions, onOpen }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+    <div
+      className="dashboard-quick-actions"
+      style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}
+    >
       {actions.slice(0, 6).map((action) => (
         <Button
           key={action.label}
@@ -1504,6 +1521,7 @@ function Dashboard() {
 
   return (
     <div
+      className="dashboard-shell"
       style={{
         margin: -24,
         padding: 24,
@@ -1513,6 +1531,7 @@ function Dashboard() {
       }}
     >
       <div
+        className="dashboard-header"
         style={{
           display: "flex",
           alignItems: "flex-start",
@@ -1532,7 +1551,7 @@ function Dashboard() {
             Mirë se vini në sistemin e menaxhimit të biznesit
           </Text>
         </div>
-        <Space size={12} wrap={false}>
+        <Space className="dashboard-toolbar" size={12} wrap>
           {isAdmin() && (
             <Tag color="red" icon={<CrownOutlined />} style={{ borderRadius: 999 }}>
               Administrator
@@ -1559,7 +1578,7 @@ function Dashboard() {
       </div>
 
       <Row gutter={[14, 14]}>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={8} xl={4}>
           <KpiCard
             title="Të Ardhurat"
             value={stats?.currentMonthIncome}
@@ -1570,7 +1589,7 @@ function Dashboard() {
             trendLabel={previousMonthLabel}
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={8} xl={4}>
           <KpiCard
             title="Shpenzimet"
             value={currentMonthOutflow}
@@ -1581,7 +1600,7 @@ function Dashboard() {
             trendLabel={previousMonthLabel}
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={8} xl={4}>
           <KpiCard
             title="Fitimi Neto"
             value={stats?.currentMonthProfit}
@@ -1593,7 +1612,7 @@ function Dashboard() {
             trendLabel={previousMonthLabel}
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={8} xl={4}>
           <KpiCard
             title="Fatura"
             value={stats?.currentMonthArchivedInvoices || 0}
@@ -1608,7 +1627,7 @@ function Dashboard() {
             trendLabel={previousMonthLabel}
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={8} xl={4}>
           <KpiCard
             title="Detyrat e punëtorëve aktive"
             value={activeWorkCount}
@@ -1619,7 +1638,7 @@ function Dashboard() {
             trendLabel={previousMonthLabel}
           />
         </Col>
-        <Col span={4}>
+        <Col xs={24} sm={12} md={8} xl={4}>
           <KpiCard
             title="Borxhet"
             value={debtExposure}
@@ -1634,12 +1653,12 @@ function Dashboard() {
       </Row>
 
       <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
-        <Col span={10}>
+        <Col xs={24} lg={24} xl={10}>
           <SectionCard title="Të Ardhurat, Shpenzimet & Fitimi Neto" minHeight={340}>
             <FinancialOverviewChart data={monthlyChartData} currency={currency} />
           </SectionCard>
         </Col>
-        <Col span={7}>
+        <Col xs={24} md={12} xl={7}>
           <SectionCard title={`Shpenzimet sipas Kategorisë (${currentMonthTitle})`} minHeight={340}>
             <ExpenseDonut
               items={expenseCategoryData}
@@ -1648,7 +1667,7 @@ function Dashboard() {
             />
           </SectionCard>
         </Col>
-        <Col span={7}>
+        <Col xs={24} md={12} xl={7}>
           <SectionCard title="Situata e Borxheve" minHeight={340}>
             <DebtSituation
               summary={dashboardData.debtsSummary}
@@ -1660,7 +1679,7 @@ function Dashboard() {
       </Row>
 
       <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
-        <Col span={8}>
+        <Col xs={24} md={12} xl={8}>
           <SectionCard
             title="Aktivitetet e Fundit"
             extra={
@@ -1672,7 +1691,7 @@ function Dashboard() {
             <ActivityFeed items={activityItems} onOpen={navigate} />
           </SectionCard>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={12} xl={8}>
           <SectionCard
             title="Faturat e Fundit"
             extra={
@@ -1686,7 +1705,7 @@ function Dashboard() {
             <RecentInvoices invoices={sortedInvoices} currency={currency} onOpen={navigate} />
           </SectionCard>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={24} xl={8}>
           <SectionCard
             title="Stoku - Paralajmërime"
             extra={
@@ -1703,7 +1722,7 @@ function Dashboard() {
       </Row>
 
       <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
-        <Col span={6}>
+        <Col xs={24} lg={8} xl={6}>
           <SectionCard
             title="Punëtorë"
             extra={
@@ -1721,7 +1740,7 @@ function Dashboard() {
             />
           </SectionCard>
         </Col>
-        <Col span={7}>
+        <Col xs={24} lg={8} xl={7}>
           <SectionCard
             title="Detyrat e punëtorëve aktive"
             extra={
@@ -1738,7 +1757,7 @@ function Dashboard() {
             <ActiveWork items={activeWorkItems} onOpen={navigate} />
           </SectionCard>
         </Col>
-        <Col span={11}>
+        <Col xs={24} lg={8} xl={11}>
           <SectionCard title="Veprime të Shpejta">
             <QuickActions actions={quickActions} onOpen={navigate} />
           </SectionCard>

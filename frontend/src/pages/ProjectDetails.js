@@ -176,8 +176,8 @@ const ProjectDetails = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-4">
+      <div className="responsive-page-header flex justify-between items-center">
+        <div className="flex flex-wrap items-center gap-4">
           <Button
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate("/projects")}
@@ -195,8 +195,8 @@ const ProjectDetails = () => {
       </div>
 
       {/* Project Overview */}
-      <Row gutter={16}>
-        <Col span={8}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
           <Card>
             <Statistic
               title="Prometi"
@@ -207,7 +207,7 @@ const ProjectDetails = () => {
             />
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card>
             <Statistic
               title="Harxhimet"
@@ -218,7 +218,7 @@ const ProjectDetails = () => {
             />
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} md={8}>
           <Card>
             <Statistic
               title="Fitimi"
@@ -290,8 +290,8 @@ const ProjectDetails = () => {
 
       {/* Financial Summary */}
       <Card title="Përmbledhje Financiare">
-        <Row gutter={16}>
-          <Col span={8}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
                 {project.promet?.toLocaleString()} €
@@ -299,7 +299,7 @@ const ProjectDetails = () => {
               <div className="text-sm text-gray-600">Prometi Gjithsej</div>
             </div>
           </Col>
-          <Col span={8}>
+          <Col xs={24} sm={8}>
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <div className="text-2xl font-bold text-red-600">
                 {(project.expenses || 0).toLocaleString()} €
@@ -307,7 +307,7 @@ const ProjectDetails = () => {
               <div className="text-sm text-gray-600">Harxhimet</div>
             </div>
           </Col>
-          <Col span={8}>
+          <Col xs={24} sm={8}>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
                 {(project.profit || 0).toLocaleString()} €
@@ -379,8 +379,8 @@ const ProjectDetails = () => {
         width={800}
       >
         <Form form={form} layout="vertical" onFinish={handleUpdate}>
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="name"
                 label="Emri i Objektit"
@@ -394,7 +394,7 @@ const ProjectDetails = () => {
                 <Input placeholder="Emri i objektit" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="content"
                 label="Permbajtja"
@@ -407,8 +407,8 @@ const ProjectDetails = () => {
             </Col>
           </Row>
 
-          <Row gutter={16}>
-            <Col span={12}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="startDate"
                 label="Data e Fillimit"
@@ -426,7 +426,7 @@ const ProjectDetails = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="endDate"
                 label="Data e Përfundimit"
@@ -446,8 +446,8 @@ const ProjectDetails = () => {
             </Col>
           </Row>
 
-          <Row gutter={16}>
-            <Col span={8}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={8}>
               <Form.Item
                 name="promet"
                 label="Prometi (€)"
@@ -463,7 +463,7 @@ const ProjectDetails = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="expenses" label="Harxhimet (€)">
                 <InputNumber
                   style={{ width: "100%" }}
@@ -473,7 +473,7 @@ const ProjectDetails = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} md={8}>
               <Form.Item name="profit" label="Fitimi (€)">
                 <InputNumber
                   style={{ width: "100%" }}

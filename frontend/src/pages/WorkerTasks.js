@@ -365,7 +365,7 @@ function WorkerTasks() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="responsive-page-header flex justify-between items-center mb-6">
         <Space align="center" size={12}>
           <CheckSquareOutlined className="text-2xl text-blue-600" />
           <Title level={2} className="m-0">

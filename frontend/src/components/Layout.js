@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Layout as AntLayout,
   Menu,
@@ -6,6 +6,8 @@ import {
   Typography,
   Avatar,
   Tag,
+  Drawer,
+  Grid,
 } from "antd";
 import {
   DashboardOutlined,
@@ -19,6 +21,7 @@ import {
   UserOutlined,
   UserAddOutlined,
   CrownOutlined,
+  MenuOutlined,
   PrinterOutlined,
   ProjectOutlined,
   ExclamationCircleOutlined,
@@ -32,12 +35,20 @@ import { PERMISSIONS } from "../config/permissions";
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
+const { useBreakpoint } = Grid;
 
 function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAdmin, hasPermission } = useAuth();
+  const screens = useBreakpoint();
+  const isMobile = screens.md === false;
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -171,50 +182,87 @@ function Layout() {
   };
 
   const menuItems = getMenuItems();
+  const handleMenuClick = ({ key }) => {
+    navigate(key);
+    setMobileMenuOpen(false);
+  };
+
+  const sidebarContent = (
+    <>
+      <div className="erp-sidebar-logo p-4 text-center bg-gradient-to-br from-gray-800 to-gray-900">
+        <div className="flex justify-center">
+          <img
+            src={
+              process.env.NODE_ENV === "development"
+                ? "/prolux-logo.png"
+                : "./prolux-logo.png"
+            }
+            alt="ProLux Logo"
+            className={collapsed && !isMobile ? "w-8 h-8" : "w-12 h-12"}
+            style={{ objectFit: "contain" }}
+          />
+        </div>
+      </div>
+      <Menu
+        theme="dark"
+        mode="inline"
+        selectedKeys={[location.pathname]}
+        items={menuItems}
+        onClick={handleMenuClick}
+        className="border-r-0 erp-sidebar-menu"
+      />
+    </>
+  );
 
   return (
-    <AntLayout style={{ minHeight: "100vh" }} className="bg-transparent">
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={(value) => setCollapsed(value)}
-        theme="dark"
-        className="shadow-xl"
-      >
-        <div className="p-4 text-center bg-gradient-to-br from-gray-800 to-gray-900">
-          <div className="flex justify-center">
-            <img
-              src={
-                process.env.NODE_ENV === "development"
-                  ? "/prolux-logo.png"
-                  : "./prolux-logo.png"
-              }
-              alt="ProLux Logo"
-              className={collapsed ? "w-8 h-8" : "w-12 h-12"}
-              style={{ objectFit: "contain" }}
-            />
-          </div>
-        </div>
-        <Menu
+    <AntLayout style={{ minHeight: "100vh" }} className="bg-transparent erp-app-shell">
+      {!isMobile && (
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={(value) => setCollapsed(value)}
+          onBreakpoint={(broken) => setCollapsed(broken)}
+          breakpoint="lg"
+          width={232}
+          collapsedWidth={72}
           theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          className="border-r-0"
-        />
-      </Sider>
+          className="shadow-xl erp-sider"
+        >
+          {sidebarContent}
+        </Sider>
+      )}
+      <Drawer
+        title={null}
+        placement="left"
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        width={286}
+        closeIcon={null}
+        className="erp-mobile-drawer"
+        styles={{ body: { padding: 0, background: "#001529" } }}
+      >
+        {sidebarContent}
+      </Drawer>
       <AntLayout className="bg-transparent">
-        <Header className="bg-white px-6 flex items-center justify-between border-b border-gray-200/50 shadow-sm">
-          <div className="flex items-center">
-            <Title level={4} className="m-0 text-gray-800 font-semibold">
+        <Header className="erp-header bg-white px-6 flex items-center justify-between border-b border-gray-200/50 shadow-sm">
+          <div className="flex items-center min-w-0">
+            {isMobile && (
+              <Button
+                type="text"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileMenuOpen(true)}
+                className="erp-menu-button"
+                aria-label="Hap navigimin"
+              />
+            )}
+            <Title level={4} className="erp-header-title m-0 text-gray-800 font-semibold">
               Menaxhimi i PROLUX Group
             </Title>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-full">
+          <div className="erp-header-actions flex items-center gap-4">
+            <div className="erp-user-shell flex items-center gap-2 bg-gray-50 px-3 py-1 rounded-full">
               <Avatar icon={<UserOutlined />} className="bg-blue-500" />
-              <div className="flex flex-col">
+              <div className="erp-user-meta flex flex-col">
                 <span className="text-gray-700 font-medium text-sm">
                   {user?.username || user?.fullName || "Përdorues"}
                 </span>
@@ -240,13 +288,13 @@ function Layout() {
               icon={<LogoutOutlined />}
               onClick={handleLogout}
               danger
-              className="hover:bg-red-50"
+              className="erp-logout-button hover:bg-red-50"
             >
               Dil
             </Button>
           </div>
         </Header>
-        <Content className="m-6 p-6 bg-white rounded-xl shadow-lg border border-white/20">
+        <Content className="erp-content m-6 p-6 bg-white rounded-xl shadow-lg border border-white/20">
           <Outlet />
         </Content>
       </AntLayout>

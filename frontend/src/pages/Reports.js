@@ -186,11 +186,11 @@ function Reports() {
 
   return (
     <Layout className="min-h-screen bg-gray-50">
-      <Content className="p-6">
+      <Content className="responsive-report-content p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
+            <div className="responsive-page-header flex justify-between items-center mb-4">
               <div className="flex items-center space-x-3">
                 <BarChartOutlined className="text-2xl text-blue-600" />
                 <Title level={2} className="mb-0 text-gray-800">
@@ -198,7 +198,7 @@ function Reports() {
                   {selectedMonth.split("-")[0]}
                 </Title>
               </div>
-              <Space>
+              <Space wrap>
                 <Select
                   value={selectedMonth}
                   onChange={setSelectedMonth}
