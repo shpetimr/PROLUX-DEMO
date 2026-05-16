@@ -385,12 +385,12 @@ function LegendDot({ color, label }) {
   );
 }
 
-function FinancialOverviewChart({ data, currency }) {
+function FinancialOverviewChart({ data, currentData, currency }) {
   if (!data.length) {
     return <MiniEmpty text="Nuk ka seri mujore për grafik." />;
   }
 
-  const latest = data[data.length - 1] || {};
+  const latest = currentData || data[data.length - 1] || {};
   const netProfit = normalizeNumber(latest.netProfit);
   const chartItems = [
     {
@@ -1223,8 +1223,23 @@ function Dashboard() {
   const previousMonthLabel = `nga ${
     fullMonthLabels[currentMonthIndex === 0 ? 11 : currentMonthIndex - 1]
   } ${currentMonthIndex === 0 ? dayjs().year() - 1 : dayjs().year()}`;
+  const dashboardCurrentMonthData =
+    stats &&
+    (stats.currentMonthIncome !== undefined ||
+      stats.currentMonthExpenses !== undefined ||
+      stats.currentMonthProfit !== undefined)
+      ? {
+          month: currentMonthIndex + 1,
+          label: monthLabels[currentMonthIndex],
+          fullLabel: getMonthYearLabel(currentMonthIndex, dayjs().year()),
+          income: normalizeNumber(stats?.currentMonthIncome),
+          outflow: getCurrentMonthOutflow(stats),
+          netProfit: normalizeNumber(stats?.currentMonthProfit),
+        }
+      : null;
   const currentMonthData =
     monthlyChartData.find((item) => item.month === currentMonthIndex + 1) ||
+    dashboardCurrentMonthData ||
     monthlyChartData[monthlyChartData.length - 1] ||
     {};
   const previousMonthData =
@@ -1581,7 +1596,11 @@ function Dashboard() {
       <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
         <Col xs={24} lg={24} xl={10}>
           <SectionCard title="Përmbledhje Financiare Mujore" minHeight={340}>
-            <FinancialOverviewChart data={monthlyChartData} currency={currency} />
+            <FinancialOverviewChart
+              data={monthlyChartData}
+              currentData={currentMonthData}
+              currency={currency}
+            />
           </SectionCard>
         </Col>
         <Col xs={24} md={12} xl={7}>
