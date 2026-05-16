@@ -391,142 +391,103 @@ function FinancialOverviewChart({ data, currency }) {
   }
 
   const latest = data[data.length - 1] || {};
-  const previous = data[Math.max(0, data.length - 2)] || {};
-  const maxValue = Math.max(
-    1,
-    normalizeNumber(latest.income),
-    normalizeNumber(latest.outflow),
-    Math.abs(normalizeNumber(latest.netProfit))
-  );
-  const rows = [
+  const netProfit = normalizeNumber(latest.netProfit);
+  const chartItems = [
     {
-      key: "income",
-      title: "Të ardhurat",
-      value: latest.income,
-      previous: previous.income,
+      label: "Të ardhurat",
+      value: normalizeNumber(latest.income),
       color: "#16a34a",
-      bg: "#ecfdf5",
-      helper: "Hyrje mujore",
-      lowerIsBetter: false,
     },
     {
-      key: "outflow",
-      title: "Shpenzimet",
-      value: latest.outflow,
-      previous: previous.outflow,
+      label: "Shpenzimet",
+      value: normalizeNumber(latest.outflow),
       color: "#dc2626",
-      bg: "#fff1f2",
-      helper: "Dalje mujore",
-      lowerIsBetter: true,
     },
     {
-      key: "netProfit",
-      title: "Fitimi neto",
-      value: latest.netProfit,
-      previous: previous.netProfit,
-      color: normalizeNumber(latest.netProfit) >= 0 ? "#2563eb" : "#dc2626",
-      bg: normalizeNumber(latest.netProfit) >= 0 ? "#eff6ff" : "#fff1f2",
-      helper: "Rezultati final",
-      lowerIsBetter: false,
+      label: "Fitimi neto",
+      value: Math.abs(netProfit),
+      displayValue: netProfit,
+      color: netProfit >= 0 ? "#2563eb" : "#f97316",
     },
-  ];
+  ].filter((item) => item.value > 0);
+  const total = chartItems.reduce((sum, item) => sum + normalizeNumber(item.value), 0);
+  const radius = 62;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  if (!chartItems.length) {
+    return <MiniEmpty text="Nuk ka të dhëna financiare për këtë muaj." />;
+  }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "2px 2px 8px",
-        }}
-      >
-        <div>
-          <Text style={{ color: "#0f172a", display: "block", fontSize: 14, fontWeight: 850 }}>
-            {latest.fullLabel || "Muaji aktual"}
-          </Text>
-          <Text style={{ color: "#64748b", fontSize: 12 }}>
-            Krahasim financiar mujor
-          </Text>
-        </div>
-        <Tag color="blue" style={{ borderRadius: 999, marginInlineEnd: 0 }}>
+    <div
+      className="dashboard-donut"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "190px 1fr",
+        alignItems: "center",
+        minHeight: 250,
+      }}
+    >
+      <svg width="190" height="190" viewBox="0 0 190 190" role="img">
+        <circle cx="95" cy="95" r={radius} fill="none" stroke="#eef2f7" strokeWidth="30" />
+        {chartItems.map((item) => {
+          const length = (normalizeNumber(item.value) / total) * circumference;
+          const segment = (
+            <circle
+              key={item.label}
+              cx="95"
+              cy="95"
+              r={radius}
+              fill="none"
+              stroke={item.color}
+              strokeWidth="30"
+              strokeDasharray={`${length} ${circumference - length}`}
+              strokeDashoffset={-offset}
+              transform="rotate(-90 95 95)"
+            >
+              <title>{`${item.label}: ${formatMoney(item.displayValue ?? item.value, currency)}`}</title>
+            </circle>
+          );
+          offset += length;
+          return segment;
+        })}
+        <text
+          x="95"
+          y="88"
+          textAnchor="middle"
+          fill={netProfit >= 0 ? "#2563eb" : "#dc2626"}
+          fontSize="20"
+          fontWeight="850"
+        >
+          {formatAmount(netProfit, { compact: true })}
+        </text>
+        <text x="95" y="111" textAnchor="middle" fill="#0f172a" fontSize="13" fontWeight="800">
           {currency}
-        </Tag>
-      </div>
+        </text>
+      </svg>
 
-      {rows.map((row) => {
-        const value = normalizeNumber(row.value);
-        const trend = getTrend(value, row.previous, row.lowerIsBetter);
-        const trendColor = trend.good ? "#16a34a" : "#dc2626";
-        const barWidth = Math.min(100, (Math.abs(value) / maxValue) * 100);
-
-        return (
-          <div
-            key={row.key}
-            style={{
-              border: "1px solid #e8edf5",
-              borderRadius: 10,
-              padding: 12,
-              background: "#ffffff",
-              display: "grid",
-              gap: 10,
-            }}
-          >
+      <div style={{ display: "grid", gap: 13 }}>
+        {chartItems.map((item) => {
+          const percent = total > 0 ? (normalizeNumber(item.value) / total) * 100 : 0;
+          return (
             <div
+              key={item.label}
               style={{
                 display: "grid",
                 gridTemplateColumns: "minmax(0, 1fr) auto",
-                alignItems: "start",
+                alignItems: "center",
                 gap: 12,
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <Text style={{ color: "#0f172a", display: "block", fontSize: 13, fontWeight: 850 }}>
-                  {row.title}
-                </Text>
-                <Text style={{ color: "#64748b", fontSize: 12 }}>{row.helper}</Text>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <Text style={{ color: row.color, display: "block", fontSize: 18, fontWeight: 850 }}>
-                  {formatMoney(value, currency)}
-                </Text>
-                <span
-                  style={{
-                    color: trendColor,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    fontWeight: 850,
-                  }}
-                >
-                  {trend.direction === "down" ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
-                  {formatAmount(trend.percent, { decimals: 1 })}%
-                </span>
-              </div>
+              <LegendDot color={item.color} label={item.label} />
+              <Text style={{ color: "#0f172a", fontSize: 13, fontWeight: 850 }}>
+                {formatAmount(percent, { decimals: 1 })}%
+              </Text>
             </div>
-
-            <div
-              style={{
-                height: 9,
-                borderRadius: 999,
-                background: "#eef2f7",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${barWidth}%`,
-                  height: "100%",
-                  borderRadius: 999,
-                  background: row.color,
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
