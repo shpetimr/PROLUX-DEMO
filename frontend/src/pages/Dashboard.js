@@ -1003,8 +1003,6 @@ function Dashboard() {
   const canManageEmployees = hasPermission(PERMISSIONS.EMPLOYEES_MANAGE);
   const canManageExpenses = hasPermission(PERMISSIONS.EXPENSES_MANAGE);
   const canManagePurchases = hasPermission(PERMISSIONS.PURCHASES_MANAGE);
-  const canManageRents = hasPermission(PERMISSIONS.RENTS_MANAGE);
-  const canManageIncomes = hasPermission(PERMISSIONS.INCOMES_MANAGE);
   const canManageDebts = hasPermission(PERMISSIONS.DEBTS_MANAGE);
   const canViewReports = hasPermission(PERMISSIONS.REPORTS_VIEW);
   const canManageProjects = hasPermission(PERMISSIONS.PROJECTS_MANAGE);
@@ -1165,18 +1163,37 @@ function Dashboard() {
   const monthlyChartData = useMemo(() => {
     const currentMonth = dayjs().month() + 1;
     const currentYear = dayjs().year();
-    const normalized = dashboardData.monthlyBreakdown.map((item) => ({
-      month: normalizeNumber(item.month),
-      label: monthLabels[Math.max(0, normalizeNumber(item.month) - 1)] || `${item.month}`,
-      fullLabel: getMonthYearLabel(Math.max(0, normalizeNumber(item.month) - 1), item.year || currentYear),
-      income: normalizeNumber(item.totalIncome),
-      outflow:
-        normalizeNumber(item.totalExpenses) +
-        normalizeNumber(item.totalPurchases) +
-        normalizeNumber(item.totalRent) +
-        normalizeNumber(item.totalSalaries),
-      netProfit: normalizeNumber(item.netProfit),
-    }));
+    const hasCurrentStats =
+      stats &&
+      (stats.currentMonthIncome !== undefined ||
+        stats.currentMonthExpenses !== undefined ||
+        stats.currentMonthProfit !== undefined);
+    const normalized = dashboardData.monthlyBreakdown.map((item) => {
+      const itemMonth = normalizeNumber(item.month);
+      const itemYear = normalizeNumber(item.year) || currentYear;
+      const isCurrentMonth = itemMonth === currentMonth && itemYear === currentYear;
+
+      return {
+        month: itemMonth,
+        label: monthLabels[Math.max(0, itemMonth - 1)] || `${item.month}`,
+        fullLabel: getMonthYearLabel(Math.max(0, itemMonth - 1), itemYear),
+        income:
+          isCurrentMonth && hasCurrentStats
+            ? normalizeNumber(stats?.currentMonthIncome)
+            : normalizeNumber(item.totalIncome),
+        outflow:
+          isCurrentMonth && hasCurrentStats
+            ? getCurrentMonthOutflow(stats)
+            : normalizeNumber(item.totalExpenses) +
+              normalizeNumber(item.totalPurchases) +
+              normalizeNumber(item.totalRent) +
+              normalizeNumber(item.totalSalaries),
+        netProfit:
+          isCurrentMonth && hasCurrentStats
+            ? normalizeNumber(stats?.currentMonthProfit)
+            : normalizeNumber(item.netProfit),
+      };
+    });
     const hasFutureData = normalized.some(
       (item) =>
         item.month > currentMonth &&
