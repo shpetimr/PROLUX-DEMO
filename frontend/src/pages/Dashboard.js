@@ -392,14 +392,20 @@ function FinancialOverviewChart({ data, currency }) {
 
   const latest = data[data.length - 1] || {};
   const previous = data[Math.max(0, data.length - 2)] || {};
-  const summaryItems = [
+  const maxValue = Math.max(
+    1,
+    normalizeNumber(latest.income),
+    normalizeNumber(latest.outflow),
+    Math.abs(normalizeNumber(latest.netProfit))
+  );
+  const rows = [
     {
       key: "income",
       title: "Të ardhurat",
       value: latest.income,
       previous: previous.income,
       color: "#16a34a",
-      bg: "#f0fdf4",
+      bg: "#ecfdf5",
       helper: "Hyrje mujore",
       lowerIsBetter: false,
     },
@@ -426,187 +432,104 @@ function FinancialOverviewChart({ data, currency }) {
   ];
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 10,
-        }}
-      >
-        {summaryItems.map((item) => (
-          <FinancialSummaryTile key={item.key} item={item} currency={currency} />
-        ))}
-      </div>
-      <NetProfitTrendPanel data={data} currency={currency} />
-    </div>
-  );
-}
-
-function FinancialSummaryTile({ item, currency }) {
-  const trend = getTrend(item.value, item.previous, item.lowerIsBetter);
-  const trendColor = trend.good ? "#16a34a" : "#dc2626";
-
-  return (
-    <div
-      style={{
-        border: "1px solid #e8edf5",
-        borderRadius: 10,
-        padding: 12,
-        background: item.bg,
-        minHeight: 104,
-      }}
-    >
-      <Text style={{ color: "#475569", display: "block", fontSize: 12, fontWeight: 850 }}>
-        {item.title}
-      </Text>
-      <div
-        style={{
-          color: item.color,
-          fontSize: 18,
-          fontWeight: 850,
-          lineHeight: 1.15,
-          marginTop: 8,
-          wordBreak: "break-word",
-        }}
-      >
-        {formatMoney(item.value, currency)}
-      </div>
-      <Text style={{ color: "#64748b", fontSize: 12 }}>{item.helper}</Text>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          color: trendColor,
-          fontSize: 12,
-          fontWeight: 850,
-          marginTop: 10,
-        }}
-      >
-        {trend.direction === "down" ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
-        {formatAmount(trend.percent, { decimals: 1 })}%
-      </div>
-    </div>
-  );
-}
-
-function NetProfitTrendPanel({ data, currency }) {
-  const values = data.map((item) => normalizeNumber(item.netProfit));
-  const minValue = Math.min(0, ...values);
-  const maxValue = Math.max(0, ...values);
-  const range = maxValue - minValue || 1;
-  const width = 820;
-  const height = 148;
-  const left = 42;
-  const right = 18;
-  const top = 16;
-  const bottom = 30;
-  const chartWidth = width - left - right;
-  const chartHeight = height - top - bottom;
-  const xForIndex = (index) =>
-    data.length === 1
-      ? left + chartWidth / 2
-      : left + (chartWidth / (data.length - 1)) * index;
-  const yForValue = (value) =>
-    top + chartHeight - ((normalizeNumber(value) - minValue) / range) * chartHeight;
-  const zeroY = yForValue(0);
-  const points = data
-    .map((item, index) => `${xForIndex(index)},${yForValue(item.netProfit)}`)
-    .join(" ");
-  const areaPath = data.length
-    ? `M ${data
-        .map((item, index) => `${xForIndex(index)} ${yForValue(item.netProfit)}`)
-        .join(" L ")} L ${xForIndex(data.length - 1)} ${zeroY} L ${xForIndex(0)} ${zeroY} Z`
-    : "";
-  const latest = data[data.length - 1] || {};
-  const positiveLatest = normalizeNumber(latest.netProfit) >= 0;
-  const color = positiveLatest ? "#2563eb" : "#dc2626";
-
-  return (
-    <div
-      style={{
-        border: "1px solid #e8edf5",
-        borderRadius: 10,
-        padding: "12px 14px",
-        background: "#ffffff",
-      }}
-    >
+    <div style={{ display: "grid", gap: 12 }}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 12,
-          marginBottom: 8,
+          padding: "2px 2px 8px",
         }}
       >
-        <Text style={{ color: "#0f172a", fontSize: 13, fontWeight: 850 }}>
-          Trendi i fitimit neto
-        </Text>
-        <Text style={{ color, fontSize: 13, fontWeight: 850 }}>
-          {formatMoney(latest.netProfit, currency)}
-        </Text>
+        <div>
+          <Text style={{ color: "#0f172a", display: "block", fontSize: 14, fontWeight: 850 }}>
+            {latest.fullLabel || "Muaji aktual"}
+          </Text>
+          <Text style={{ color: "#64748b", fontSize: 12 }}>
+            Krahasim financiar mujor
+          </Text>
+        </div>
+        <Tag color="blue" style={{ borderRadius: 999, marginInlineEnd: 0 }}>
+          {currency}
+        </Tag>
       </div>
 
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="148" role="img">
-        {[minValue, 0, maxValue].map((value, index) => {
-          const y = yForValue(value);
-          return (
-            <g key={`${value}-${index}`}>
-              <line
-                x1={left}
-                x2={width - right}
-                y1={y}
-                y2={y}
-                stroke={value === 0 ? "#cbd5e1" : "#e5eaf2"}
-                strokeDasharray={value === 0 ? "0" : "4 4"}
+      {rows.map((row) => {
+        const value = normalizeNumber(row.value);
+        const trend = getTrend(value, row.previous, row.lowerIsBetter);
+        const trendColor = trend.good ? "#16a34a" : "#dc2626";
+        const barWidth = Math.min(100, (Math.abs(value) / maxValue) * 100);
+
+        return (
+          <div
+            key={row.key}
+            style={{
+              border: "1px solid #e8edf5",
+              borderRadius: 10,
+              padding: 12,
+              background: "#ffffff",
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                alignItems: "start",
+                gap: 12,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <Text style={{ color: "#0f172a", display: "block", fontSize: 13, fontWeight: 850 }}>
+                  {row.title}
+                </Text>
+                <Text style={{ color: "#64748b", fontSize: 12 }}>{row.helper}</Text>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <Text style={{ color: row.color, display: "block", fontSize: 18, fontWeight: 850 }}>
+                  {formatMoney(value, currency)}
+                </Text>
+                <span
+                  style={{
+                    color: trendColor,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 850,
+                  }}
+                >
+                  {trend.direction === "down" ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
+                  {formatAmount(trend.percent, { decimals: 1 })}%
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                height: 9,
+                borderRadius: 999,
+                background: "#eef2f7",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${barWidth}%`,
+                  height: "100%",
+                  borderRadius: 999,
+                  background: row.color,
+                }}
               />
-              <text x={6} y={y + 4} fill="#94a3b8" fontSize="10">
-                {formatAmount(value, { compact: true })}
-              </text>
-            </g>
-          );
-        })}
-        <line x1={left} x2={width - right} y1={zeroY} y2={zeroY} stroke="#cbd5e1" />
-        <path d={areaPath} fill={color} opacity="0.12" />
-        <polyline
-          points={points}
-          fill="none"
-          stroke={color}
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {data.map((item, index) => (
-          <g key={`net-profit-${item.label}-${index}`}>
-            <circle
-              cx={xForIndex(index)}
-              cy={yForValue(item.netProfit)}
-              r="3.6"
-              fill="#ffffff"
-              stroke={color}
-              strokeWidth="2"
-            >
-              <title>{`Fitimi neto: ${formatMoney(item.netProfit, currency)}`}</title>
-            </circle>
-            <text
-              x={xForIndex(index)}
-              y={height - 8}
-              textAnchor="middle"
-              fill="#64748b"
-              fontSize="10"
-              fontWeight="650"
-            >
-              {item.label}
-            </text>
-          </g>
-        ))}
-      </svg>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
-
 function ExpenseDonut({ items, total, currency }) {
   const chartItems = items.filter((item) => normalizeNumber(item.value) > 0).slice(0, 5);
   const chartTotal = chartItems.reduce((sum, item) => sum + normalizeNumber(item.value), 0);
