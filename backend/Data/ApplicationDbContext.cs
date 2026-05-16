@@ -48,6 +48,7 @@ namespace backend.Data
                 entity.Property(e => e.OvertimeRate).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Position).HasConversion<string>();
                 entity.HasIndex(e => e.IsDeleted);
+                entity.HasIndex(e => e.CreatedAt);
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -63,6 +64,8 @@ namespace backend.Data
                 entity.Property(e => e.AttendanceDeduction).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Penalties).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.TotalSalary).HasColumnType("decimal(18,2)");
+                entity.HasIndex(e => e.Month);
+                entity.HasIndex(e => new { e.EmployeeId, e.Month, e.CreatedAt });
                 entity.HasOne(e => e.Employee)
                     .WithMany(e => e.SalaryRecords)
                     .HasForeignKey(e => e.EmployeeId)
@@ -97,6 +100,10 @@ namespace backend.Data
                 entity.Property(e => e.ExpenseType).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Amount).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.Date);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.ExpenseType);
+                entity.HasIndex(e => new { e.CreatedById, e.Date });
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -111,6 +118,10 @@ namespace backend.Data
                 entity.Property(e => e.UnitPrice).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.TotalPrice).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.PurchaseDate);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.ItemName);
+                entity.HasIndex(e => new { e.CreatedById, e.PurchaseDate });
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -124,6 +135,9 @@ namespace backend.Data
                 entity.Property(e => e.Location).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.MonthlyAmount).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.PaymentDate);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.Location);
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -137,6 +151,9 @@ namespace backend.Data
                 entity.Property(e => e.Source).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.Amount).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.Date);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.Source);
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -168,6 +185,9 @@ namespace backend.Data
                 entity.Property(e => e.Type).HasConversion<string>();
                 entity.Property(e => e.Amount).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.DueDate);
+                entity.HasIndex(e => e.IsPaid);
+                entity.HasIndex(e => new { e.Type, e.IsPaid });
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -185,6 +205,10 @@ namespace backend.Data
                 entity.Property(e => e.Profit).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(1000);
                 entity.Property(e => e.Status).HasConversion<string>();
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.StartDate);
+                entity.HasIndex(e => e.EndDate);
                 entity.HasOne(e => e.CreatedBy)
                     .WithMany()
                     .HasForeignKey(e => e.CreatedById)
@@ -225,6 +249,7 @@ namespace backend.Data
                 entity.Property(e => e.SellPrice).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.ReorderLevel).HasColumnType("decimal(18,2)");
+                entity.HasIndex(e => e.StockType);
                 entity.HasMany(e => e.Movements)
                     .WithOne(m => m.StockItem)
                     .HasForeignKey(m => m.StockItemId)
@@ -240,6 +265,9 @@ namespace backend.Data
                 entity.Property(e => e.MovementKind).HasMaxLength(50);
                 entity.Property(e => e.Note).HasMaxLength(500);
                 entity.HasIndex(e => e.StockItemId);
+                entity.HasIndex(e => e.OccurredAt);
+                entity.HasIndex(e => new { e.MovementKind, e.OccurredAt });
+                entity.HasIndex(e => new { e.StockItemId, e.OccurredAt });
             });
 
             modelBuilder.Entity<InvoiceStockDeduction>(entity =>
@@ -268,6 +296,9 @@ namespace backend.Data
                     .OnDelete(DeleteBehavior.Restrict);
                 entity.HasIndex(e => e.AssignedUserId);
                 entity.HasIndex(e => e.CreatedById);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.Deadline);
+                entity.HasIndex(e => new { e.Status, e.CreatedAt });
             });
 
             modelBuilder.Entity<WorkSale>(entity =>

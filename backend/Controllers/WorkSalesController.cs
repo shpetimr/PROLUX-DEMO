@@ -25,14 +25,20 @@ namespace backend.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<WorkSaleResponseDto>>> GetWorkSales()
+        public async Task<ActionResult<IEnumerable<WorkSaleResponseDto>>> GetWorkSales([FromQuery] int? limit = null)
         {
-            var workSales = await _context.WorkSales
+            IQueryable<WorkSale> query = _context.WorkSales
                 .AsNoTracking()
                 .Include(workSale => workSale.CreatedBy)
                 .OrderByDescending(workSale => workSale.Date)
-                .ThenByDescending(workSale => workSale.Id)
-                .ToListAsync();
+                .ThenByDescending(workSale => workSale.Id);
+
+            if (limit is > 0)
+            {
+                query = query.Take(Math.Min(limit.Value, 100));
+            }
+
+            var workSales = await query.ToListAsync();
 
             return Ok(workSales.Select(ToDto));
         }

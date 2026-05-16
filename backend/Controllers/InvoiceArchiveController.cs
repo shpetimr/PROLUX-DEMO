@@ -39,14 +39,20 @@ namespace backend.Controllers
 
         [HttpGet]
         [Authorize(Policy = AppPermissions.InvoiceArchiveManage)]
-        public async Task<ActionResult<IEnumerable<InvoiceArchiveResponseDto>>> GetArchivedInvoices()
+        public async Task<ActionResult<IEnumerable<InvoiceArchiveResponseDto>>> GetArchivedInvoices([FromQuery] int? limit = null)
         {
-            var invoices = await _context.InvoiceArchives
+            IQueryable<InvoiceArchive> query = _context.InvoiceArchives
                 .AsNoTracking()
                 .Include(invoice => invoice.CreatedBy)
                 .OrderByDescending(invoice => invoice.CreatedAt)
-                .ThenByDescending(invoice => invoice.Id)
-                .ToListAsync();
+                .ThenByDescending(invoice => invoice.Id);
+
+            if (limit is > 0)
+            {
+                query = query.Take(Math.Min(limit.Value, 100));
+            }
+
+            var invoices = await query.ToListAsync();
 
             return Ok(invoices.Select(ToDto).ToList());
         }

@@ -26,10 +26,10 @@ namespace backend.Controllers
 
         [HttpGet]
         [Authorize]
-        public async Task<ActionResult<IEnumerable<ExpenseResponseDto>>> GetExpenses()
+        public async Task<ActionResult<IEnumerable<ExpenseResponseDto>>> GetExpenses([FromQuery] int? limit = null)
         {
             // Admin can see all expenses, users can only see their own
-            IQueryable<Expense> expensesQuery = _context.Expenses;
+            IQueryable<Expense> expensesQuery = _context.Expenses.AsNoTracking();
             
             if (!_currentUserService.IsAdmin())
             {
@@ -37,9 +37,16 @@ namespace backend.Controllers
                 expensesQuery = expensesQuery.Where(e => e.CreatedById == _currentUserService.GetCurrentUserId());
             }
             
-            var expenses = await expensesQuery
+            expensesQuery = expensesQuery
                 .OrderByDescending(e => e.Date)
-                .ToListAsync();
+                .ThenByDescending(e => e.Id);
+
+            if (limit is > 0)
+            {
+                expensesQuery = expensesQuery.Take(Math.Min(limit.Value, 100));
+            }
+
+            var expenses = await expensesQuery.ToListAsync();
 
             var response = expenses.Select(e => new ExpenseResponseDto
             {

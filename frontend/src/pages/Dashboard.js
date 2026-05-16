@@ -1030,19 +1030,22 @@ function Dashboard() {
           apiClient.get(`${API_ENDPOINTS.REPORTS}/monthly-breakdown/${currentYear}`),
         ],
         canManageEmployees && ["employees", apiClient.get(API_ENDPOINTS.EMPLOYEES)],
-        canManageExpenses && ["expenses", apiClient.get(API_ENDPOINTS.EXPENSES)],
-        canManageIncomes && ["incomes", apiClient.get(API_ENDPOINTS.INCOMES)],
-        canManagePurchases && ["purchases", apiClient.get(API_ENDPOINTS.PURCHASES)],
-        canManageRents && ["rents", apiClient.get(API_ENDPOINTS.RENTS)],
+        canManageExpenses && [
+          "expenses",
+          apiClient.get(API_ENDPOINTS.EXPENSES, { params: { limit: 5 } }),
+        ],
         canManageDebts && [
           "debtsSummary",
           apiClient.get(API_ENDPOINTS.DEBTS_STATISTICS),
         ],
         canManageProjects && ["projects", apiClient.get(API_ENDPOINTS.PROJECTS)],
-        canManageWorkSales && ["workSales", apiClient.get(API_ENDPOINTS.WORK_SALES)],
+        canManageWorkSales && [
+          "workSales",
+          apiClient.get(API_ENDPOINTS.WORK_SALES, { params: { limit: 4 } }),
+        ],
         canManageInvoices && [
           "invoices",
-          apiClient.get(API_ENDPOINTS.INVOICE_ARCHIVE),
+          apiClient.get(API_ENDPOINTS.INVOICE_ARCHIVE, { params: { limit: 6 } }),
         ],
         canManageStock && [
           "stockMaterials",
@@ -1110,11 +1113,8 @@ function Dashboard() {
     canManageDebts,
     canManageEmployees,
     canManageExpenses,
-    canManageIncomes,
     canManageInvoices,
     canManageProjects,
-    canManagePurchases,
-    canManageRents,
     canManageStock,
     canManageWorkSales,
     canViewDashboard,
@@ -1216,21 +1216,11 @@ function Dashboard() {
     {};
 
   const expenseCategoryData = useMemo(() => {
-    const monthStart = dayjs().startOf("month");
-    const monthEnd = dayjs().endOf("month");
-    const manualExpensesFromList = dashboardData.expenses
-      .filter((expense) => {
-        const date = dayjs(expense.date);
-        return date.isValid() && date.isAfter(monthStart.subtract(1, "millisecond")) && date.isBefore(monthEnd.add(1, "millisecond"));
-      })
-      .reduce((sum, expense) => sum + normalizeNumber(expense.amount), 0);
     const invoiceCost = normalizeNumber(stats?.currentMonthInvoiceStockCost);
-    const fallbackManualExpenses = Math.max(
+    const manualExpenses = Math.max(
       0,
       normalizeNumber(stats?.currentMonthExpenses) - invoiceCost
     );
-    const manualExpenses =
-      manualExpensesFromList > 0 ? manualExpensesFromList : fallbackManualExpenses;
 
     return [
       { label: "Pagat", value: normalizeNumber(stats?.currentMonthSalaries), color: "#2563eb" },
@@ -1239,7 +1229,7 @@ function Dashboard() {
       { label: "Blerjet", value: normalizeNumber(stats?.currentMonthPurchases), color: "#f97316" },
       { label: "Kosto e faturave", value: invoiceCost, color: "#0891b2" },
     ].filter((item) => item.value > 0);
-  }, [dashboardData.expenses, stats]);
+  }, [stats]);
 
   const expenseCategoryTotal = expenseCategoryData.reduce(
     (sum, item) => sum + normalizeNumber(item.value),

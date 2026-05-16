@@ -210,11 +210,10 @@ namespace backend.Services
                 var yearStart = DateTimeUtc.YearStart(currentDate.Year);
                 var todayExclusive = DateTimeUtc.Date(currentDate).AddDays(1);
                 
-                // Filter data based on user role
                 var currentUserId = _currentUserService.GetCurrentUserId();
                 var isAdmin = _currentUserService.IsAdmin();
-                var expensesQuery = _context.Expenses.AsQueryable();
-                var purchasesQuery = _context.Purchases.AsQueryable();
+                var expensesQuery = _context.Expenses.AsNoTracking().AsQueryable();
+                var purchasesQuery = _context.Purchases.AsNoTracking().AsQueryable();
 
                 if (!isAdmin)
                 {
@@ -222,107 +221,100 @@ namespace backend.Services
                     purchasesQuery = purchasesQuery.Where(p => p.CreatedById == currentUserId);
                 }
                 
-                // Employee statistics with new position system (only for admins)
-                var totalEmployees = isAdmin ? await _context.Employees.CountAsync(e => !e.IsDeleted) : 0;
-                var magazineEmployees = isAdmin ? await _context.Employees.CountAsync(e => !e.IsDeleted && e.Position == Models.EmployeePosition.Magazine) : 0;
-                var terrenEmployees = isAdmin ? await _context.Employees.CountAsync(e => !e.IsDeleted && e.Position == Models.EmployeePosition.Terren) : 0;
-                
-                // Calculate current month salaries using new system
-                var currentMonthSalaryTotals = await GetSalaryFinancialTotalsAsync(currentMonthStart, currentMonthEnd);
+                var employeeCounts = isAdmin
+                    ? await GetDashboardEmployeeCountsAsync()
+                    : DashboardEmployeeCounts.Empty;
+                var salaryBuckets = await GetDashboardSalaryTotalsAsync(
+                    currentMonthStart,
+                    currentMonthEnd,
+                    yearStart,
+                    todayExclusive);
+                var currentMonthSalaryTotals = salaryBuckets.CurrentMonth;
                 var currentMonthSalaries = currentMonthSalaryTotals.TotalSalaries;
                 var averageSalary = currentMonthSalaryTotals.EmployeeCount > 0
                     ? currentMonthSalaries / currentMonthSalaryTotals.EmployeeCount
                     : 0;
-                
-                // Calculate current month financial data
-                var currentMonthExpenses = await expensesQuery
-                    .Where(e => e.Date >= currentMonthStart && e.Date < currentMonthEnd)
-                    .SumAsync(e => e.Amount);
-                    
-                var currentMonthWorkSaleTotals = isAdmin
-                    ? await GetWorkSaleFinancialTotalsAsync(currentMonthStart, currentMonthEnd)
-                    : WorkSaleFinancialTotals.Empty;
-                var currentMonthArchivedInvoiceTotals = isAdmin
-                    ? await GetArchivedInvoiceFinancialTotalsAsync(currentMonthStart, currentMonthEnd)
-                    : ArchivedInvoiceFinancialTotals.Empty;
-                var currentMonthInvoiceStockCostTotals = isAdmin
-                    ? await GetInvoiceStockCostTotalsAsync(currentMonthStart, currentMonthEnd)
-                    : InvoiceStockCostTotals.Empty;
 
-                var currentMonthIncome = isAdmin
-                    ? await _context.Incomes
-                        .Where(i => i.Date >= currentMonthStart && i.Date < currentMonthEnd)
-                        .SumAsync(i => i.Amount)
-                    : 0m;
-                currentMonthIncome += currentMonthWorkSaleTotals.Profit + currentMonthArchivedInvoiceTotals.Total;
-                currentMonthExpenses += currentMonthInvoiceStockCostTotals.Cost;
-                    
-                var currentMonthPurchases = await purchasesQuery
-                    .Where(p => p.PurchaseDate >= currentMonthStart && p.PurchaseDate < currentMonthEnd)
-                    .SumAsync(p => p.TotalPrice);
-                    
-                var currentMonthRents = isAdmin
-                    ? await _context.Rents
-                        .Where(r => r.PaymentDate >= currentMonthStart && r.PaymentDate < currentMonthEnd)
-                        .SumAsync(r => r.MonthlyAmount)
-                    : 0m;
-                    
-                var currentMonthProfit = currentMonthIncome - (currentMonthExpenses + currentMonthPurchases + currentMonthRents + currentMonthSalaries);
-                
-                // Calculate year to date data
-                var yearToDateWorkSaleTotals = isAdmin
-                    ? await GetWorkSaleFinancialTotalsAsync(yearStart, todayExclusive)
-                    : WorkSaleFinancialTotals.Empty;
-                var yearToDateArchivedInvoiceTotals = isAdmin
-                    ? await GetArchivedInvoiceFinancialTotalsAsync(yearStart, todayExclusive)
-                    : ArchivedInvoiceFinancialTotals.Empty;
-                var yearToDateInvoiceStockCostTotals = isAdmin
-                    ? await GetInvoiceStockCostTotalsAsync(yearStart, todayExclusive)
-                    : InvoiceStockCostTotals.Empty;
-                var yearToDateSalaryTotals = await GetSalaryFinancialTotalsAsync(yearStart, todayExclusive);
-
-                var yearToDateIncome = isAdmin
-                    ? await _context.Incomes
-                        .Where(i => i.Date >= yearStart && i.Date <= currentDate)
-                        .SumAsync(i => i.Amount)
-                    : 0m;
-                yearToDateIncome += yearToDateWorkSaleTotals.Profit + yearToDateArchivedInvoiceTotals.Total;
-                    
-                var yearToDateExpenses = await expensesQuery
-                    .Where(e => e.Date >= yearStart && e.Date <= currentDate)
-                    .SumAsync(e => e.Amount);
-                yearToDateExpenses += yearToDateInvoiceStockCostTotals.Cost;
-
-                var yearToDatePurchases = await purchasesQuery
-                    .Where(p => p.PurchaseDate >= yearStart && p.PurchaseDate <= currentDate)
-                    .SumAsync(p => p.TotalPrice);
-
-                var yearToDateRents = isAdmin
-                    ? await _context.Rents
-                        .Where(r => r.PaymentDate >= yearStart && r.PaymentDate <= currentDate)
-                        .SumAsync(r => r.MonthlyAmount)
-                    : 0m;
-                    
-                var yearToDateProfit = yearToDateIncome -
-                    (yearToDateExpenses + yearToDatePurchases + yearToDateRents + yearToDateSalaryTotals.TotalSalaries);
-                
-                // Calculate total data
-                var allTimeWorkSaleTotals = isAdmin
-                    ? await GetWorkSaleFinancialTotalsAsync(null, null)
-                    : WorkSaleFinancialTotals.Empty;
-                var allTimeArchivedInvoiceTotals = isAdmin
-                    ? await GetArchivedInvoiceFinancialTotalsAsync(null, null)
-                    : ArchivedInvoiceFinancialTotals.Empty;
-                var allTimeInvoiceStockCostTotals = isAdmin
-                    ? await GetInvoiceStockCostTotalsAsync(null, null)
-                    : InvoiceStockCostTotals.Empty;
-                var allTimeSalaryTotals = await GetSalaryFinancialTotalsAsync(null, null);
+                var expenseBuckets = await GetDashboardExpenseBucketsAsync(
+                    expensesQuery,
+                    currentMonthStart,
+                    currentMonthEnd,
+                    yearStart,
+                    currentDate);
+                var purchaseBuckets = await GetDashboardPurchaseBucketsAsync(
+                    purchasesQuery,
+                    currentMonthStart,
+                    currentMonthEnd,
+                    yearStart,
+                    currentDate);
+                var incomeBuckets = isAdmin
+                    ? await GetDashboardIncomeBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        currentDate)
+                    : DashboardAmountBuckets.Empty;
+                var rentBuckets = isAdmin
+                    ? await GetDashboardRentBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        currentDate)
+                    : DashboardAmountBuckets.Empty;
+                var workSaleBuckets = isAdmin
+                    ? await GetDashboardWorkSaleBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        todayExclusive)
+                    : DashboardWorkSaleBuckets.Empty;
+                var archivedInvoiceBuckets = isAdmin
+                    ? await GetDashboardArchivedInvoiceBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        todayExclusive)
+                    : DashboardArchivedInvoiceBuckets.Empty;
+                var invoiceStockCostBuckets = isAdmin
+                    ? await GetDashboardInvoiceStockCostBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        todayExclusive)
+                    : DashboardInvoiceStockCostBuckets.Empty;
                 var allTimeWorkerTaskCounts = await GetWorkerTaskCountsAsync(null, null);
 
-                var totalExpenses = await expensesQuery.SumAsync(e => e.Amount);
-                var totalIncomes = isAdmin ? await _context.Incomes.SumAsync(i => i.Amount) : 0m;
-                var totalPurchases = await purchasesQuery.SumAsync(p => p.TotalPrice);
-                var totalRents = isAdmin ? await _context.Rents.SumAsync(r => r.MonthlyAmount) : 0m;
+                var currentMonthWorkSaleTotals = workSaleBuckets.CurrentMonth;
+                var currentMonthArchivedInvoiceTotals = archivedInvoiceBuckets.CurrentMonth;
+                var currentMonthInvoiceStockCostTotals = invoiceStockCostBuckets.CurrentMonth;
+                var currentMonthExpenses = expenseBuckets.CurrentMonth + currentMonthInvoiceStockCostTotals.Cost;
+                var currentMonthIncome = incomeBuckets.CurrentMonth;
+                currentMonthIncome += currentMonthWorkSaleTotals.Profit + currentMonthArchivedInvoiceTotals.Total;
+                var currentMonthPurchases = purchaseBuckets.CurrentMonth;
+                var currentMonthRents = rentBuckets.CurrentMonth;
+                var currentMonthProfit = currentMonthIncome - (currentMonthExpenses + currentMonthPurchases + currentMonthRents + currentMonthSalaries);
+
+                var yearToDateWorkSaleTotals = workSaleBuckets.YearToDate;
+                var yearToDateArchivedInvoiceTotals = archivedInvoiceBuckets.YearToDate;
+                var yearToDateInvoiceStockCostTotals = invoiceStockCostBuckets.YearToDate;
+                var yearToDateSalaryTotals = salaryBuckets.YearToDate;
+                var yearToDateIncome = incomeBuckets.YearToDate;
+                yearToDateIncome += yearToDateWorkSaleTotals.Profit + yearToDateArchivedInvoiceTotals.Total;
+                var yearToDateExpenses = expenseBuckets.YearToDate;
+                yearToDateExpenses += yearToDateInvoiceStockCostTotals.Cost;
+                var yearToDatePurchases = purchaseBuckets.YearToDate;
+                var yearToDateRents = rentBuckets.YearToDate;
+                var yearToDateProfit = yearToDateIncome -
+                    (yearToDateExpenses + yearToDatePurchases + yearToDateRents + yearToDateSalaryTotals.TotalSalaries);
+
+                var allTimeWorkSaleTotals = workSaleBuckets.AllTime;
+                var allTimeArchivedInvoiceTotals = archivedInvoiceBuckets.AllTime;
+                var allTimeInvoiceStockCostTotals = invoiceStockCostBuckets.AllTime;
+                var allTimeSalaryTotals = salaryBuckets.AllTime;
+                var totalExpenses = expenseBuckets.Total;
+                var totalIncomes = incomeBuckets.Total;
+                var totalPurchases = purchaseBuckets.Total;
+                var totalRents = rentBuckets.Total;
                 totalExpenses += allTimeInvoiceStockCostTotals.Cost;
                 totalIncomes += allTimeWorkSaleTotals.Profit + allTimeArchivedInvoiceTotals.Total;
                 var profitMargin = totalIncomes > 0
@@ -331,9 +323,9 @@ namespace backend.Services
                 
                 return new DashboardStatsDto
                 {
-                    TotalEmployees = totalEmployees,
-                    WarehouseEmployees = magazineEmployees,
-                    FieldEmployees = terrenEmployees,
+                    TotalEmployees = employeeCounts.Total,
+                    WarehouseEmployees = employeeCounts.Magazine,
+                    FieldEmployees = employeeCounts.Terren,
                     CurrentMonthSalaries = currentMonthSalaries,
                     CurrentMonthExpenses = currentMonthExpenses,
                     CurrentMonthIncome = currentMonthIncome,
@@ -968,42 +960,48 @@ namespace backend.Services
         {
             try
             {
-                // Project statistics
-                var totalProjects = await _context.Projects.CountAsync();
-                var inProgressProjects = await _context.Projects.CountAsync(p => p.Status == ProjectStatus.InProgress);
-                var completedProjects = await _context.Projects.CountAsync(p => p.Status == ProjectStatus.Completed);
-                var totalPromet = await _context.Projects.SumAsync(p => p.Promet);
+                var projectStats = await _context.Projects
+                    .AsNoTracking()
+                    .GroupBy(_ => 1)
+                    .Select(group => new
+                    {
+                        TotalProjects = group.Count(),
+                        InProgressProjects = group.Count(project => project.Status == ProjectStatus.InProgress),
+                        CompletedProjects = group.Count(project => project.Status == ProjectStatus.Completed),
+                        TotalPromet = group.Sum(project => project.Promet)
+                    })
+                    .FirstOrDefaultAsync();
 
-                // Debt statistics
-                var totalOwedToCompany = await _context.Debts
-                    .Where(d => d.Type == DebtType.OwedToCompany && !d.IsPaid)
-                    .SumAsync(d => d.Amount);
-
-                var totalCompanyOwes = await _context.Debts
-                    .Where(d => d.Type == DebtType.CompanyOwes && !d.IsPaid)
-                    .SumAsync(d => d.Amount);
-
-                var pendingToCompany = await _context.Debts
-                    .CountAsync(d => d.Type == DebtType.OwedToCompany && !d.IsPaid);
-
-                var pendingFromCompany = await _context.Debts
-                    .CountAsync(d => d.Type == DebtType.CompanyOwes && !d.IsPaid);
+                var debtStats = await _context.Debts
+                    .AsNoTracking()
+                    .Where(debt => !debt.IsPaid)
+                    .GroupBy(_ => 1)
+                    .Select(group => new
+                    {
+                        TotalOwedToCompany = group.Sum(debt =>
+                            debt.Type == DebtType.OwedToCompany ? debt.Amount : 0m),
+                        TotalCompanyOwes = group.Sum(debt =>
+                            debt.Type == DebtType.CompanyOwes ? debt.Amount : 0m),
+                        PendingToCompany = group.Count(debt => debt.Type == DebtType.OwedToCompany),
+                        PendingFromCompany = group.Count(debt => debt.Type == DebtType.CompanyOwes)
+                    })
+                    .FirstOrDefaultAsync();
 
                 return new
                 {
                     Projects = new
                     {
-                        TotalProjects = totalProjects,
-                        InProgressProjects = inProgressProjects,
-                        CompletedProjects = completedProjects,
-                        TotalPromet = totalPromet
+                        TotalProjects = projectStats?.TotalProjects ?? 0,
+                        InProgressProjects = projectStats?.InProgressProjects ?? 0,
+                        CompletedProjects = projectStats?.CompletedProjects ?? 0,
+                        TotalPromet = projectStats?.TotalPromet ?? 0m
                     },
                     Debts = new
                     {
-                        TotalOwedToCompany = totalOwedToCompany,
-                        TotalCompanyOwes = totalCompanyOwes,
-                        PendingToCompany = pendingToCompany,
-                        PendingFromCompany = pendingFromCompany
+                        TotalOwedToCompany = debtStats?.TotalOwedToCompany ?? 0m,
+                        TotalCompanyOwes = debtStats?.TotalCompanyOwes ?? 0m,
+                        PendingToCompany = debtStats?.PendingToCompany ?? 0,
+                        PendingFromCompany = debtStats?.PendingFromCompany ?? 0
                     },
                     CurrencyCode = "MKD",
                     CurrencySymbol = "MKD"
@@ -1017,18 +1015,754 @@ namespace backend.Services
 
         public async Task<List<MonthlyReportDto>> GetMonthlyReportsForYearAsync(int year)
         {
-            var reports = new List<MonthlyReportDto>();
-            
-            for (int month = 1; month <= 12; month++)
+            var yearStart = DateTimeUtc.YearStart(year);
+            var yearEnd = yearStart.AddYears(1);
+
+            var expenseTotals = await GetMonthlyExpenseTotalsAsync(yearStart, yearEnd);
+            var purchaseTotals = await GetMonthlyPurchaseTotalsAsync(yearStart, yearEnd);
+            var rentTotals = await GetMonthlyRentTotalsAsync(yearStart, yearEnd);
+            var incomeTotals = await GetMonthlyIncomeTotalsAsync(yearStart, yearEnd);
+            var salaryTotals = await GetMonthlySalaryTotalsForYearAsync(year);
+            var workSaleTotals = await GetMonthlyWorkSaleTotalsAsync(yearStart, yearEnd);
+            var archivedInvoiceTotals = await GetMonthlyArchivedInvoiceTotalsAsync(yearStart, yearEnd);
+            var invoiceStockCostTotals = await GetMonthlyInvoiceStockCostTotalsAsync(yearStart, yearEnd);
+            var workerTaskCounts = await GetMonthlyWorkerTaskCountsAsync(yearStart, yearEnd);
+            var stockTotals = await GetCurrentStockSplitTotalsAsync();
+            var reports = new List<MonthlyReportDto>(12);
+
+            for (var month = 1; month <= 12; month++)
             {
-                var report = await GetMonthlyReportAsync(year, month);
-                reports.Add(report);
+                var expenseTotal = GetMonthlyValue(expenseTotals, month);
+                var purchaseTotal = GetMonthlyValue(purchaseTotals, month);
+                var rentTotal = GetMonthlyValue(rentTotals, month);
+                var incomeTotal = GetMonthlyValue(incomeTotals, month);
+                var salaryTotal = GetMonthlyValue(salaryTotals, month, SalaryFinancialTotals.Empty);
+                var workSaleTotal = GetMonthlyValue(workSaleTotals, month, WorkSaleFinancialTotals.Empty);
+                var archivedInvoiceTotal = GetMonthlyValue(archivedInvoiceTotals, month, ArchivedInvoiceFinancialTotals.Empty);
+                var invoiceStockCostTotal = GetMonthlyValue(invoiceStockCostTotals, month, InvoiceStockCostTotals.Empty);
+                var workerTaskCount = GetMonthlyValue(workerTaskCounts, month, WorkerTaskCounts.Empty);
+
+                var totalExpenses = expenseTotal + invoiceStockCostTotal.Cost;
+                var totalIncome = incomeTotal + workSaleTotal.Profit + archivedInvoiceTotal.Total;
+                var netProfit = totalIncome - (totalExpenses + rentTotal + purchaseTotal + salaryTotal.TotalSalaries);
+
+                reports.Add(new MonthlyReportDto
+                {
+                    Year = year,
+                    Month = month,
+                    TotalSalaries = salaryTotal.TotalSalaries,
+                    TotalExpenses = totalExpenses,
+                    TotalRent = rentTotal,
+                    TotalPurchases = purchaseTotal,
+                    TotalIncome = totalIncome,
+                    NetProfit = netProfit,
+                    EmployeeCount = salaryTotal.EmployeeCount,
+                    TotalArchivedInvoices = archivedInvoiceTotal.Total,
+                    ArchivedInvoicesCount = archivedInvoiceTotal.Count,
+                    TotalWorkSalesRevenue = workSaleTotal.Revenue,
+                    TotalWorkSalesCost = workSaleTotal.Cost,
+                    TotalWorkSalesProfit = workSaleTotal.Profit,
+                    WorkSalesCount = workSaleTotal.Count,
+                    TotalInvoiceStockCost = invoiceStockCostTotal.Cost,
+                    InvoiceStockCostCount = invoiceStockCostTotal.Count,
+                    MaterialStockItemCount = stockTotals.Material.ItemCount,
+                    MaterialStockQuantity = stockTotals.Material.CurrentQuantity,
+                    ProductStockItemCount = stockTotals.Product.ItemCount,
+                    ProductStockQuantity = stockTotals.Product.CurrentQuantity,
+                    WorkerTasksTotal = workerTaskCount.Total,
+                    WorkerTasksWaiting = workerTaskCount.Waiting,
+                    WorkerTasksInProcess = workerTaskCount.InProcess,
+                    WorkerTasksCompleted = workerTaskCount.Completed
+                });
             }
-            
+
             return reports;
         }
 
         // Breakdown për blerjet (purchases) - Ditore
+        private async Task<DashboardEmployeeCounts> GetDashboardEmployeeCountsAsync()
+        {
+            return await _context.Employees
+                .AsNoTracking()
+                .Where(employee => !employee.IsDeleted)
+                .GroupBy(_ => 1)
+                .Select(group => new DashboardEmployeeCounts
+                {
+                    Total = group.Count(),
+                    Magazine = group.Count(employee => employee.Position == EmployeePosition.Magazine),
+                    Terren = group.Count(employee => employee.Position == EmployeePosition.Terren)
+                })
+                .FirstOrDefaultAsync() ?? DashboardEmployeeCounts.Empty;
+        }
+
+        private async Task<DashboardAmountBuckets> GetDashboardExpenseBucketsAsync(
+            IQueryable<Expense> expenses,
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime yearEndInclusive)
+        {
+            return await expenses
+                .GroupBy(_ => 1)
+                .Select(group => new DashboardAmountBuckets
+                {
+                    CurrentMonth = group.Sum(expense =>
+                        expense.Date >= currentMonthStart && expense.Date < currentMonthEnd
+                            ? expense.Amount
+                            : 0m),
+                    YearToDate = group.Sum(expense =>
+                        expense.Date >= yearStart && expense.Date <= yearEndInclusive
+                            ? expense.Amount
+                            : 0m),
+                    Total = group.Sum(expense => expense.Amount)
+                })
+                .FirstOrDefaultAsync() ?? DashboardAmountBuckets.Empty;
+        }
+
+        private async Task<DashboardAmountBuckets> GetDashboardPurchaseBucketsAsync(
+            IQueryable<Purchase> purchases,
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime yearEndInclusive)
+        {
+            return await purchases
+                .GroupBy(_ => 1)
+                .Select(group => new DashboardAmountBuckets
+                {
+                    CurrentMonth = group.Sum(purchase =>
+                        purchase.PurchaseDate >= currentMonthStart && purchase.PurchaseDate < currentMonthEnd
+                            ? purchase.TotalPrice
+                            : 0m),
+                    YearToDate = group.Sum(purchase =>
+                        purchase.PurchaseDate >= yearStart && purchase.PurchaseDate <= yearEndInclusive
+                            ? purchase.TotalPrice
+                            : 0m),
+                    Total = group.Sum(purchase => purchase.TotalPrice)
+                })
+                .FirstOrDefaultAsync() ?? DashboardAmountBuckets.Empty;
+        }
+
+        private async Task<DashboardAmountBuckets> GetDashboardIncomeBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime yearEndInclusive)
+        {
+            return await _context.Incomes
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(group => new DashboardAmountBuckets
+                {
+                    CurrentMonth = group.Sum(income =>
+                        income.Date >= currentMonthStart && income.Date < currentMonthEnd
+                            ? income.Amount
+                            : 0m),
+                    YearToDate = group.Sum(income =>
+                        income.Date >= yearStart && income.Date <= yearEndInclusive
+                            ? income.Amount
+                            : 0m),
+                    Total = group.Sum(income => income.Amount)
+                })
+                .FirstOrDefaultAsync() ?? DashboardAmountBuckets.Empty;
+        }
+
+        private async Task<DashboardAmountBuckets> GetDashboardRentBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime yearEndInclusive)
+        {
+            return await _context.Rents
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(group => new DashboardAmountBuckets
+                {
+                    CurrentMonth = group.Sum(rent =>
+                        rent.PaymentDate >= currentMonthStart && rent.PaymentDate < currentMonthEnd
+                            ? rent.MonthlyAmount
+                            : 0m),
+                    YearToDate = group.Sum(rent =>
+                        rent.PaymentDate >= yearStart && rent.PaymentDate <= yearEndInclusive
+                            ? rent.MonthlyAmount
+                            : 0m),
+                    Total = group.Sum(rent => rent.MonthlyAmount)
+                })
+                .FirstOrDefaultAsync() ?? DashboardAmountBuckets.Empty;
+        }
+
+        private async Task<DashboardWorkSaleBuckets> GetDashboardWorkSaleBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive)
+        {
+            var row = await _context.WorkSales
+                .AsNoTracking()
+                .GroupBy(_ => 1)
+                .Select(group => new DashboardWorkSaleBucketRow
+                {
+                    CurrentMonthRevenue = group.Sum(workSale =>
+                        workSale.Date >= currentMonthStart && workSale.Date < currentMonthEnd
+                            ? workSale.TotalRevenue
+                            : 0m),
+                    CurrentMonthCost = group.Sum(workSale =>
+                        workSale.Date >= currentMonthStart && workSale.Date < currentMonthEnd
+                            ? workSale.TotalCost
+                            : 0m),
+                    CurrentMonthProfit = group.Sum(workSale =>
+                        workSale.Date >= currentMonthStart && workSale.Date < currentMonthEnd
+                            ? workSale.Profit
+                            : 0m),
+                    CurrentMonthCount = group.Sum(workSale =>
+                        workSale.Date >= currentMonthStart && workSale.Date < currentMonthEnd ? 1 : 0),
+                    YearToDateRevenue = group.Sum(workSale =>
+                        workSale.Date >= yearStart && workSale.Date < todayExclusive
+                            ? workSale.TotalRevenue
+                            : 0m),
+                    YearToDateCost = group.Sum(workSale =>
+                        workSale.Date >= yearStart && workSale.Date < todayExclusive
+                            ? workSale.TotalCost
+                            : 0m),
+                    YearToDateProfit = group.Sum(workSale =>
+                        workSale.Date >= yearStart && workSale.Date < todayExclusive
+                            ? workSale.Profit
+                            : 0m),
+                    YearToDateCount = group.Sum(workSale =>
+                        workSale.Date >= yearStart && workSale.Date < todayExclusive ? 1 : 0),
+                    TotalRevenue = group.Sum(workSale => workSale.TotalRevenue),
+                    TotalCost = group.Sum(workSale => workSale.TotalCost),
+                    TotalProfit = group.Sum(workSale => workSale.Profit),
+                    TotalCount = group.Count()
+                })
+                .FirstOrDefaultAsync();
+
+            return row?.ToBuckets() ?? DashboardWorkSaleBuckets.Empty;
+        }
+
+        private async Task<DashboardArchivedInvoiceBuckets> GetDashboardArchivedInvoiceBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive)
+        {
+            var invoices = await GetArchivedInvoiceFinancialSnapshots().ToListAsync();
+            var currentMonth = new ArchivedInvoiceFinancialAccumulator();
+            var yearToDate = new ArchivedInvoiceFinancialAccumulator();
+            var allTime = new ArchivedInvoiceFinancialAccumulator();
+
+            foreach (var invoice in invoices)
+            {
+                allTime.Add(invoice);
+
+                if (invoice.CreatedAt >= yearStart && invoice.CreatedAt < todayExclusive)
+                {
+                    yearToDate.Add(invoice);
+                }
+
+                if (invoice.CreatedAt >= currentMonthStart && invoice.CreatedAt < currentMonthEnd)
+                {
+                    currentMonth.Add(invoice);
+                }
+            }
+
+            return new DashboardArchivedInvoiceBuckets
+            {
+                CurrentMonth = currentMonth.ToTotals(),
+                YearToDate = yearToDate.ToTotals(),
+                AllTime = allTime.ToTotals()
+            };
+        }
+
+        private async Task<DashboardInvoiceStockCostBuckets> GetDashboardInvoiceStockCostBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive)
+        {
+            var movements = await GetInvoiceStockCostMovementSnapshotsAsync(null, null);
+            var currentMonth = new InvoiceStockCostAccumulator();
+            var yearToDate = new InvoiceStockCostAccumulator();
+            var allTime = new InvoiceStockCostAccumulator();
+
+            foreach (var movement in movements)
+            {
+                allTime.Add(movement);
+
+                if (movement.OccurredAt >= yearStart && movement.OccurredAt < todayExclusive)
+                {
+                    yearToDate.Add(movement);
+                }
+
+                if (movement.OccurredAt >= currentMonthStart && movement.OccurredAt < currentMonthEnd)
+                {
+                    currentMonth.Add(movement);
+                }
+            }
+
+            return new DashboardInvoiceStockCostBuckets
+            {
+                CurrentMonth = currentMonth.ToTotals(),
+                YearToDate = yearToDate.ToTotals(),
+                AllTime = allTime.ToTotals()
+            };
+        }
+
+        private async Task<DashboardSalaryBuckets> GetDashboardSalaryTotalsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive)
+        {
+            if (!_currentUserService.IsAdmin())
+            {
+                return DashboardSalaryBuckets.Empty;
+            }
+
+            var records = SelectLatestSalaryRecords(await _context.SalaryRecords
+                .AsNoTracking()
+                .ToListAsync());
+            var currentMonth = new SalaryFinancialAccumulator();
+            var yearToDate = new SalaryFinancialAccumulator();
+            var allTime = new SalaryFinancialAccumulator();
+            var yearSalaryEnd = GetMonthAfterLastCoveredDate(todayExclusive);
+
+            foreach (var record in records)
+            {
+                allTime.Add(record.EmployeeId, record.TotalSalary, record.DaysWorked);
+
+                if (record.Month >= yearStart && record.Month < yearSalaryEnd)
+                {
+                    yearToDate.Add(
+                        record.EmployeeId,
+                        record.TotalSalary,
+                        record.DaysWorked,
+                        GetMonthCoverageFactor(record.Month, yearStart, todayExclusive));
+                }
+
+                if (record.Month >= currentMonthStart && record.Month < currentMonthEnd)
+                {
+                    currentMonth.Add(
+                        record.EmployeeId,
+                        record.TotalSalary,
+                        record.DaysWorked,
+                        GetMonthCoverageFactor(record.Month, currentMonthStart, currentMonthEnd));
+                }
+            }
+
+            var recordedEmployeeMonths = records
+                .Select(record => EmployeeMonthKey.From(record.EmployeeId, record.Month))
+                .ToHashSet();
+
+            await AddDashboardFallbackSalariesAsync(
+                currentMonthStart,
+                currentMonthEnd,
+                yearStart,
+                todayExclusive,
+                recordedEmployeeMonths,
+                currentMonth,
+                yearToDate,
+                allTime);
+
+            return new DashboardSalaryBuckets
+            {
+                CurrentMonth = currentMonth.ToTotals(),
+                YearToDate = yearToDate.ToTotals(),
+                AllTime = allTime.ToTotals()
+            };
+        }
+
+        private async Task AddDashboardFallbackSalariesAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive,
+            IReadOnlySet<EmployeeMonthKey> recordedEmployeeMonths,
+            SalaryFinancialAccumulator currentMonth,
+            SalaryFinancialAccumulator yearToDate,
+            SalaryFinancialAccumulator allTime)
+        {
+            var employees = await _context.Employees
+                .AsNoTracking()
+                .Where(employee => !employee.IsDeleted)
+                .ToListAsync();
+            if (employees.Count == 0)
+            {
+                return;
+            }
+
+            var monthStarts = GetCoveredMonthStarts(yearStart, todayExclusive);
+            if (monthStarts.Count == 0)
+            {
+                return;
+            }
+
+            var employeeIds = employees.Select(employee => employee.Id).ToList();
+            var attendanceTotals = await GetAttendanceSalaryTotalsAsync(
+                employeeIds,
+                monthStarts.First(),
+                currentMonthEnd);
+
+            foreach (var monthStart in monthStarts)
+            {
+                var monthEnd = monthStart.AddMonths(1);
+                var isCurrentMonth = monthStart.Year == currentMonthStart.Year &&
+                    monthStart.Month == currentMonthStart.Month;
+
+                foreach (var employee in employees)
+                {
+                    if (DateTimeUtc.Date(employee.HireDate) >= monthEnd)
+                    {
+                        continue;
+                    }
+
+                    var key = EmployeeMonthKey.From(employee.Id, monthStart);
+                    if (recordedEmployeeMonths.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    attendanceTotals.TryGetValue(key, out var attendance);
+                    var fallbackSalary = BuildFallbackEmployeeMonthlySalary(
+                        employee,
+                        monthStart,
+                        1m,
+                        attendance);
+
+                    yearToDate.Add(
+                        fallbackSalary.EmployeeId,
+                        fallbackSalary.TotalSalary,
+                        fallbackSalary.DaysWorked,
+                        GetMonthCoverageFactor(monthStart, yearStart, todayExclusive));
+
+                    if (!isCurrentMonth)
+                    {
+                        continue;
+                    }
+
+                    currentMonth.Add(
+                        fallbackSalary.EmployeeId,
+                        fallbackSalary.TotalSalary,
+                        fallbackSalary.DaysWorked,
+                        GetMonthCoverageFactor(monthStart, currentMonthStart, currentMonthEnd));
+                    allTime.Add(
+                        fallbackSalary.EmployeeId,
+                        fallbackSalary.TotalSalary,
+                        fallbackSalary.DaysWorked,
+                        GetMonthCoverageFactor(monthStart, currentMonthStart, todayExclusive));
+                }
+            }
+        }
+
+        private async Task<Dictionary<EmployeeMonthKey, AttendanceSalaryTotals>> GetAttendanceSalaryTotalsAsync(
+            IReadOnlyCollection<int> employeeIds,
+            DateTime startDate,
+            DateTime endExclusive)
+        {
+            if (employeeIds.Count == 0 || endExclusive <= startDate)
+            {
+                return new Dictionary<EmployeeMonthKey, AttendanceSalaryTotals>();
+            }
+
+            return await _context.AttendanceRecords
+                .AsNoTracking()
+                .Where(record =>
+                    employeeIds.Contains(record.EmployeeId) &&
+                    record.Date >= startDate &&
+                    record.Date < endExclusive)
+                .GroupBy(record => new { record.EmployeeId, record.Date.Year, record.Date.Month })
+                .Select(group => new AttendanceSalaryTotals
+                {
+                    EmployeeId = group.Key.EmployeeId,
+                    Year = group.Key.Year,
+                    Month = group.Key.Month,
+                    AbsentDays = group.Count(record => !record.IsPresent),
+                    DailyBonuses = group.Sum(record => record.DailyBonus ?? 0),
+                    DailyPenalties = group.Sum(record => record.DailyPenalty ?? 0)
+                })
+                .ToDictionaryAsync(
+                    totals => new EmployeeMonthKey(totals.EmployeeId, totals.Year, totals.Month));
+        }
+
+        private async Task<Dictionary<int, decimal>> GetMonthlyExpenseTotalsAsync(DateTime yearStart, DateTime yearEnd)
+        {
+            return await _context.Expenses
+                .AsNoTracking()
+                .Where(expense => expense.Date >= yearStart && expense.Date < yearEnd)
+                .GroupBy(expense => expense.Date.Month)
+                .Select(group => new { Month = group.Key, Total = group.Sum(expense => expense.Amount) })
+                .ToDictionaryAsync(item => item.Month, item => item.Total);
+        }
+
+        private async Task<Dictionary<int, decimal>> GetMonthlyPurchaseTotalsAsync(DateTime yearStart, DateTime yearEnd)
+        {
+            return await _context.Purchases
+                .AsNoTracking()
+                .Where(purchase => purchase.PurchaseDate >= yearStart && purchase.PurchaseDate < yearEnd)
+                .GroupBy(purchase => purchase.PurchaseDate.Month)
+                .Select(group => new { Month = group.Key, Total = group.Sum(purchase => purchase.TotalPrice) })
+                .ToDictionaryAsync(item => item.Month, item => item.Total);
+        }
+
+        private async Task<Dictionary<int, decimal>> GetMonthlyRentTotalsAsync(DateTime yearStart, DateTime yearEnd)
+        {
+            return await _context.Rents
+                .AsNoTracking()
+                .Where(rent => rent.PaymentDate >= yearStart && rent.PaymentDate < yearEnd)
+                .GroupBy(rent => rent.PaymentDate.Month)
+                .Select(group => new { Month = group.Key, Total = group.Sum(rent => rent.MonthlyAmount) })
+                .ToDictionaryAsync(item => item.Month, item => item.Total);
+        }
+
+        private async Task<Dictionary<int, decimal>> GetMonthlyIncomeTotalsAsync(DateTime yearStart, DateTime yearEnd)
+        {
+            return await _context.Incomes
+                .AsNoTracking()
+                .Where(income => income.Date >= yearStart && income.Date < yearEnd)
+                .GroupBy(income => income.Date.Month)
+                .Select(group => new { Month = group.Key, Total = group.Sum(income => income.Amount) })
+                .ToDictionaryAsync(item => item.Month, item => item.Total);
+        }
+
+        private async Task<Dictionary<int, SalaryFinancialTotals>> GetMonthlySalaryTotalsForYearAsync(int year)
+        {
+            if (!_currentUserService.IsAdmin())
+            {
+                return new Dictionary<int, SalaryFinancialTotals>();
+            }
+
+            var yearStart = DateTimeUtc.YearStart(year);
+            var yearEnd = yearStart.AddYears(1);
+            var accumulators = Enumerable.Range(1, 12)
+                .ToDictionary(month => month, _ => new SalaryFinancialAccumulator());
+            var records = SelectLatestSalaryRecords(await _context.SalaryRecords
+                .AsNoTracking()
+                .Where(record => record.Month >= yearStart && record.Month < yearEnd)
+                .ToListAsync());
+
+            foreach (var record in records)
+            {
+                if (record.Month.Year == year && accumulators.TryGetValue(record.Month.Month, out var accumulator))
+                {
+                    accumulator.Add(record.EmployeeId, record.TotalSalary, record.DaysWorked);
+                }
+            }
+
+            var recordedEmployeeMonths = records
+                .Select(record => EmployeeMonthKey.From(record.EmployeeId, record.Month))
+                .ToHashSet();
+            var employees = await _context.Employees
+                .AsNoTracking()
+                .Where(employee => !employee.IsDeleted)
+                .ToListAsync();
+            if (employees.Count > 0)
+            {
+                var employeeIds = employees.Select(employee => employee.Id).ToList();
+                var attendanceTotals = await GetAttendanceSalaryTotalsAsync(employeeIds, yearStart, yearEnd);
+
+                foreach (var month in Enumerable.Range(1, 12))
+                {
+                    var monthStart = DateTimeUtc.MonthStart(year, month);
+                    var monthEnd = monthStart.AddMonths(1);
+
+                    foreach (var employee in employees)
+                    {
+                        if (DateTimeUtc.Date(employee.HireDate) >= monthEnd)
+                        {
+                            continue;
+                        }
+
+                        var key = EmployeeMonthKey.From(employee.Id, monthStart);
+                        if (recordedEmployeeMonths.Contains(key))
+                        {
+                            continue;
+                        }
+
+                        attendanceTotals.TryGetValue(key, out var attendance);
+                        var fallbackSalary = BuildFallbackEmployeeMonthlySalary(
+                            employee,
+                            monthStart,
+                            1m,
+                            attendance);
+                        accumulators[month].Add(
+                            fallbackSalary.EmployeeId,
+                            fallbackSalary.TotalSalary,
+                            fallbackSalary.DaysWorked);
+                    }
+                }
+            }
+
+            return accumulators.ToDictionary(
+                item => item.Key,
+                item => item.Value.ToTotals());
+        }
+
+        private async Task<Dictionary<int, WorkSaleFinancialTotals>> GetMonthlyWorkSaleTotalsAsync(DateTime yearStart, DateTime yearEnd)
+        {
+            var rows = await _context.WorkSales
+                .AsNoTracking()
+                .Where(workSale => workSale.Date >= yearStart && workSale.Date < yearEnd)
+                .GroupBy(workSale => workSale.Date.Month)
+                .Select(group => new MonthlyWorkSaleTotalsRow
+                {
+                    Month = group.Key,
+                    Revenue = group.Sum(workSale => workSale.TotalRevenue),
+                    Cost = group.Sum(workSale => workSale.TotalCost),
+                    Profit = group.Sum(workSale => workSale.Profit),
+                    Count = group.Count()
+                })
+                .ToListAsync();
+
+            return rows.ToDictionary(
+                row => row.Month,
+                row => new WorkSaleFinancialTotals
+                {
+                    Revenue = row.Revenue,
+                    Cost = row.Cost,
+                    Profit = row.Profit,
+                    Count = row.Count
+                });
+        }
+
+        private async Task<Dictionary<int, ArchivedInvoiceFinancialTotals>> GetMonthlyArchivedInvoiceTotalsAsync(
+            DateTime yearStart,
+            DateTime yearEnd)
+        {
+            var invoices = await GetArchivedInvoiceFinancialSnapshots()
+                .Where(invoice => invoice.CreatedAt >= yearStart && invoice.CreatedAt < yearEnd)
+                .ToListAsync();
+            var accumulators = new Dictionary<int, ArchivedInvoiceFinancialAccumulator>();
+
+            foreach (var invoice in invoices)
+            {
+                var month = invoice.CreatedAt.Month;
+                if (!accumulators.TryGetValue(month, out var accumulator))
+                {
+                    accumulator = new ArchivedInvoiceFinancialAccumulator();
+                    accumulators[month] = accumulator;
+                }
+
+                accumulator.Add(invoice);
+            }
+
+            return accumulators.ToDictionary(
+                item => item.Key,
+                item => item.Value.ToTotals());
+        }
+
+        private async Task<Dictionary<int, InvoiceStockCostTotals>> GetMonthlyInvoiceStockCostTotalsAsync(
+            DateTime yearStart,
+            DateTime yearEnd)
+        {
+            var movements = await GetInvoiceStockCostMovementSnapshotsAsync(yearStart, yearEnd);
+            var accumulators = new Dictionary<int, InvoiceStockCostAccumulator>();
+
+            foreach (var movement in movements)
+            {
+                var month = movement.OccurredAt.Month;
+                if (!accumulators.TryGetValue(month, out var accumulator))
+                {
+                    accumulator = new InvoiceStockCostAccumulator();
+                    accumulators[month] = accumulator;
+                }
+
+                accumulator.Add(movement);
+            }
+
+            return accumulators.ToDictionary(
+                item => item.Key,
+                item => item.Value.ToTotals());
+        }
+
+        private async Task<Dictionary<int, WorkerTaskCounts>> GetMonthlyWorkerTaskCountsAsync(DateTime yearStart, DateTime yearEnd)
+        {
+            if (!_currentUserService.IsAdmin())
+            {
+                return new Dictionary<int, WorkerTaskCounts>();
+            }
+
+            var rows = await _context.WorkerTasks
+                .AsNoTracking()
+                .Where(task => task.CreatedAt >= yearStart && task.CreatedAt < yearEnd)
+                .GroupBy(task => task.CreatedAt.Month)
+                .Select(group => new MonthlyWorkerTaskCountsRow
+                {
+                    Month = group.Key,
+                    Total = group.Count(),
+                    Waiting = group.Count(task => task.Status == WorkerTaskStatus.Waiting),
+                    InProcess = group.Count(task => task.Status == WorkerTaskStatus.InProcess),
+                    Completed = group.Count(task => task.Status == WorkerTaskStatus.Completed)
+                })
+                .ToListAsync();
+
+            return rows.ToDictionary(
+                row => row.Month,
+                row => new WorkerTaskCounts
+                {
+                    Total = row.Total,
+                    Waiting = row.Waiting,
+                    InProcess = row.InProcess,
+                    Completed = row.Completed
+                });
+        }
+
+        private async Task<StockSplitTotals> GetCurrentStockSplitTotalsAsync()
+        {
+            var stockItems = await _context.StockItems
+                .AsNoTracking()
+                .Select(item => new StockItemSnapshot
+                {
+                    Id = item.Id,
+                    StockType = item.StockType,
+                    ReorderLevel = item.ReorderLevel
+                })
+                .ToListAsync();
+
+            if (stockItems.Count == 0)
+            {
+                return StockSplitTotals.Empty;
+            }
+
+            var stockItemIds = stockItems.Select(item => item.Id).ToList();
+            var stockTypeById = stockItems.ToDictionary(item => item.Id, item => item.StockType);
+            var balances = await _context.StockMovements
+                .AsNoTracking()
+                .Where(movement => stockItemIds.Contains(movement.StockItemId))
+                .GroupBy(movement => movement.StockItemId)
+                .Select(group => new
+                {
+                    StockItemId = group.Key,
+                    Quantity = group.Sum(movement => movement.QuantityChange)
+                })
+                .ToDictionaryAsync(item => item.StockItemId, item => item.Quantity);
+
+            return new StockSplitTotals
+            {
+                Material = BuildStockSplitSegment(
+                    StockType.Material,
+                    stockItems,
+                    balances,
+                    Array.Empty<StockMovementSnapshot>(),
+                    stockTypeById),
+                Product = BuildStockSplitSegment(
+                    StockType.Product,
+                    stockItems,
+                    balances,
+                    Array.Empty<StockMovementSnapshot>(),
+                    stockTypeById)
+            };
+        }
+
+        private static decimal GetMonthlyValue(IReadOnlyDictionary<int, decimal> values, int month)
+        {
+            return values.TryGetValue(month, out var value) ? value : 0m;
+        }
+
+        private static T GetMonthlyValue<T>(IReadOnlyDictionary<int, T> values, int month, T defaultValue)
+        {
+            return values.TryGetValue(month, out var value) ? value : defaultValue;
+        }
+
         public async Task<object> GetDailyPurchasesBreakdownAsync(DateTime? date = null)
         {
             var targetDate = DateTimeUtc.Date(date ?? DateTime.UtcNow);
@@ -1624,7 +2358,7 @@ namespace backend.Services
 
         private IQueryable<WorkerTask> GetWorkerTasksForPeriod(DateTime? startDate, DateTime? endExclusive)
         {
-            var workerTasks = _context.WorkerTasks.AsQueryable();
+            var workerTasks = _context.WorkerTasks.AsNoTracking().AsQueryable();
 
             if (startDate.HasValue)
             {
@@ -1648,18 +2382,21 @@ namespace backend.Services
 
             var workerTasks = GetWorkerTasksForPeriod(startDate, endExclusive);
 
-            return new WorkerTaskCounts
-            {
-                Total = await workerTasks.CountAsync(),
-                Waiting = await workerTasks.CountAsync(task => task.Status == WorkerTaskStatus.Waiting),
-                InProcess = await workerTasks.CountAsync(task => task.Status == WorkerTaskStatus.InProcess),
-                Completed = await workerTasks.CountAsync(task => task.Status == WorkerTaskStatus.Completed)
-            };
+            return await workerTasks
+                .GroupBy(_ => 1)
+                .Select(group => new WorkerTaskCounts
+                {
+                    Total = group.Count(),
+                    Waiting = group.Count(task => task.Status == WorkerTaskStatus.Waiting),
+                    InProcess = group.Count(task => task.Status == WorkerTaskStatus.InProcess),
+                    Completed = group.Count(task => task.Status == WorkerTaskStatus.Completed)
+                })
+                .FirstOrDefaultAsync() ?? WorkerTaskCounts.Empty;
         }
 
         private IQueryable<WorkSale> GetWorkSalesForPeriod(DateTime? startDate, DateTime? endExclusive)
         {
-            var workSales = _context.WorkSales.AsQueryable();
+            var workSales = _context.WorkSales.AsNoTracking().AsQueryable();
 
             if (startDate.HasValue)
             {
@@ -1678,13 +2415,16 @@ namespace backend.Services
         {
             var workSales = GetWorkSalesForPeriod(startDate, endExclusive);
 
-            return new WorkSaleFinancialTotals
-            {
-                Revenue = await workSales.SumAsync(workSale => (decimal?)workSale.TotalRevenue) ?? 0m,
-                Cost = await workSales.SumAsync(workSale => (decimal?)workSale.TotalCost) ?? 0m,
-                Profit = await workSales.SumAsync(workSale => (decimal?)workSale.Profit) ?? 0m,
-                Count = await workSales.CountAsync()
-            };
+            return await workSales
+                .GroupBy(_ => 1)
+                .Select(group => new WorkSaleFinancialTotals
+                {
+                    Revenue = group.Sum(workSale => workSale.TotalRevenue),
+                    Cost = group.Sum(workSale => workSale.TotalCost),
+                    Profit = group.Sum(workSale => workSale.Profit),
+                    Count = group.Count()
+                })
+                .FirstOrDefaultAsync() ?? WorkSaleFinancialTotals.Empty;
         }
 
         private static WorkSaleFinancialTotals GetWorkSaleFinancialTotals(IEnumerable<WorkSale> workSales)
@@ -1702,7 +2442,7 @@ namespace backend.Services
 
         private IQueryable<InvoiceArchive> GetArchivedInvoicesForPeriod(DateTime? startDate, DateTime? endExclusive)
         {
-            var archivedInvoices = _context.InvoiceArchives.AsQueryable();
+            var archivedInvoices = _context.InvoiceArchives.AsNoTracking().AsQueryable();
 
             if (startDate.HasValue)
             {
@@ -1719,11 +2459,25 @@ namespace backend.Services
 
         private async Task<ArchivedInvoiceFinancialTotals> GetArchivedInvoiceFinancialTotalsAsync(DateTime? startDate, DateTime? endExclusive)
         {
-            var archivedInvoices = await GetArchivedInvoicesForPeriod(startDate, endExclusive)
-                .AsNoTracking()
+            var archivedInvoices = await GetArchivedInvoiceFinancialSnapshots(startDate, endExclusive)
                 .ToListAsync();
 
             return GetArchivedInvoiceFinancialTotals(archivedInvoices);
+        }
+
+        private IQueryable<ArchivedInvoiceFinancialSnapshot> GetArchivedInvoiceFinancialSnapshots(
+            DateTime? startDate = null,
+            DateTime? endExclusive = null)
+        {
+            var invoices = GetArchivedInvoicesForPeriod(startDate, endExclusive);
+
+            return invoices.Select(invoice => new ArchivedInvoiceFinancialSnapshot
+            {
+                CreatedAt = invoice.CreatedAt,
+                Subtotal = invoice.Subtotal,
+                Total = invoice.Total,
+                ItemsJson = invoice.ItemsJson
+            });
         }
 
         private static ArchivedInvoiceFinancialTotals GetArchivedInvoiceFinancialTotals(IEnumerable<InvoiceArchive> archivedInvoices)
@@ -1734,6 +2488,18 @@ namespace backend.Services
             {
                 Subtotal = invoiceList.Sum(invoice => invoice.Subtotal),
                 Total = invoiceList.Sum(InvoiceArchiveFinancials.GetRevenueTotal),
+                Count = invoiceList.Count
+            };
+        }
+
+        private static ArchivedInvoiceFinancialTotals GetArchivedInvoiceFinancialTotals(IEnumerable<ArchivedInvoiceFinancialSnapshot> archivedInvoices)
+        {
+            var invoiceList = archivedInvoices as ICollection<ArchivedInvoiceFinancialSnapshot> ?? archivedInvoices.ToList();
+
+            return new ArchivedInvoiceFinancialTotals
+            {
+                Subtotal = invoiceList.Sum(invoice => invoice.Subtotal),
+                Total = invoiceList.Sum(invoice => InvoiceArchiveFinancials.GetRevenueTotal(invoice.ItemsJson, invoice.Total)),
                 Count = invoiceList.Count
             };
         }
@@ -2217,6 +2983,205 @@ namespace backend.Services
             public int Waiting { get; init; }
             public int InProcess { get; init; }
             public int Completed { get; init; }
+        }
+
+        private sealed class DashboardEmployeeCounts
+        {
+            public static DashboardEmployeeCounts Empty { get; } = new();
+
+            public int Total { get; init; }
+            public int Magazine { get; init; }
+            public int Terren { get; init; }
+        }
+
+        private sealed class DashboardAmountBuckets
+        {
+            public static DashboardAmountBuckets Empty { get; } = new();
+
+            public decimal CurrentMonth { get; init; }
+            public decimal YearToDate { get; init; }
+            public decimal Total { get; init; }
+        }
+
+        private sealed class DashboardSalaryBuckets
+        {
+            public static DashboardSalaryBuckets Empty { get; } = new();
+
+            public SalaryFinancialTotals CurrentMonth { get; init; } = SalaryFinancialTotals.Empty;
+            public SalaryFinancialTotals YearToDate { get; init; } = SalaryFinancialTotals.Empty;
+            public SalaryFinancialTotals AllTime { get; init; } = SalaryFinancialTotals.Empty;
+        }
+
+        private sealed class DashboardWorkSaleBuckets
+        {
+            public static DashboardWorkSaleBuckets Empty { get; } = new();
+
+            public WorkSaleFinancialTotals CurrentMonth { get; init; } = WorkSaleFinancialTotals.Empty;
+            public WorkSaleFinancialTotals YearToDate { get; init; } = WorkSaleFinancialTotals.Empty;
+            public WorkSaleFinancialTotals AllTime { get; init; } = WorkSaleFinancialTotals.Empty;
+        }
+
+        private sealed class DashboardArchivedInvoiceBuckets
+        {
+            public static DashboardArchivedInvoiceBuckets Empty { get; } = new();
+
+            public ArchivedInvoiceFinancialTotals CurrentMonth { get; init; } = ArchivedInvoiceFinancialTotals.Empty;
+            public ArchivedInvoiceFinancialTotals YearToDate { get; init; } = ArchivedInvoiceFinancialTotals.Empty;
+            public ArchivedInvoiceFinancialTotals AllTime { get; init; } = ArchivedInvoiceFinancialTotals.Empty;
+        }
+
+        private sealed class DashboardInvoiceStockCostBuckets
+        {
+            public static DashboardInvoiceStockCostBuckets Empty { get; } = new();
+
+            public InvoiceStockCostTotals CurrentMonth { get; init; } = InvoiceStockCostTotals.Empty;
+            public InvoiceStockCostTotals YearToDate { get; init; } = InvoiceStockCostTotals.Empty;
+            public InvoiceStockCostTotals AllTime { get; init; } = InvoiceStockCostTotals.Empty;
+        }
+
+        private sealed class DashboardWorkSaleBucketRow
+        {
+            public decimal CurrentMonthRevenue { get; init; }
+            public decimal CurrentMonthCost { get; init; }
+            public decimal CurrentMonthProfit { get; init; }
+            public int CurrentMonthCount { get; init; }
+            public decimal YearToDateRevenue { get; init; }
+            public decimal YearToDateCost { get; init; }
+            public decimal YearToDateProfit { get; init; }
+            public int YearToDateCount { get; init; }
+            public decimal TotalRevenue { get; init; }
+            public decimal TotalCost { get; init; }
+            public decimal TotalProfit { get; init; }
+            public int TotalCount { get; init; }
+
+            public DashboardWorkSaleBuckets ToBuckets()
+            {
+                return new DashboardWorkSaleBuckets
+                {
+                    CurrentMonth = new WorkSaleFinancialTotals
+                    {
+                        Revenue = CurrentMonthRevenue,
+                        Cost = CurrentMonthCost,
+                        Profit = CurrentMonthProfit,
+                        Count = CurrentMonthCount
+                    },
+                    YearToDate = new WorkSaleFinancialTotals
+                    {
+                        Revenue = YearToDateRevenue,
+                        Cost = YearToDateCost,
+                        Profit = YearToDateProfit,
+                        Count = YearToDateCount
+                    },
+                    AllTime = new WorkSaleFinancialTotals
+                    {
+                        Revenue = TotalRevenue,
+                        Cost = TotalCost,
+                        Profit = TotalProfit,
+                        Count = TotalCount
+                    }
+                };
+            }
+        }
+
+        private sealed class MonthlyWorkSaleTotalsRow
+        {
+            public int Month { get; init; }
+            public decimal Revenue { get; init; }
+            public decimal Cost { get; init; }
+            public decimal Profit { get; init; }
+            public int Count { get; init; }
+        }
+
+        private sealed class MonthlyWorkerTaskCountsRow
+        {
+            public int Month { get; init; }
+            public int Total { get; init; }
+            public int Waiting { get; init; }
+            public int InProcess { get; init; }
+            public int Completed { get; init; }
+        }
+
+        private sealed class ArchivedInvoiceFinancialSnapshot
+        {
+            public DateTime CreatedAt { get; init; }
+            public decimal Subtotal { get; init; }
+            public decimal Total { get; init; }
+            public string ItemsJson { get; init; } = string.Empty;
+        }
+
+        private sealed class ArchivedInvoiceFinancialAccumulator
+        {
+            private decimal _subtotal;
+            private decimal _total;
+            private int _count;
+
+            public void Add(ArchivedInvoiceFinancialSnapshot invoice)
+            {
+                _subtotal += invoice.Subtotal;
+                _total += InvoiceArchiveFinancials.GetRevenueTotal(invoice.ItemsJson, invoice.Total);
+                _count++;
+            }
+
+            public ArchivedInvoiceFinancialTotals ToTotals()
+            {
+                return new ArchivedInvoiceFinancialTotals
+                {
+                    Subtotal = _subtotal,
+                    Total = _total,
+                    Count = _count
+                };
+            }
+        }
+
+        private sealed class InvoiceStockCostAccumulator
+        {
+            private decimal _cost;
+            private int _count;
+
+            public void Add(InvoiceStockCostMovementSnapshot movement)
+            {
+                _cost += GetInvoiceStockMovementCost(movement);
+                _count++;
+            }
+
+            public InvoiceStockCostTotals ToTotals()
+            {
+                return new InvoiceStockCostTotals
+                {
+                    Cost = _cost,
+                    Count = _count
+                };
+            }
+        }
+
+        private sealed class SalaryFinancialAccumulator
+        {
+            private decimal _totalSalaries;
+            private decimal _totalDaysWorked;
+            private readonly HashSet<int> _employeeIds = new();
+
+            public void Add(int employeeId, decimal totalSalary, decimal daysWorked, decimal coverageFactor = 1m)
+            {
+                if (coverageFactor <= 0)
+                {
+                    return;
+                }
+
+                _totalSalaries += totalSalary * coverageFactor;
+                _totalDaysWorked += daysWorked * coverageFactor;
+                _employeeIds.Add(employeeId);
+            }
+
+            public SalaryFinancialTotals ToTotals()
+            {
+                return new SalaryFinancialTotals
+                {
+                    TotalSalaries = RoundMoney(_totalSalaries),
+                    TotalDaysWorked = RoundCount(_totalDaysWorked),
+                    EmployeeCount = _employeeIds.Count,
+                    EmployeeIds = _employeeIds.ToArray()
+                };
+            }
         }
 
         private sealed class ExpenseBreakdownItem
