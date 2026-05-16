@@ -390,189 +390,172 @@ function FinancialOverviewChart({ data, currency }) {
     return <MiniEmpty text="Nuk ka seri mujore për grafik." />;
   }
 
-  const width = 920;
-  const height = 298;
-  const left = 50;
-  const right = 24;
-  const top = 22;
-  const bottom = 42;
+  const latest = data[data.length - 1] || {};
+  const previous = data[Math.max(0, data.length - 2)] || {};
+  const panels = [
+    {
+      key: "income",
+      title: "Të ardhurat",
+      value: latest.income,
+      previous: previous.income,
+      color: "#16a34a",
+      bg: "#f0fdf4",
+      helper: "Hyrje mujore",
+      lowerIsBetter: false,
+    },
+    {
+      key: "outflow",
+      title: "Shpenzimet",
+      value: latest.outflow,
+      previous: previous.outflow,
+      color: "#dc2626",
+      bg: "#fff1f2",
+      helper: "Dalje mujore",
+      lowerIsBetter: true,
+    },
+    {
+      key: "netProfit",
+      title: "Fitimi neto",
+      value: latest.netProfit,
+      previous: previous.netProfit,
+      color: normalizeNumber(latest.netProfit) >= 0 ? "#2563eb" : "#dc2626",
+      bg: normalizeNumber(latest.netProfit) >= 0 ? "#eff6ff" : "#fff1f2",
+      helper: "Rezultati final",
+      lowerIsBetter: false,
+    },
+  ];
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gap: 12,
+      }}
+    >
+      {panels.map((panel) => (
+        <FinancialMiniPanel
+          key={panel.key}
+          panel={panel}
+          data={data}
+          currency={currency}
+        />
+      ))}
+    </div>
+  );
+}
+
+function FinancialMiniPanel({ panel, data, currency }) {
+  const values = data.map((item) => normalizeNumber(item[panel.key]));
+  const minValue = Math.min(0, ...values);
+  const maxValue = Math.max(0, ...values);
+  const range = maxValue - minValue || 1;
+  const width = 260;
+  const height = 122;
+  const left = 10;
+  const right = 10;
+  const top = 14;
+  const bottom = 24;
   const chartWidth = width - left - right;
   const chartHeight = height - top - bottom;
-  const maxBarValue = Math.max(
-    1,
-    ...data.flatMap((item) => [normalizeNumber(item.income), normalizeNumber(item.outflow)])
-  );
-  const maxValue = Math.max(maxBarValue, ...data.map((item) => normalizeNumber(item.netProfit)));
-  const minValue = Math.min(0, ...data.map((item) => normalizeNumber(item.netProfit)));
-  const range = maxValue - minValue || 1;
-  const groupWidth = chartWidth / data.length;
-  const barWidth = Math.min(18, Math.max(9, groupWidth * 0.2));
-  const xForIndex = (index) => left + groupWidth * index + groupWidth / 2;
+  const xForIndex = (index) =>
+    data.length === 1
+      ? left + chartWidth / 2
+      : left + (chartWidth / (data.length - 1)) * index;
   const yForValue = (value) =>
     top + chartHeight - ((normalizeNumber(value) - minValue) / range) * chartHeight;
   const zeroY = yForValue(0);
-  const netProfitPoints = data
-    .map((item, index) => `${xForIndex(index)},${yForValue(item.netProfit)}`)
+  const points = data
+    .map((item, index) => `${xForIndex(index)},${yForValue(item[panel.key])}`)
     .join(" ");
-  const netProfitArea = data.length
+  const areaPath = data.length
     ? `M ${data
-        .map((item, index) => `${xForIndex(index)} ${yForValue(item.netProfit)}`)
+        .map((item, index) => `${xForIndex(index)} ${yForValue(item[panel.key])}`)
         .join(" L ")} L ${xForIndex(data.length - 1)} ${zeroY} L ${xForIndex(0)} ${zeroY} Z`
     : "";
-  const latestIndex = Math.max(
-    0,
-    data.findLastIndex?.(
-      (item) =>
-        normalizeNumber(item.income) ||
-        normalizeNumber(item.outflow) ||
-        normalizeNumber(item.netProfit)
-    ) ?? data.length - 1
-  );
-  const latest = data[latestIndex] || data[data.length - 1];
-  const latestX = xForIndex(latestIndex);
-  const tooltipX = Math.min(width - 230, Math.max(left + 8, latestX + 18));
-  const tooltipY = Math.max(top + 8, Math.min(height - 120, yForValue(latest?.netProfit) - 46));
+  const trend = getTrend(panel.value, panel.previous, panel.lowerIsBetter);
+  const trendColor = trend.good ? "#16a34a" : "#dc2626";
 
   return (
-    <div className="dashboard-chart-scroll">
-      <Space size={18} style={{ marginBottom: 6 }}>
-        <LegendDot color="#22a447" label="Të Ardhurat" />
-        <LegendDot color="#ef4444" label="Shpenzimet" />
-        <LegendDot color="#2563eb" label="Fitimi Neto" />
-      </Space>
+    <div
+      style={{
+        border: "1px solid #e8edf5",
+        borderRadius: 10,
+        padding: 12,
+        background: panel.bg,
+        minHeight: 290,
+      }}
+    >
+      <Text style={{ color: "#475569", display: "block", fontSize: 12, fontWeight: 800 }}>
+        {panel.title}
+      </Text>
+      <div
+        style={{
+          color: panel.color,
+          fontSize: 23,
+          fontWeight: 850,
+          lineHeight: 1.15,
+          marginTop: 8,
+        }}
+      >
+        {formatMoney(panel.value, currency)}
+      </div>
+      <Text style={{ color: "#64748b", fontSize: 12 }}>{panel.helper}</Text>
 
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="298" role="img">
-        {[0, 0.25, 0.5, 0.75, 1].map((step) => {
-          const value = minValue + range * step;
-          const y = yForValue(value);
-          return (
-            <g key={step}>
-              <line
-                x1={left}
-                x2={width - right}
-                y1={y}
-                y2={y}
-                stroke={value === 0 ? "#cbd5e1" : "#e5eaf2"}
-              />
-              <text x={8} y={y + 4} fill="#94a3b8" fontSize="11">
-                {formatAmount(value, { compact: true })}
-              </text>
-            </g>
-          );
-        })}
-
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height="122" role="img">
         <line x1={left} x2={width - right} y1={zeroY} y2={zeroY} stroke="#cbd5e1" />
-
-        {data.map((item, index) => {
-          const center = xForIndex(index);
-          const incomeY = yForValue(item.income);
-          const outflowY = yForValue(item.outflow);
-          const incomeHeight = Math.max(0, zeroY - incomeY);
-          const outflowHeight = Math.max(0, zeroY - outflowY);
-
-          return (
-            <g key={`${item.label}-${index}`}>
-              <rect
-                x={center - barWidth - 4}
-                y={incomeY}
-                width={barWidth}
-                height={incomeHeight}
-                rx="5"
-                fill="#22a447"
-                opacity="0.88"
-              >
-                <title>{`Të ardhurat: ${formatMoney(item.income, currency)}`}</title>
-              </rect>
-              <rect
-                x={center + 4}
-                y={outflowY}
-                width={barWidth}
-                height={outflowHeight}
-                rx="5"
-                fill="#ef4444"
-                opacity="0.8"
-              >
-                <title>{`Shpenzimet: ${formatMoney(item.outflow, currency)}`}</title>
-              </rect>
-              <text
-                x={center}
-                y={height - 16}
-                textAnchor="middle"
-                fill="#64748b"
-                fontSize="11"
-                fontWeight="650"
-              >
-                {item.label}
-              </text>
-            </g>
-          );
-        })}
-
-        <path d={netProfitArea} fill="rgba(37, 99, 235, 0.1)" />
+        <path d={areaPath} fill={panel.color} opacity="0.12" />
         <polyline
-          points={netProfitPoints}
+          points={points}
           fill="none"
-          stroke="#2563eb"
-          strokeWidth="3.5"
+          stroke={panel.color}
+          strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-
         {data.map((item, index) => (
-          <g key={`net-profit-${item.label}-${index}`}>
+          <g key={`${panel.key}-${item.label}-${index}`}>
             <circle
               cx={xForIndex(index)}
-              cy={yForValue(item.netProfit)}
-              r="4.5"
+              cy={yForValue(item[panel.key])}
+              r="3.6"
               fill="#ffffff"
-              stroke="#2563eb"
-              strokeWidth="2.6"
+              stroke={panel.color}
+              strokeWidth="2"
             >
-              <title>{`Fitimi Neto: ${formatMoney(item.netProfit, currency)}`}</title>
+              <title>{`${panel.title}: ${formatMoney(item[panel.key], currency)}`}</title>
             </circle>
+            <text
+              x={xForIndex(index)}
+              y={height - 7}
+              textAnchor="middle"
+              fill="#64748b"
+              fontSize="10"
+              fontWeight="650"
+            >
+              {item.label}
+            </text>
           </g>
         ))}
-
-        <line
-          x1={latestX}
-          x2={latestX}
-          y1={top}
-          y2={height - bottom}
-          stroke="#cbd5e1"
-          strokeDasharray="4 4"
-        />
-        <circle
-          cx={latestX}
-          cy={yForValue(latest?.netProfit)}
-          r="8"
-          fill="#ffffff"
-          stroke="#2563eb"
-          strokeWidth="3"
-        />
-        <g>
-          <rect
-            x={tooltipX}
-            y={tooltipY}
-            width="210"
-            height="94"
-            rx="10"
-            fill="#ffffff"
-            stroke="#e2e8f0"
-          />
-          <text x={tooltipX + 14} y={tooltipY + 22} fill="#0f172a" fontSize="12" fontWeight="800">
-            {latest?.fullLabel}
-          </text>
-          <text x={tooltipX + 14} y={tooltipY + 44} fill="#166534" fontSize="11" fontWeight="650">
-            Të ardhurat: {formatMoney(latest?.income, currency)}
-          </text>
-          <text x={tooltipX + 14} y={tooltipY + 62} fill="#b91c1c" fontSize="11" fontWeight="650">
-            Shpenzimet: {formatMoney(latest?.outflow, currency)}
-          </text>
-          <text x={tooltipX + 14} y={tooltipY + 80} fill="#1d4ed8" fontSize="11" fontWeight="650">
-            Fitimi Neto: {formatMoney(latest?.netProfit, currency)}
-          </text>
-        </g>
       </svg>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          color: trendColor,
+          fontSize: 12,
+          fontWeight: 850,
+          marginTop: 6,
+        }}
+      >
+        {trend.direction === "down" ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
+        {formatAmount(trend.percent, { decimals: 1 })}%
+        <Text style={{ color: "#64748b", fontSize: 12 }}>
+          nga muaji i kaluar
+        </Text>
+      </div>
     </div>
   );
 }
@@ -1659,7 +1642,7 @@ function Dashboard() {
 
       <Row gutter={[14, 14]} style={{ marginTop: 14 }}>
         <Col xs={24} lg={24} xl={10}>
-          <SectionCard title="Të Ardhurat, Shpenzimet & Fitimi Neto" minHeight={340}>
+          <SectionCard title="Përmbledhje Financiare Mujore" minHeight={340}>
             <FinancialOverviewChart data={monthlyChartData} currency={currency} />
           </SectionCard>
         </Col>
