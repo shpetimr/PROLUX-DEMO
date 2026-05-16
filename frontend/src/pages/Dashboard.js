@@ -581,7 +581,7 @@ function ExpenseDonut({ items, total, currency }) {
   const chartItems = items.filter((item) => normalizeNumber(item.value) > 0).slice(0, 5);
   const chartTotal = chartItems.reduce((sum, item) => sum + normalizeNumber(item.value), 0);
   const displayTotal = total || chartTotal;
-  const colors = ["#2563eb", "#36a853", "#fb923c", "#8b5cf6", "#94a3b8"];
+  const fallbackColors = ["#2563eb", "#dc2626", "#7c3aed", "#f97316", "#0891b2"];
   const radius = 60;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
@@ -599,6 +599,7 @@ function ExpenseDonut({ items, total, currency }) {
         <circle cx="90" cy="90" r={radius} fill="none" stroke="#eef2f7" strokeWidth="30" />
         {chartItems.map((item, index) => {
           const length = (normalizeNumber(item.value) / chartTotal) * circumference;
+          const color = item.color || fallbackColors[index];
           const segment = (
             <circle
               key={item.label}
@@ -606,7 +607,7 @@ function ExpenseDonut({ items, total, currency }) {
               cy="90"
               r={radius}
               fill="none"
-              stroke={colors[index]}
+              stroke={color}
               strokeWidth="30"
               strokeDasharray={`${length} ${circumference - length}`}
               strokeDashoffset={-offset}
@@ -636,7 +637,7 @@ function ExpenseDonut({ items, total, currency }) {
               fontSize: 13,
             }}
           >
-            <LegendDot color={colors[index]} label={item.label} />
+            <LegendDot color={item.color || fallbackColors[index]} label={item.label} />
             <Text style={{ color: "#0f172a", fontSize: 13, fontWeight: 800 }}>
               {formatAmount((normalizeNumber(item.value) / chartTotal) * 100, {
                 decimals: 1,
@@ -1318,11 +1319,11 @@ function Dashboard() {
       manualExpensesFromList > 0 ? manualExpensesFromList : fallbackManualExpenses;
 
     return [
-      { label: "Pagat", value: normalizeNumber(stats?.currentMonthSalaries) },
-      { label: "Shpenzimet", value: manualExpenses },
-      { label: "Qirat", value: normalizeNumber(stats?.currentMonthRents) },
-      { label: "Blerjet", value: normalizeNumber(stats?.currentMonthPurchases) },
-      { label: "Kosto e faturave", value: invoiceCost },
+      { label: "Pagat", value: normalizeNumber(stats?.currentMonthSalaries), color: "#2563eb" },
+      { label: "Shpenzimet", value: manualExpenses, color: "#dc2626" },
+      { label: "Qirat", value: normalizeNumber(stats?.currentMonthRents), color: "#7c3aed" },
+      { label: "Blerjet", value: normalizeNumber(stats?.currentMonthPurchases), color: "#f97316" },
+      { label: "Kosto e faturave", value: invoiceCost, color: "#0891b2" },
     ].filter((item) => item.value > 0);
   }, [dashboardData.expenses, stats]);
 
