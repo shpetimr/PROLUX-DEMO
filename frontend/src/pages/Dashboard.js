@@ -1303,29 +1303,33 @@ function Dashboard() {
   const expenseCategoryData = useMemo(() => {
     const monthStart = dayjs().startOf("month");
     const monthEnd = dayjs().endOf("month");
-    const grouped = dashboardData.expenses
+    const manualExpensesFromList = dashboardData.expenses
       .filter((expense) => {
         const date = dayjs(expense.date);
         return date.isValid() && date.isAfter(monthStart.subtract(1, "millisecond")) && date.isBefore(monthEnd.add(1, "millisecond"));
       })
-      .reduce((acc, expense) => {
-        const key = expense.expenseType || "Të tjera";
-        acc[key] = (acc[key] || 0) + normalizeNumber(expense.amount);
-        return acc;
-      }, {});
+      .reduce((sum, expense) => sum + normalizeNumber(expense.amount), 0);
+    const invoiceCost = normalizeNumber(stats?.currentMonthInvoiceStockCost);
+    const fallbackManualExpenses = Math.max(
+      0,
+      normalizeNumber(stats?.currentMonthExpenses) - invoiceCost
+    );
+    const manualExpenses =
+      manualExpensesFromList > 0 ? manualExpensesFromList : fallbackManualExpenses;
 
-    const items = Object.entries(grouped)
-      .map(([label, value]) => ({ label, value }))
-      .sort((left, right) => right.value - left.value);
-
-    if (items.length) {
-      return items;
-    }
-
-    return normalizeNumber(stats?.currentMonthExpenses) > 0
-      ? [{ label: "Shpenzime", value: stats.currentMonthExpenses }]
-      : [];
+    return [
+      { label: "Pagat", value: normalizeNumber(stats?.currentMonthSalaries) },
+      { label: "Shpenzimet", value: manualExpenses },
+      { label: "Qirat", value: normalizeNumber(stats?.currentMonthRents) },
+      { label: "Blerjet", value: normalizeNumber(stats?.currentMonthPurchases) },
+      { label: "Kosto e faturave", value: invoiceCost },
+    ].filter((item) => item.value > 0);
   }, [dashboardData.expenses, stats]);
+
+  const expenseCategoryTotal = expenseCategoryData.reduce(
+    (sum, item) => sum + normalizeNumber(item.value),
+    0
+  );
 
   const activityItems = useMemo(() => {
     const items = [
@@ -1659,10 +1663,10 @@ function Dashboard() {
           </SectionCard>
         </Col>
         <Col xs={24} md={12} xl={7}>
-          <SectionCard title={`Shpenzimet sipas Kategorisë (${currentMonthTitle})`} minHeight={340}>
+          <SectionCard title={`Shpenzimet mujore sipas kategorisë (${currentMonthTitle})`} minHeight={340}>
             <ExpenseDonut
               items={expenseCategoryData}
-              total={stats?.currentMonthExpenses}
+              total={expenseCategoryTotal}
               currency={currency}
             />
           </SectionCard>
