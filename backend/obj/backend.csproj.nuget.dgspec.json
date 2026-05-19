@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL\\backend\\backend.csproj": {}
+    "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL - DEMO\\backend\\backend.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL\\backend\\backend.csproj": {
+    "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL - DEMO\\backend\\backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL\\backend\\backend.csproj",
+        "projectUniqueName": "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL - DEMO\\backend\\backend.csproj",
         "projectName": "backend",
-        "projectPath": "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL\\backend\\backend.csproj",
+        "projectPath": "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL - DEMO\\backend\\backend.csproj",
         "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL\\backend\\obj\\",
+        "outputPath": "C:\\Users\\ASUS\\Desktop\\PROLUX - FINAL - DEMO\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ASUS\\AppData\\Roaming\\NuGet\\NuGet.Config"
