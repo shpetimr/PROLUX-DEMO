@@ -306,6 +306,9 @@ namespace backend.Data
                 await CopyTableAsync(source.Incomes, destination.Incomes, "Incomes", dryRun, cancellationToken),
                 await CopyTableAsync(source.Debts, destination.Debts, "Debts", dryRun, cancellationToken),
                 await CopyTableAsync(source.Projects, destination.Projects, "Projects", dryRun, cancellationToken),
+                await CopyTableAsync(source.FiscalReceipts, destination.FiscalReceipts, "FiscalReceipts", dryRun, cancellationToken),
+                await CopyTableAsync(source.FiscalReceiptArchives, destination.FiscalReceiptArchives, "FiscalReceiptArchives", dryRun, cancellationToken),
+                await CopyTableAsync(source.FiscalReceiptStockDeductions, destination.FiscalReceiptStockDeductions, "FiscalReceiptStockDeductions", dryRun, cancellationToken),
                 await CopyTableAsync(source.InvoiceArchives, destination.InvoiceArchives, "InvoiceArchives", dryRun, cancellationToken),
                 await CopyTableAsync(source.InvoiceStockDeductions, destination.InvoiceStockDeductions, "InvoiceStockDeductions", dryRun, cancellationToken),
                 await CopyTableAsync(source.StockItems, destination.StockItems, "StockItems", dryRun, cancellationToken),
@@ -520,6 +523,9 @@ WHERE table_schema = current_schema()
             await ValidateTableIdsAsync(source.Incomes, destination.Incomes, "Incomes", cancellationToken);
             await ValidateTableIdsAsync(source.Debts, destination.Debts, "Debts", cancellationToken);
             await ValidateTableIdsAsync(source.Projects, destination.Projects, "Projects", cancellationToken);
+            await ValidateTableIdsAsync(source.FiscalReceipts, destination.FiscalReceipts, "FiscalReceipts", cancellationToken);
+            await ValidateTableIdsAsync(source.FiscalReceiptArchives, destination.FiscalReceiptArchives, "FiscalReceiptArchives", cancellationToken);
+            await ValidateTableIdsAsync(source.FiscalReceiptStockDeductions, destination.FiscalReceiptStockDeductions, "FiscalReceiptStockDeductions", cancellationToken);
             await ValidateTableIdsAsync(source.InvoiceArchives, destination.InvoiceArchives, "InvoiceArchives", cancellationToken);
             await ValidateTableIdsAsync(source.InvoiceStockDeductions, destination.InvoiceStockDeductions, "InvoiceStockDeductions", cancellationToken);
             await ValidateTableIdsAsync(source.StockItems, destination.StockItems, "StockItems", cancellationToken);
@@ -594,6 +600,9 @@ SELECT setval(
                 new("Incomes", await destination.Incomes.CountAsync(cancellationToken)),
                 new("Debts", await destination.Debts.CountAsync(cancellationToken)),
                 new("Projects", await destination.Projects.CountAsync(cancellationToken)),
+                new("FiscalReceipts", await destination.FiscalReceipts.CountAsync(cancellationToken)),
+                new("FiscalReceiptArchives", await destination.FiscalReceiptArchives.CountAsync(cancellationToken)),
+                new("FiscalReceiptStockDeductions", await destination.FiscalReceiptStockDeductions.CountAsync(cancellationToken)),
                 new("InvoiceArchives", await destination.InvoiceArchives.CountAsync(cancellationToken)),
                 new("InvoiceStockDeductions", await destination.InvoiceStockDeductions.CountAsync(cancellationToken)),
                 new("StockItems", await destination.StockItems.CountAsync(cancellationToken)),
@@ -625,6 +634,9 @@ SELECT setval(
             "Incomes",
             "Debts",
             "Projects",
+            "FiscalReceipts",
+            "FiscalReceiptArchives",
+            "FiscalReceiptStockDeductions",
             "InvoiceArchives",
             "InvoiceStockDeductions",
             "StockItems",

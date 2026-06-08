@@ -91,6 +91,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ISalaryService, SalaryService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<IInvoiceStockDeductionService, InvoiceStockDeductionService>();
+builder.Services.AddScoped<IFiscalReceiptStockDeductionService, FiscalReceiptStockDeductionService>();
 builder.Services.AddScoped<InvoiceTemplatePdfService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
@@ -157,6 +158,7 @@ using (var scope = app.Services.CreateScope())
         await SalaryRecordSchemaBootstrapper.EnsureAsync(context);
         await WorkerTaskSchemaBootstrapper.EnsureAsync(context);
         await InvoiceArchiveSchemaBootstrapper.EnsureAsync(context);
+        await FiscalReceiptSchemaBootstrapper.EnsureAsync(context);
         await WorkSaleSchemaBootstrapper.EnsureAsync(context);
         await DashboardPerformanceSchemaBootstrapper.EnsureAsync(context);
         Console.WriteLine("Database connection established successfully.");

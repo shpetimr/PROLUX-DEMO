@@ -406,8 +406,12 @@ namespace backend.Controllers
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
                 var invoiceStockCost = periodReport.TotalInvoiceStockCost;
                 var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
-                var incomes = baseIncomes + workSalesProfit + archivedInvoiceRevenue;
-                var expenses = baseExpenses + invoiceStockCost;
+                var fiscalReceiptRevenue = periodReport.TotalFiscalReceipts;
+                var fiscalReceiptCount = periodReport.FiscalReceiptsCount;
+                var fiscalReceiptStockCost = periodReport.TotalFiscalReceiptStockCost;
+                var fiscalReceiptStockCostCount = periodReport.FiscalReceiptStockCostCount;
+                var incomes = baseIncomes + workSalesProfit + archivedInvoiceRevenue + fiscalReceiptRevenue;
+                var expenses = baseExpenses + invoiceStockCost + fiscalReceiptStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
@@ -438,6 +442,17 @@ namespace backend.Controllers
                     });
                 }
 
+                if (fiscalReceiptStockCostCount > 0 || fiscalReceiptStockCost > 0)
+                {
+                    expenseBreakdown.Add(new
+                    {
+                        Type = "Fiscal Receipt Stock Cost",
+                        Amount = fiscalReceiptStockCost,
+                        PercentageOfTotal = totalOutflow > 0 ? (fiscalReceiptStockCost / totalOutflow) * 100 : 0,
+                        PercentageOfIncome = incomes > 0 ? (fiscalReceiptStockCost / incomes) * 100 : 0
+                    });
+                }
+
                 expenseBreakdown = expenseBreakdown
                     .OrderByDescending(x => x.Amount)
                     .ToList();
@@ -455,11 +470,15 @@ namespace backend.Controllers
                         TotalEmployeePayments = totalSalaries,
                         TotalArchivedInvoices = archivedInvoiceRevenue,
                         ArchivedInvoicesCount = archivedInvoiceCount,
+                        TotalFiscalReceipts = fiscalReceiptRevenue,
+                        FiscalReceiptsCount = fiscalReceiptCount,
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
                         TotalInvoiceStockCost = invoiceStockCost,
                         InvoiceStockCostCount = invoiceStockCostCount,
+                        TotalFiscalReceiptStockCost = fiscalReceiptStockCost,
+                        FiscalReceiptStockCostCount = fiscalReceiptStockCostCount,
                         TotalOutflow = totalOutflow,
                         NetIncome = netIncome,
                         ProfitMargin = profitMargin
@@ -811,8 +830,12 @@ namespace backend.Controllers
                 var archivedInvoiceCount = periodReport.ArchivedInvoicesCount;
                 var invoiceStockCost = periodReport.TotalInvoiceStockCost;
                 var invoiceStockCostCount = periodReport.InvoiceStockCostCount;
-                var incomes = baseIncomes + workSalesProfit + archivedInvoiceRevenue;
-                var expenses = baseExpenses + invoiceStockCost;
+                var fiscalReceiptRevenue = periodReport.TotalFiscalReceipts;
+                var fiscalReceiptCount = periodReport.FiscalReceiptsCount;
+                var fiscalReceiptStockCost = periodReport.TotalFiscalReceiptStockCost;
+                var fiscalReceiptStockCostCount = periodReport.FiscalReceiptStockCostCount;
+                var incomes = baseIncomes + workSalesProfit + archivedInvoiceRevenue + fiscalReceiptRevenue;
+                var expenses = baseExpenses + invoiceStockCost + fiscalReceiptStockCost;
                 var totalSalaries = periodReport.TotalSalaries;
                 var totalOutflow = expenses + purchases + rents + totalSalaries;
                 var netIncome = incomes - totalOutflow;
@@ -847,6 +870,17 @@ namespace backend.Controllers
                         Total = invoiceStockCost,
                         Count = invoiceStockCostCount,
                         Percentage = totalOutflow > 0 ? (invoiceStockCost / totalOutflow) * 100 : 0
+                    });
+                }
+
+                if (fiscalReceiptStockCostCount > 0 || fiscalReceiptStockCost > 0)
+                {
+                    topExpenseTypes.Add(new
+                    {
+                        Type = "Fiscal Receipt Stock Cost",
+                        Total = fiscalReceiptStockCost,
+                        Count = fiscalReceiptStockCostCount,
+                        Percentage = totalOutflow > 0 ? (fiscalReceiptStockCost / totalOutflow) * 100 : 0
                     });
                 }
 
@@ -902,6 +936,22 @@ namespace backend.Controllers
                         .ToList();
                 }
 
+                if (fiscalReceiptCount > 0 || fiscalReceiptRevenue > 0)
+                {
+                    topIncomeSources.Add(new
+                    {
+                        Source = "Fiscal Receipts",
+                        Total = fiscalReceiptRevenue,
+                        Count = fiscalReceiptCount,
+                        Percentage = incomes > 0 ? (fiscalReceiptRevenue / incomes) * 100 : 0
+                    });
+
+                    topIncomeSources = topIncomeSources
+                        .OrderByDescending(x => x.Total)
+                        .Take(5)
+                        .ToList();
+                }
+
                 return Ok(new
                 {
                     Period = new { StartDate = start, EndDate = end, Days = daysInPeriod },
@@ -915,11 +965,15 @@ namespace backend.Controllers
                         TotalEmployeePayments = totalSalaries,
                         TotalArchivedInvoices = archivedInvoiceRevenue,
                         ArchivedInvoicesCount = archivedInvoiceCount,
+                        TotalFiscalReceipts = fiscalReceiptRevenue,
+                        FiscalReceiptsCount = fiscalReceiptCount,
                         TotalWorkSalesRevenue = workSalesRevenue,
                         TotalWorkSalesCost = workSalesCost,
                         TotalWorkSalesProfit = workSalesProfit,
                         TotalInvoiceStockCost = invoiceStockCost,
                         InvoiceStockCostCount = invoiceStockCostCount,
+                        TotalFiscalReceiptStockCost = fiscalReceiptStockCost,
+                        FiscalReceiptStockCostCount = fiscalReceiptStockCostCount,
                         TotalOutflow = totalOutflow,
                         NetIncome = netIncome,
                         ProfitMargin = profitMargin

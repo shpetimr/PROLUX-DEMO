@@ -7,6 +7,8 @@ namespace backend.Authorization
         public const string DashboardView = "dashboard.view";
         public const string TemplatesPrint = "templates.print";
         public const string OffersPrint = "offers.print";
+        public const string FiscalReceiptsManage = "fiscalReceipts.manage";
+        public const string FiscalReceiptArchiveManage = "fiscalReceiptArchive.manage";
         public const string InvoiceArchiveManage = "invoiceArchive.manage";
         public const string ExpensesManage = "expenses.manage";
         public const string PurchasesManage = "purchases.manage";
@@ -31,6 +33,8 @@ namespace backend.Authorization
             DashboardView,
             TemplatesPrint,
             OffersPrint,
+            FiscalReceiptsManage,
+            FiscalReceiptArchiveManage,
             InvoiceArchiveManage,
             ExpensesManage,
             PurchasesManage,

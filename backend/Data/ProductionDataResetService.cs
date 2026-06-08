@@ -71,6 +71,9 @@ namespace backend.Data
 
                 await AddDeleteCountAsync(transactionCounts, "WorkerTasks", _context.WorkerTasks, cancellationToken);
                 await AddDeleteCountAsync(transactionCounts, "WorkSales", _context.WorkSales, cancellationToken);
+                await AddDeleteCountAsync(transactionCounts, "FiscalReceiptStockDeductions", _context.FiscalReceiptStockDeductions, cancellationToken);
+                await AddDeleteCountAsync(transactionCounts, "FiscalReceiptArchives", _context.FiscalReceiptArchives, cancellationToken);
+                await AddDeleteCountAsync(transactionCounts, "FiscalReceipts", _context.FiscalReceipts, cancellationToken);
                 await AddDeleteCountAsync(transactionCounts, "InvoiceStockDeductions", _context.InvoiceStockDeductions, cancellationToken);
                 await AddDeleteCountAsync(transactionCounts, "InvoiceArchives", _context.InvoiceArchives, cancellationToken);
                 await AddDeleteCountAsync(transactionCounts, "StockMovements", _context.StockMovements, cancellationToken);
@@ -166,6 +169,9 @@ namespace backend.Data
             {
                 new ProductionDataResetTableCount("WorkerTasks", await _context.WorkerTasks.CountAsync(cancellationToken)),
                 new ProductionDataResetTableCount("WorkSales", await _context.WorkSales.CountAsync(cancellationToken)),
+                new ProductionDataResetTableCount("FiscalReceiptStockDeductions", await _context.FiscalReceiptStockDeductions.CountAsync(cancellationToken)),
+                new ProductionDataResetTableCount("FiscalReceiptArchives", await _context.FiscalReceiptArchives.CountAsync(cancellationToken)),
+                new ProductionDataResetTableCount("FiscalReceipts", await _context.FiscalReceipts.CountAsync(cancellationToken)),
                 new ProductionDataResetTableCount("InvoiceStockDeductions", await _context.InvoiceStockDeductions.CountAsync(cancellationToken)),
                 new ProductionDataResetTableCount("InvoiceArchives", await _context.InvoiceArchives.CountAsync(cancellationToken)),
                 new ProductionDataResetTableCount("StockMovements", await _context.StockMovements.CountAsync(cancellationToken)),

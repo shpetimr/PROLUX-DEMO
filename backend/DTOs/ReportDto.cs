@@ -14,12 +14,16 @@ namespace backend.DTOs
         public int EmployeeCount { get; set; }
         public decimal TotalArchivedInvoices { get; set; }
         public int ArchivedInvoicesCount { get; set; }
+        public decimal TotalFiscalReceipts { get; set; }
+        public int FiscalReceiptsCount { get; set; }
         public decimal TotalWorkSalesRevenue { get; set; }
         public decimal TotalWorkSalesCost { get; set; }
         public decimal TotalWorkSalesProfit { get; set; }
         public int WorkSalesCount { get; set; }
         public decimal TotalInvoiceStockCost { get; set; }
         public int InvoiceStockCostCount { get; set; }
+        public decimal TotalFiscalReceiptStockCost { get; set; }
+        public int FiscalReceiptStockCostCount { get; set; }
         public int MaterialStockItemCount { get; set; }
         public decimal MaterialStockQuantity { get; set; }
         public int ProductStockItemCount { get; set; }
@@ -47,12 +51,16 @@ namespace backend.DTOs
         public int EmployeeCount { get; set; }
         public decimal TotalArchivedInvoices { get; set; }
         public int ArchivedInvoicesCount { get; set; }
+        public decimal TotalFiscalReceipts { get; set; }
+        public int FiscalReceiptsCount { get; set; }
         public decimal TotalWorkSalesRevenue { get; set; }
         public decimal TotalWorkSalesCost { get; set; }
         public decimal TotalWorkSalesProfit { get; set; }
         public int WorkSalesCount { get; set; }
         public decimal TotalInvoiceStockCost { get; set; }
         public int InvoiceStockCostCount { get; set; }
+        public decimal TotalFiscalReceiptStockCost { get; set; }
+        public int FiscalReceiptStockCostCount { get; set; }
         public int MaterialStockItemCount { get; set; }
         public decimal MaterialStockQuantity { get; set; }
         public int ProductStockItemCount { get; set; }
@@ -77,12 +85,16 @@ namespace backend.DTOs
         public int EmployeeCount { get; set; }
         public decimal TotalArchivedInvoices { get; set; }
         public int ArchivedInvoicesCount { get; set; }
+        public decimal TotalFiscalReceipts { get; set; }
+        public int FiscalReceiptsCount { get; set; }
         public decimal TotalWorkSalesRevenue { get; set; }
         public decimal TotalWorkSalesCost { get; set; }
         public decimal TotalWorkSalesProfit { get; set; }
         public int WorkSalesCount { get; set; }
         public decimal TotalInvoiceStockCost { get; set; }
         public int InvoiceStockCostCount { get; set; }
+        public decimal TotalFiscalReceiptStockCost { get; set; }
+        public int FiscalReceiptStockCostCount { get; set; }
         public int MaterialStockItemCount { get; set; }
         public decimal MaterialStockQuantity { get; set; }
         public int ProductStockItemCount { get; set; }
@@ -115,6 +127,10 @@ namespace backend.DTOs
         public int CurrentMonthArchivedInvoicesCount { get; set; }
         public decimal CurrentMonthInvoiceStockCost { get; set; }
         public int CurrentMonthInvoiceStockCostCount { get; set; }
+        public decimal CurrentMonthFiscalReceipts { get; set; }
+        public int CurrentMonthFiscalReceiptsCount { get; set; }
+        public decimal CurrentMonthFiscalReceiptStockCost { get; set; }
+        public int CurrentMonthFiscalReceiptStockCostCount { get; set; }
         public decimal YearToDateIncome { get; set; }
         public decimal YearToDateExpenses { get; set; }
         public decimal YearToDatePurchases { get; set; }
@@ -128,6 +144,10 @@ namespace backend.DTOs
         public int YearToDateArchivedInvoicesCount { get; set; }
         public decimal YearToDateInvoiceStockCost { get; set; }
         public int YearToDateInvoiceStockCostCount { get; set; }
+        public decimal YearToDateFiscalReceipts { get; set; }
+        public int YearToDateFiscalReceiptsCount { get; set; }
+        public decimal YearToDateFiscalReceiptStockCost { get; set; }
+        public int YearToDateFiscalReceiptStockCostCount { get; set; }
         public decimal YearToDateProfit { get; set; }
         
         // Additional statistics for comprehensive dashboard
@@ -144,6 +164,10 @@ namespace backend.DTOs
         public int TotalArchivedInvoicesCount { get; set; }
         public decimal TotalInvoiceStockCost { get; set; }
         public int TotalInvoiceStockCostCount { get; set; }
+        public decimal TotalFiscalReceipts { get; set; }
+        public int TotalFiscalReceiptsCount { get; set; }
+        public decimal TotalFiscalReceiptStockCost { get; set; }
+        public int TotalFiscalReceiptStockCostCount { get; set; }
         public int WorkerTasksTotal { get; set; }
         public int WorkerTasksWaiting { get; set; }
         public int WorkerTasksInProcess { get; set; }

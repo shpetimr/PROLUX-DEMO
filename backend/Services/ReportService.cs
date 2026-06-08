@@ -10,6 +10,7 @@ namespace backend.Services
     public class ReportService : IReportService
     {
         private const string InvoiceStockMovementKind = "Invoice";
+        private const string FiscalReceiptStockMovementKind = FiscalReceiptStockDeductionService.FiscalReceiptMovementKind;
 
         private readonly ApplicationDbContext _context;
         private readonly ICurrentUserService _currentUserService;
@@ -81,6 +82,8 @@ namespace backend.Services
             var salaryTotals = await GetSalaryFinancialTotalsAsync(normalizedStartDate, endExclusive);
             var archivedInvoiceTotals = await GetArchivedInvoiceFinancialTotalsAsync(normalizedStartDate, endExclusive);
             var invoiceStockCostTotals = await GetInvoiceStockCostTotalsAsync(normalizedStartDate, endExclusive);
+            var fiscalReceiptTotals = await GetFiscalReceiptFinancialTotalsAsync(normalizedStartDate, endExclusive);
+            var fiscalReceiptStockCostTotals = await GetFiscalReceiptStockCostTotalsAsync(normalizedStartDate, endExclusive);
             var stockSplitTotals = await GetStockSplitTotalsAsync(normalizedStartDate, endExclusive);
             var workerTaskCounts = await GetWorkerTaskCountsAsync(normalizedStartDate, endExclusive);
 
@@ -88,8 +91,8 @@ namespace backend.Services
             var totalRent = (decimal)await rents.SumAsync(r => (double)r.MonthlyAmount);
             var totalPurchases = (decimal)await purchases.SumAsync(p => (double)p.TotalPrice);
             var baseIncome = (decimal)await incomes.SumAsync(i => (double)i.Amount);
-            var totalExpenses = baseExpenses + invoiceStockCostTotals.Cost;
-            var totalIncome = baseIncome + workSaleTotals.Profit + archivedInvoiceTotals.Total;
+            var totalExpenses = baseExpenses + invoiceStockCostTotals.Cost + fiscalReceiptStockCostTotals.Cost;
+            var totalIncome = baseIncome + workSaleTotals.Profit + archivedInvoiceTotals.Total + fiscalReceiptTotals.Total;
             var netBalance = totalIncome - (totalExpenses + totalRent + totalPurchases + salaryTotals.TotalSalaries);
 
             return new FinancialReportDto
@@ -106,12 +109,16 @@ namespace backend.Services
                 EmployeeCount = salaryTotals.EmployeeCount,
                 TotalArchivedInvoices = archivedInvoiceTotals.Total,
                 ArchivedInvoicesCount = archivedInvoiceTotals.Count,
+                TotalFiscalReceipts = fiscalReceiptTotals.Total,
+                FiscalReceiptsCount = fiscalReceiptTotals.Count,
                 TotalWorkSalesRevenue = workSaleTotals.Revenue,
                 TotalWorkSalesCost = workSaleTotals.Cost,
                 TotalWorkSalesProfit = workSaleTotals.Profit,
                 WorkSalesCount = workSaleTotals.Count,
                 TotalInvoiceStockCost = invoiceStockCostTotals.Cost,
                 InvoiceStockCostCount = invoiceStockCostTotals.Count,
+                TotalFiscalReceiptStockCost = fiscalReceiptStockCostTotals.Cost,
+                FiscalReceiptStockCostCount = fiscalReceiptStockCostTotals.Count,
                 MaterialStockItemCount = stockSplitTotals.Material.ItemCount,
                 MaterialStockQuantity = stockSplitTotals.Material.CurrentQuantity,
                 ProductStockItemCount = stockSplitTotals.Product.ItemCount,
@@ -145,12 +152,16 @@ namespace backend.Services
                 EmployeeCount = report.EmployeeCount,
                 TotalArchivedInvoices = report.TotalArchivedInvoices,
                 ArchivedInvoicesCount = report.ArchivedInvoicesCount,
+                TotalFiscalReceipts = report.TotalFiscalReceipts,
+                FiscalReceiptsCount = report.FiscalReceiptsCount,
                 TotalWorkSalesRevenue = report.TotalWorkSalesRevenue,
                 TotalWorkSalesCost = report.TotalWorkSalesCost,
                 TotalWorkSalesProfit = report.TotalWorkSalesProfit,
                 WorkSalesCount = report.WorkSalesCount,
                 TotalInvoiceStockCost = report.TotalInvoiceStockCost,
                 InvoiceStockCostCount = report.InvoiceStockCostCount,
+                TotalFiscalReceiptStockCost = report.TotalFiscalReceiptStockCost,
+                FiscalReceiptStockCostCount = report.FiscalReceiptStockCostCount,
                 MaterialStockItemCount = report.MaterialStockItemCount,
                 MaterialStockQuantity = report.MaterialStockQuantity,
                 ProductStockItemCount = report.ProductStockItemCount,
@@ -182,12 +193,16 @@ namespace backend.Services
                 EmployeeCount = report.EmployeeCount,
                 TotalArchivedInvoices = report.TotalArchivedInvoices,
                 ArchivedInvoicesCount = report.ArchivedInvoicesCount,
+                TotalFiscalReceipts = report.TotalFiscalReceipts,
+                FiscalReceiptsCount = report.FiscalReceiptsCount,
                 TotalWorkSalesRevenue = report.TotalWorkSalesRevenue,
                 TotalWorkSalesCost = report.TotalWorkSalesCost,
                 TotalWorkSalesProfit = report.TotalWorkSalesProfit,
                 WorkSalesCount = report.WorkSalesCount,
                 TotalInvoiceStockCost = report.TotalInvoiceStockCost,
                 InvoiceStockCostCount = report.InvoiceStockCostCount,
+                TotalFiscalReceiptStockCost = report.TotalFiscalReceiptStockCost,
+                FiscalReceiptStockCostCount = report.FiscalReceiptStockCostCount,
                 MaterialStockItemCount = report.MaterialStockItemCount,
                 MaterialStockQuantity = report.MaterialStockQuantity,
                 ProductStockItemCount = report.ProductStockItemCount,
@@ -282,14 +297,34 @@ namespace backend.Services
                         yearStart,
                         todayExclusive)
                     : DashboardInvoiceStockCostBuckets.Empty;
+                var fiscalReceiptBuckets = isAdmin
+                    ? await GetDashboardFiscalReceiptBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        todayExclusive)
+                    : DashboardArchivedInvoiceBuckets.Empty;
+                var fiscalReceiptStockCostBuckets = isAdmin
+                    ? await GetDashboardFiscalReceiptStockCostBucketsAsync(
+                        currentMonthStart,
+                        currentMonthEnd,
+                        yearStart,
+                        todayExclusive)
+                    : DashboardInvoiceStockCostBuckets.Empty;
                 var allTimeWorkerTaskCounts = await GetWorkerTaskCountsAsync(null, null);
 
                 var currentMonthWorkSaleTotals = workSaleBuckets.CurrentMonth;
                 var currentMonthArchivedInvoiceTotals = archivedInvoiceBuckets.CurrentMonth;
                 var currentMonthInvoiceStockCostTotals = invoiceStockCostBuckets.CurrentMonth;
-                var currentMonthExpenses = expenseBuckets.CurrentMonth + currentMonthInvoiceStockCostTotals.Cost;
+                var currentMonthFiscalReceiptTotals = fiscalReceiptBuckets.CurrentMonth;
+                var currentMonthFiscalReceiptStockCostTotals = fiscalReceiptStockCostBuckets.CurrentMonth;
+                var currentMonthExpenses = expenseBuckets.CurrentMonth +
+                    currentMonthInvoiceStockCostTotals.Cost +
+                    currentMonthFiscalReceiptStockCostTotals.Cost;
                 var currentMonthIncome = incomeBuckets.CurrentMonth;
-                currentMonthIncome += currentMonthWorkSaleTotals.Profit + currentMonthArchivedInvoiceTotals.Total;
+                currentMonthIncome += currentMonthWorkSaleTotals.Profit +
+                    currentMonthArchivedInvoiceTotals.Total +
+                    currentMonthFiscalReceiptTotals.Total;
                 var currentMonthPurchases = purchaseBuckets.CurrentMonth;
                 var currentMonthRents = rentBuckets.CurrentMonth;
                 var currentMonthProfit = currentMonthIncome - (currentMonthExpenses + currentMonthPurchases + currentMonthRents + currentMonthSalaries);
@@ -297,11 +332,16 @@ namespace backend.Services
                 var yearToDateWorkSaleTotals = workSaleBuckets.YearToDate;
                 var yearToDateArchivedInvoiceTotals = archivedInvoiceBuckets.YearToDate;
                 var yearToDateInvoiceStockCostTotals = invoiceStockCostBuckets.YearToDate;
+                var yearToDateFiscalReceiptTotals = fiscalReceiptBuckets.YearToDate;
+                var yearToDateFiscalReceiptStockCostTotals = fiscalReceiptStockCostBuckets.YearToDate;
                 var yearToDateSalaryTotals = salaryBuckets.YearToDate;
                 var yearToDateIncome = incomeBuckets.YearToDate;
-                yearToDateIncome += yearToDateWorkSaleTotals.Profit + yearToDateArchivedInvoiceTotals.Total;
+                yearToDateIncome += yearToDateWorkSaleTotals.Profit +
+                    yearToDateArchivedInvoiceTotals.Total +
+                    yearToDateFiscalReceiptTotals.Total;
                 var yearToDateExpenses = expenseBuckets.YearToDate;
-                yearToDateExpenses += yearToDateInvoiceStockCostTotals.Cost;
+                yearToDateExpenses += yearToDateInvoiceStockCostTotals.Cost +
+                    yearToDateFiscalReceiptStockCostTotals.Cost;
                 var yearToDatePurchases = purchaseBuckets.YearToDate;
                 var yearToDateRents = rentBuckets.YearToDate;
                 var yearToDateProfit = yearToDateIncome -
@@ -310,13 +350,17 @@ namespace backend.Services
                 var allTimeWorkSaleTotals = workSaleBuckets.AllTime;
                 var allTimeArchivedInvoiceTotals = archivedInvoiceBuckets.AllTime;
                 var allTimeInvoiceStockCostTotals = invoiceStockCostBuckets.AllTime;
+                var allTimeFiscalReceiptTotals = fiscalReceiptBuckets.AllTime;
+                var allTimeFiscalReceiptStockCostTotals = fiscalReceiptStockCostBuckets.AllTime;
                 var allTimeSalaryTotals = salaryBuckets.AllTime;
                 var totalExpenses = expenseBuckets.Total;
                 var totalIncomes = incomeBuckets.Total;
                 var totalPurchases = purchaseBuckets.Total;
                 var totalRents = rentBuckets.Total;
-                totalExpenses += allTimeInvoiceStockCostTotals.Cost;
-                totalIncomes += allTimeWorkSaleTotals.Profit + allTimeArchivedInvoiceTotals.Total;
+                totalExpenses += allTimeInvoiceStockCostTotals.Cost + allTimeFiscalReceiptStockCostTotals.Cost;
+                totalIncomes += allTimeWorkSaleTotals.Profit +
+                    allTimeArchivedInvoiceTotals.Total +
+                    allTimeFiscalReceiptTotals.Total;
                 var profitMargin = totalIncomes > 0
                     ? ((totalIncomes - totalExpenses - totalPurchases - totalRents) / totalIncomes) * 100
                     : 0m;
@@ -340,6 +384,10 @@ namespace backend.Services
                     CurrentMonthArchivedInvoicesCount = currentMonthArchivedInvoiceTotals.Count,
                     CurrentMonthInvoiceStockCost = currentMonthInvoiceStockCostTotals.Cost,
                     CurrentMonthInvoiceStockCostCount = currentMonthInvoiceStockCostTotals.Count,
+                    CurrentMonthFiscalReceipts = currentMonthFiscalReceiptTotals.Total,
+                    CurrentMonthFiscalReceiptsCount = currentMonthFiscalReceiptTotals.Count,
+                    CurrentMonthFiscalReceiptStockCost = currentMonthFiscalReceiptStockCostTotals.Cost,
+                    CurrentMonthFiscalReceiptStockCostCount = currentMonthFiscalReceiptStockCostTotals.Count,
                     YearToDateIncome = yearToDateIncome,
                     YearToDateExpenses = yearToDateExpenses,
                     YearToDatePurchases = yearToDatePurchases,
@@ -353,6 +401,10 @@ namespace backend.Services
                     YearToDateArchivedInvoicesCount = yearToDateArchivedInvoiceTotals.Count,
                     YearToDateInvoiceStockCost = yearToDateInvoiceStockCostTotals.Cost,
                     YearToDateInvoiceStockCostCount = yearToDateInvoiceStockCostTotals.Count,
+                    YearToDateFiscalReceipts = yearToDateFiscalReceiptTotals.Total,
+                    YearToDateFiscalReceiptsCount = yearToDateFiscalReceiptTotals.Count,
+                    YearToDateFiscalReceiptStockCost = yearToDateFiscalReceiptStockCostTotals.Cost,
+                    YearToDateFiscalReceiptStockCostCount = yearToDateFiscalReceiptStockCostTotals.Count,
                     YearToDateProfit = yearToDateProfit,
                     TotalExpenses = totalExpenses,
                     TotalIncomes = totalIncomes,
@@ -367,6 +419,10 @@ namespace backend.Services
                     TotalArchivedInvoicesCount = allTimeArchivedInvoiceTotals.Count,
                     TotalInvoiceStockCost = allTimeInvoiceStockCostTotals.Cost,
                     TotalInvoiceStockCostCount = allTimeInvoiceStockCostTotals.Count,
+                    TotalFiscalReceipts = allTimeFiscalReceiptTotals.Total,
+                    TotalFiscalReceiptsCount = allTimeFiscalReceiptTotals.Count,
+                    TotalFiscalReceiptStockCost = allTimeFiscalReceiptStockCostTotals.Cost,
+                    TotalFiscalReceiptStockCostCount = allTimeFiscalReceiptStockCostTotals.Count,
                     WorkerTasksTotal = allTimeWorkerTaskCounts.Total,
                     WorkerTasksWaiting = allTimeWorkerTaskCounts.Waiting,
                     WorkerTasksInProcess = allTimeWorkerTaskCounts.InProcess,
@@ -410,21 +466,35 @@ namespace backend.Services
                 .Where(invoice => invoice.CreatedAt >= targetDate && invoice.CreatedAt < nextDate)
                 .ToListAsync();
             var dailyInvoiceStockCostMovements = await GetInvoiceStockCostMovementSnapshotsAsync(targetDate, nextDate);
+            var dailyFiscalReceipts = await GetFiscalReceiptFinancialSnapshots(targetDate, nextDate).ToListAsync();
+            var dailyFiscalReceiptStockCostMovements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(targetDate, nextDate);
             var workSaleTotals = GetWorkSaleFinancialTotals(dailyWorkSales);
             var archivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(dailyArchivedInvoices);
             var invoiceStockCostTotals = GetInvoiceStockCostTotals(dailyInvoiceStockCostMovements);
+            var fiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(dailyFiscalReceipts);
+            var fiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(dailyFiscalReceiptStockCostMovements);
             var stockSplitTotals = await GetStockSplitTotalsAsync(targetDate, nextDate);
             var salaryTotals = await GetSalaryFinancialTotalsAsync(targetDate, nextDate);
             var workerTaskCounts = await GetWorkerTaskCountsAsync(targetDate, nextDate);
 
-            var totalExpenses = dailyExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = dailyIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
+            var totalExpenses = dailyExpenses.Sum(e => e.Amount) +
+                invoiceStockCostTotals.Cost +
+                fiscalReceiptStockCostTotals.Cost;
+            var totalIncome = dailyIncomes.Sum(i => i.Amount) +
+                workSaleTotals.Profit +
+                archivedInvoiceTotals.Total +
+                fiscalReceiptTotals.Total;
             var totalPurchases = dailyPurchases.Sum(p => p.TotalPrice);
             var totalRents = dailyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
             var netIncome = totalIncome - totalOutflow;
 
-            var expensesByType = BuildExpenseBreakdown(dailyExpenses, totalOutflow, invoiceStockCostTotals, salaryTotals);
+            var expensesByType = BuildExpenseBreakdown(
+                dailyExpenses,
+                totalOutflow,
+                invoiceStockCostTotals,
+                salaryTotals,
+                fiscalReceiptStockCostTotals);
 
             return new
             {
@@ -439,11 +509,15 @@ namespace backend.Services
                     TotalEmployeePayments = salaryTotals.TotalSalaries,
                     TotalArchivedInvoices = archivedInvoiceTotals.Total,
                     ArchivedInvoicesCount = archivedInvoiceTotals.Count,
+                    TotalFiscalReceipts = fiscalReceiptTotals.Total,
+                    FiscalReceiptsCount = fiscalReceiptTotals.Count,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalInvoiceStockCost = invoiceStockCostTotals.Cost,
                     InvoiceStockCostCount = invoiceStockCostTotals.Count,
+                    TotalFiscalReceiptStockCost = fiscalReceiptStockCostTotals.Cost,
+                    FiscalReceiptStockCostCount = fiscalReceiptStockCostTotals.Count,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     ProfitMargin = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0
@@ -456,12 +530,15 @@ namespace backend.Services
                     Purchases = dailyPurchases.Count,
                     Rents = dailyRents.Count,
                     ArchivedInvoices = dailyArchivedInvoices.Count,
+                    FiscalReceipts = fiscalReceiptTotals.Count,
                     WorkSales = dailyWorkSales.Count,
                     InvoiceStockCostMovements = invoiceStockCostTotals.Count,
+                    FiscalReceiptStockCostMovements = fiscalReceiptStockCostTotals.Count,
                     StockMovements = stockSplitTotals.TotalMovementCount,
                     WorkerTasks = workerTaskCounts.Total
                 },
                 ArchivedInvoices = BuildArchivedInvoiceReport(archivedInvoiceTotals),
+                FiscalReceipts = BuildArchivedInvoiceReport(fiscalReceiptTotals),
                 StockSplit = BuildStockSplitReport(stockSplitTotals),
                 WorkerTaskCounts = new
                 {
@@ -477,17 +554,25 @@ namespace backend.Services
                         Expenses = dailyExpenses.Where(e => e.Date.Hour == hour).Sum(e => e.Amount) +
                                    dailyInvoiceStockCostMovements
                                        .Where(movement => movement.OccurredAt.Hour == hour)
+                                       .Sum(GetInvoiceStockMovementCost) +
+                                   dailyFiscalReceiptStockCostMovements
+                                       .Where(movement => movement.OccurredAt.Hour == hour)
                                        .Sum(GetInvoiceStockMovementCost),
                         Incomes = dailyIncomes.Where(i => i.Date.Hour == hour).Sum(i => i.Amount) +
                                   dailyWorkSales.Where(workSale => workSale.Date.Hour == hour).Sum(workSale => workSale.Profit) +
                                   dailyArchivedInvoices
                                       .Where(invoice => invoice.CreatedAt.Hour == hour)
-                                      .Sum(InvoiceArchiveFinancials.GetRevenueTotal),
+                                      .Sum(InvoiceArchiveFinancials.GetRevenueTotal) +
+                                  dailyFiscalReceipts
+                                      .Where(receipt => receipt.CreatedAt.Hour == hour)
+                                      .Sum(receipt => InvoiceArchiveFinancials.GetRevenueTotal(receipt.ItemsJson, receipt.Total)),
                         Count = dailyExpenses.Count(e => e.Date.Hour == hour) + 
                                dailyIncomes.Count(i => i.Date.Hour == hour) +
                                dailyWorkSales.Count(workSale => workSale.Date.Hour == hour) +
                                dailyArchivedInvoices.Count(invoice => invoice.CreatedAt.Hour == hour) +
-                               dailyInvoiceStockCostMovements.Count(movement => movement.OccurredAt.Hour == hour)
+                               dailyFiscalReceipts.Count(receipt => receipt.CreatedAt.Hour == hour) +
+                               dailyInvoiceStockCostMovements.Count(movement => movement.OccurredAt.Hour == hour) +
+                               dailyFiscalReceiptStockCostMovements.Count(movement => movement.OccurredAt.Hour == hour)
                     })
                     .Where(x => x.Count > 0)
                     .ToList()
@@ -523,15 +608,24 @@ namespace backend.Services
                 .Where(invoice => invoice.CreatedAt >= startOfWeek && invoice.CreatedAt < endOfWeek)
                 .ToListAsync();
             var weeklyInvoiceStockCostMovements = await GetInvoiceStockCostMovementSnapshotsAsync(startOfWeek, endOfWeek);
+            var weeklyFiscalReceipts = await GetFiscalReceiptFinancialSnapshots(startOfWeek, endOfWeek).ToListAsync();
+            var weeklyFiscalReceiptStockCostMovements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(startOfWeek, endOfWeek);
             var workSaleTotals = GetWorkSaleFinancialTotals(weeklyWorkSales);
             var archivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(weeklyArchivedInvoices);
             var invoiceStockCostTotals = GetInvoiceStockCostTotals(weeklyInvoiceStockCostMovements);
+            var fiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(weeklyFiscalReceipts);
+            var fiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(weeklyFiscalReceiptStockCostMovements);
             var stockSplitTotals = await GetStockSplitTotalsAsync(startOfWeek, endOfWeek);
             var salaryTotals = await GetSalaryFinancialTotalsAsync(startOfWeek, endOfWeek);
             var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfWeek, endOfWeek);
 
-            var totalExpenses = weeklyExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = weeklyIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
+            var totalExpenses = weeklyExpenses.Sum(e => e.Amount) +
+                invoiceStockCostTotals.Cost +
+                fiscalReceiptStockCostTotals.Cost;
+            var totalIncome = weeklyIncomes.Sum(i => i.Amount) +
+                workSaleTotals.Profit +
+                archivedInvoiceTotals.Total +
+                fiscalReceiptTotals.Total;
             var totalPurchases = weeklyPurchases.Sum(p => p.TotalPrice);
             var totalRents = weeklyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
@@ -548,22 +642,26 @@ namespace backend.Services
                     var dayWorkSaleTotals = GetWorkSaleFinancialTotals(weeklyWorkSales.Where(workSale => workSale.Date.Date == day));
                     var dayArchivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(weeklyArchivedInvoices.Where(invoice => invoice.CreatedAt.Date == day));
                     var dayInvoiceStockCostTotals = GetInvoiceStockCostTotals(weeklyInvoiceStockCostMovements.Where(movement => movement.OccurredAt.Date == day));
+                    var dayFiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(weeklyFiscalReceipts.Where(receipt => receipt.CreatedAt.Date == day));
+                    var dayFiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(weeklyFiscalReceiptStockCostMovements.Where(movement => movement.OccurredAt.Date == day));
 
                     return new
                     {
                         Date = day,
                         DayOfWeek = day.DayOfWeek.ToString(),
-                        Expenses = dayExpenses + dayInvoiceStockCostTotals.Cost,
-                        Incomes = dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total,
+                        Expenses = dayExpenses + dayInvoiceStockCostTotals.Cost + dayFiscalReceiptStockCostTotals.Cost,
+                        Incomes = dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total + dayFiscalReceiptTotals.Total,
                         Purchases = dayPurchases,
                         Rents = dayRents,
                         ArchivedInvoices = dayArchivedInvoiceTotals.Total,
+                        FiscalReceipts = dayFiscalReceiptTotals.Total,
                         WorkSalesRevenue = dayWorkSaleTotals.Revenue,
                         WorkSalesCost = dayWorkSaleTotals.Cost,
                         WorkSalesProfit = dayWorkSaleTotals.Profit,
                         InvoiceStockCost = dayInvoiceStockCostTotals.Cost,
-                        NetIncome = (dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total) -
-                                    (dayExpenses + dayInvoiceStockCostTotals.Cost) -
+                        FiscalReceiptStockCost = dayFiscalReceiptStockCostTotals.Cost,
+                        NetIncome = (dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total + dayFiscalReceiptTotals.Total) -
+                                    (dayExpenses + dayInvoiceStockCostTotals.Cost + dayFiscalReceiptStockCostTotals.Cost) -
                                     dayPurchases -
                                     dayRents
                     };
@@ -584,11 +682,15 @@ namespace backend.Services
                     TotalEmployeePayments = salaryTotals.TotalSalaries,
                     TotalArchivedInvoices = archivedInvoiceTotals.Total,
                     ArchivedInvoicesCount = archivedInvoiceTotals.Count,
+                    TotalFiscalReceipts = fiscalReceiptTotals.Total,
+                    FiscalReceiptsCount = fiscalReceiptTotals.Count,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalInvoiceStockCost = invoiceStockCostTotals.Cost,
                     InvoiceStockCostCount = invoiceStockCostTotals.Count,
+                    TotalFiscalReceiptStockCost = fiscalReceiptStockCostTotals.Cost,
+                    FiscalReceiptStockCostCount = fiscalReceiptStockCostTotals.Count,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     ProfitMargin = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0,
@@ -602,12 +704,15 @@ namespace backend.Services
                     Purchases = weeklyPurchases.Count,
                     Rents = weeklyRents.Count,
                     ArchivedInvoices = weeklyArchivedInvoices.Count,
+                    FiscalReceipts = fiscalReceiptTotals.Count,
                     WorkSales = weeklyWorkSales.Count,
                     InvoiceStockCostMovements = invoiceStockCostTotals.Count,
+                    FiscalReceiptStockCostMovements = fiscalReceiptStockCostTotals.Count,
                     StockMovements = stockSplitTotals.TotalMovementCount,
                     WorkerTasks = workerTaskCounts.Total
                 },
                 ArchivedInvoices = BuildArchivedInvoiceReport(archivedInvoiceTotals),
+                FiscalReceipts = BuildArchivedInvoiceReport(fiscalReceiptTotals),
                 StockSplit = BuildStockSplitReport(stockSplitTotals),
                 WorkerTaskCounts = new
                 {
@@ -616,7 +721,12 @@ namespace backend.Services
                     InProcess = workerTaskCounts.InProcess,
                     Completed = workerTaskCounts.Completed
                 },
-                ExpenseBreakdown = BuildExpenseBreakdown(weeklyExpenses, totalOutflow, invoiceStockCostTotals, salaryTotals)
+                ExpenseBreakdown = BuildExpenseBreakdown(
+                    weeklyExpenses,
+                    totalOutflow,
+                    invoiceStockCostTotals,
+                    salaryTotals,
+                    fiscalReceiptStockCostTotals)
             };
         }
 
@@ -651,9 +761,13 @@ namespace backend.Services
                 .Where(invoice => invoice.CreatedAt >= startOfMonth && invoice.CreatedAt < endOfMonth)
                 .ToListAsync();
             var monthlyInvoiceStockCostMovements = await GetInvoiceStockCostMovementSnapshotsAsync(startOfMonth, endOfMonth);
+            var monthlyFiscalReceipts = await GetFiscalReceiptFinancialSnapshots(startOfMonth, endOfMonth).ToListAsync();
+            var monthlyFiscalReceiptStockCostMovements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(startOfMonth, endOfMonth);
             var workSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales);
             var archivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(monthlyArchivedInvoices);
             var invoiceStockCostTotals = GetInvoiceStockCostTotals(monthlyInvoiceStockCostMovements);
+            var fiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(monthlyFiscalReceipts);
+            var fiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(monthlyFiscalReceiptStockCostMovements);
             var stockSplitTotals = await GetStockSplitTotalsAsync(startOfMonth, endOfMonth);
             var salaryTotals = await GetSalaryFinancialTotalsAsync(startOfMonth, endOfMonth);
             var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfMonth, endOfMonth);
@@ -661,8 +775,13 @@ namespace backend.Services
             // Calculate employee salaries for the month
             var totalEmployeePayments = salaryTotals.TotalSalaries;
             
-            var totalExpenses = monthlyExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = monthlyIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
+            var totalExpenses = monthlyExpenses.Sum(e => e.Amount) +
+                invoiceStockCostTotals.Cost +
+                fiscalReceiptStockCostTotals.Cost;
+            var totalIncome = monthlyIncomes.Sum(i => i.Amount) +
+                workSaleTotals.Profit +
+                archivedInvoiceTotals.Total +
+                fiscalReceiptTotals.Total;
             var totalPurchases = monthlyPurchases.Sum(p => p.TotalPrice);
             var totalRents = monthlyRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + totalEmployeePayments;
@@ -679,27 +798,31 @@ namespace backend.Services
                     var dayWorkSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales.Where(workSale => workSale.Date.Date == day));
                     var dayArchivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(monthlyArchivedInvoices.Where(invoice => invoice.CreatedAt.Date == day));
                     var dayInvoiceStockCostTotals = GetInvoiceStockCostTotals(monthlyInvoiceStockCostMovements.Where(movement => movement.OccurredAt.Date == day));
+                    var dayFiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(monthlyFiscalReceipts.Where(receipt => receipt.CreatedAt.Date == day));
+                    var dayFiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(monthlyFiscalReceiptStockCostMovements.Where(movement => movement.OccurredAt.Date == day));
 
                     return new
                     {
                         Date = day,
                         DayOfMonth = dayOffset + 1,
-                        Expenses = dayExpenses + dayInvoiceStockCostTotals.Cost,
-                        Incomes = dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total,
+                        Expenses = dayExpenses + dayInvoiceStockCostTotals.Cost + dayFiscalReceiptStockCostTotals.Cost,
+                        Incomes = dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total + dayFiscalReceiptTotals.Total,
                         Purchases = dayPurchases,
                         Rents = dayRents,
                         ArchivedInvoices = dayArchivedInvoiceTotals.Total,
+                        FiscalReceipts = dayFiscalReceiptTotals.Total,
                         WorkSalesRevenue = dayWorkSaleTotals.Revenue,
                         WorkSalesCost = dayWorkSaleTotals.Cost,
                         WorkSalesProfit = dayWorkSaleTotals.Profit,
                         InvoiceStockCost = dayInvoiceStockCostTotals.Cost,
-                        NetIncome = (dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total) -
-                                    (dayExpenses + dayInvoiceStockCostTotals.Cost) -
+                        FiscalReceiptStockCost = dayFiscalReceiptStockCostTotals.Cost,
+                        NetIncome = (dayIncomes + dayWorkSaleTotals.Profit + dayArchivedInvoiceTotals.Total + dayFiscalReceiptTotals.Total) -
+                                    (dayExpenses + dayInvoiceStockCostTotals.Cost + dayFiscalReceiptStockCostTotals.Cost) -
                                     dayPurchases -
                                     dayRents
                     };
                 })
-                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0 || x.ArchivedInvoices > 0 || x.WorkSalesRevenue > 0 || x.WorkSalesCost > 0 || x.InvoiceStockCost > 0)
+                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0 || x.ArchivedInvoices > 0 || x.FiscalReceipts > 0 || x.WorkSalesRevenue > 0 || x.WorkSalesCost > 0 || x.InvoiceStockCost > 0 || x.FiscalReceiptStockCost > 0)
                 .ToList();
 
             var weeklyBreakdown = Enumerable.Range(0, 6)
@@ -714,28 +837,32 @@ namespace backend.Services
                     var weekWorkSaleTotals = GetWorkSaleFinancialTotals(monthlyWorkSales.Where(workSale => workSale.Date >= weekStart && workSale.Date < weekEnd));
                     var weekArchivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(monthlyArchivedInvoices.Where(invoice => invoice.CreatedAt >= weekStart && invoice.CreatedAt < weekEnd));
                     var weekInvoiceStockCostTotals = GetInvoiceStockCostTotals(monthlyInvoiceStockCostMovements.Where(movement => movement.OccurredAt >= weekStart && movement.OccurredAt < weekEnd));
+                    var weekFiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(monthlyFiscalReceipts.Where(receipt => receipt.CreatedAt >= weekStart && receipt.CreatedAt < weekEnd));
+                    var weekFiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(monthlyFiscalReceiptStockCostMovements.Where(movement => movement.OccurredAt >= weekStart && movement.OccurredAt < weekEnd));
 
                     return new
                     {
                         WeekNumber = weekOffset + 1,
                         StartDate = weekStart,
                         EndDate = weekEnd.AddDays(-1),
-                        Expenses = weekExpenses + weekInvoiceStockCostTotals.Cost,
-                        Incomes = weekIncomes + weekWorkSaleTotals.Profit + weekArchivedInvoiceTotals.Total,
+                        Expenses = weekExpenses + weekInvoiceStockCostTotals.Cost + weekFiscalReceiptStockCostTotals.Cost,
+                        Incomes = weekIncomes + weekWorkSaleTotals.Profit + weekArchivedInvoiceTotals.Total + weekFiscalReceiptTotals.Total,
                         Purchases = weekPurchases,
                         Rents = weekRents,
                         ArchivedInvoices = weekArchivedInvoiceTotals.Total,
+                        FiscalReceipts = weekFiscalReceiptTotals.Total,
                         WorkSalesRevenue = weekWorkSaleTotals.Revenue,
                         WorkSalesCost = weekWorkSaleTotals.Cost,
                         WorkSalesProfit = weekWorkSaleTotals.Profit,
                         InvoiceStockCost = weekInvoiceStockCostTotals.Cost,
-                        NetIncome = (weekIncomes + weekWorkSaleTotals.Profit + weekArchivedInvoiceTotals.Total) -
-                                    (weekExpenses + weekInvoiceStockCostTotals.Cost) -
+                        FiscalReceiptStockCost = weekFiscalReceiptStockCostTotals.Cost,
+                        NetIncome = (weekIncomes + weekWorkSaleTotals.Profit + weekArchivedInvoiceTotals.Total + weekFiscalReceiptTotals.Total) -
+                                    (weekExpenses + weekInvoiceStockCostTotals.Cost + weekFiscalReceiptStockCostTotals.Cost) -
                                     weekPurchases -
                                     weekRents
                     };
                 })
-                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0 || x.ArchivedInvoices > 0 || x.WorkSalesRevenue > 0 || x.WorkSalesCost > 0 || x.InvoiceStockCost > 0)
+                .Where(x => x.Expenses > 0 || x.Incomes > 0 || x.Purchases > 0 || x.Rents > 0 || x.ArchivedInvoices > 0 || x.FiscalReceipts > 0 || x.WorkSalesRevenue > 0 || x.WorkSalesCost > 0 || x.InvoiceStockCost > 0 || x.FiscalReceiptStockCost > 0)
                 .ToList();
 
             return new
@@ -753,11 +880,15 @@ namespace backend.Services
                     TotalEmployeePayments = totalEmployeePayments,
                     TotalArchivedInvoices = archivedInvoiceTotals.Total,
                     ArchivedInvoicesCount = archivedInvoiceTotals.Count,
+                    TotalFiscalReceipts = fiscalReceiptTotals.Total,
+                    FiscalReceiptsCount = fiscalReceiptTotals.Count,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalInvoiceStockCost = invoiceStockCostTotals.Cost,
                     InvoiceStockCostCount = invoiceStockCostTotals.Count,
+                    TotalFiscalReceiptStockCost = fiscalReceiptStockCostTotals.Cost,
+                    FiscalReceiptStockCostCount = fiscalReceiptStockCostTotals.Count,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     DailyAverage = netIncome / DateTime.DaysInMonth(targetYear, targetMonth),
@@ -772,12 +903,15 @@ namespace backend.Services
                     Purchases = monthlyPurchases.Count,
                     Rents = monthlyRents.Count,
                     ArchivedInvoices = monthlyArchivedInvoices.Count,
+                    FiscalReceipts = fiscalReceiptTotals.Count,
                     WorkSales = monthlyWorkSales.Count,
                     InvoiceStockCostMovements = invoiceStockCostTotals.Count,
+                    FiscalReceiptStockCostMovements = fiscalReceiptStockCostTotals.Count,
                     StockMovements = stockSplitTotals.TotalMovementCount,
                     WorkerTasks = workerTaskCounts.Total
                 },
                 ArchivedInvoices = BuildArchivedInvoiceReport(archivedInvoiceTotals),
+                FiscalReceipts = BuildArchivedInvoiceReport(fiscalReceiptTotals),
                 StockSplit = BuildStockSplitReport(stockSplitTotals),
                 WorkerTaskCounts = new
                 {
@@ -786,7 +920,12 @@ namespace backend.Services
                     InProcess = workerTaskCounts.InProcess,
                     Completed = workerTaskCounts.Completed
                 },
-                ExpenseBreakdown = BuildExpenseBreakdown(monthlyExpenses, totalOutflow, invoiceStockCostTotals, salaryTotals)
+                ExpenseBreakdown = BuildExpenseBreakdown(
+                    monthlyExpenses,
+                    totalOutflow,
+                    invoiceStockCostTotals,
+                    salaryTotals,
+                    fiscalReceiptStockCostTotals)
             };
         }
 
@@ -819,15 +958,24 @@ namespace backend.Services
                 .Where(invoice => invoice.CreatedAt >= startOfYear && invoice.CreatedAt < endOfYear)
                 .ToListAsync();
             var annualInvoiceStockCostMovements = await GetInvoiceStockCostMovementSnapshotsAsync(startOfYear, endOfYear);
+            var annualFiscalReceipts = await GetFiscalReceiptFinancialSnapshots(startOfYear, endOfYear).ToListAsync();
+            var annualFiscalReceiptStockCostMovements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(startOfYear, endOfYear);
             var workSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales);
             var archivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(annualArchivedInvoices);
             var invoiceStockCostTotals = GetInvoiceStockCostTotals(annualInvoiceStockCostMovements);
+            var fiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(annualFiscalReceipts);
+            var fiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(annualFiscalReceiptStockCostMovements);
             var stockSplitTotals = await GetStockSplitTotalsAsync(startOfYear, endOfYear);
             var salaryTotals = await GetSalaryFinancialTotalsAsync(startOfYear, endOfYear);
             var workerTaskCounts = await GetWorkerTaskCountsAsync(startOfYear, endOfYear);
 
-            var totalExpenses = annualExpenses.Sum(e => e.Amount) + invoiceStockCostTotals.Cost;
-            var totalIncome = annualIncomes.Sum(i => i.Amount) + workSaleTotals.Profit + archivedInvoiceTotals.Total;
+            var totalExpenses = annualExpenses.Sum(e => e.Amount) +
+                invoiceStockCostTotals.Cost +
+                fiscalReceiptStockCostTotals.Cost;
+            var totalIncome = annualIncomes.Sum(i => i.Amount) +
+                workSaleTotals.Profit +
+                archivedInvoiceTotals.Total +
+                fiscalReceiptTotals.Total;
             var totalPurchases = annualPurchases.Sum(p => p.TotalPrice);
             var totalRents = annualRents.Sum(r => r.MonthlyAmount);
             var totalOutflow = totalExpenses + totalPurchases + totalRents + salaryTotals.TotalSalaries;
@@ -843,23 +991,27 @@ namespace backend.Services
                     var monthWorkSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales.Where(workSale => workSale.Date.Month == month));
                     var monthArchivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(annualArchivedInvoices.Where(invoice => invoice.CreatedAt.Month == month));
                     var monthInvoiceStockCostTotals = GetInvoiceStockCostTotals(annualInvoiceStockCostMovements.Where(movement => movement.OccurredAt.Month == month));
+                    var monthFiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(annualFiscalReceipts.Where(receipt => receipt.CreatedAt.Month == month));
+                    var monthFiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(annualFiscalReceiptStockCostMovements.Where(movement => movement.OccurredAt.Month == month));
 
                     return new
                     {
                         Year = targetYear,
                         Month = month,
                         MonthName = new DateTime(targetYear, month, 1).ToString("MMMM"),
-                        Expenses = monthExpenses + monthInvoiceStockCostTotals.Cost,
-                        Incomes = monthIncomes + monthWorkSaleTotals.Profit + monthArchivedInvoiceTotals.Total,
+                        Expenses = monthExpenses + monthInvoiceStockCostTotals.Cost + monthFiscalReceiptStockCostTotals.Cost,
+                        Incomes = monthIncomes + monthWorkSaleTotals.Profit + monthArchivedInvoiceTotals.Total + monthFiscalReceiptTotals.Total,
                         Purchases = monthPurchases,
                         Rents = monthRents,
                         ArchivedInvoices = monthArchivedInvoiceTotals.Total,
+                        FiscalReceipts = monthFiscalReceiptTotals.Total,
                         WorkSalesRevenue = monthWorkSaleTotals.Revenue,
                         WorkSalesCost = monthWorkSaleTotals.Cost,
                         WorkSalesProfit = monthWorkSaleTotals.Profit,
                         InvoiceStockCost = monthInvoiceStockCostTotals.Cost,
-                        NetIncome = (monthIncomes + monthWorkSaleTotals.Profit + monthArchivedInvoiceTotals.Total) -
-                                    (monthExpenses + monthInvoiceStockCostTotals.Cost) -
+                        FiscalReceiptStockCost = monthFiscalReceiptStockCostTotals.Cost,
+                        NetIncome = (monthIncomes + monthWorkSaleTotals.Profit + monthArchivedInvoiceTotals.Total + monthFiscalReceiptTotals.Total) -
+                                    (monthExpenses + monthInvoiceStockCostTotals.Cost + monthFiscalReceiptStockCostTotals.Cost) -
                                     monthPurchases -
                                     monthRents
                     };
@@ -878,23 +1030,27 @@ namespace backend.Services
                     var quarterWorkSaleTotals = GetWorkSaleFinancialTotals(annualWorkSales.Where(workSale => workSale.Date.Month >= startMonth && workSale.Date.Month <= endMonth));
                     var quarterArchivedInvoiceTotals = GetArchivedInvoiceFinancialTotals(annualArchivedInvoices.Where(invoice => invoice.CreatedAt.Month >= startMonth && invoice.CreatedAt.Month <= endMonth));
                     var quarterInvoiceStockCostTotals = GetInvoiceStockCostTotals(annualInvoiceStockCostMovements.Where(movement => movement.OccurredAt.Month >= startMonth && movement.OccurredAt.Month <= endMonth));
+                    var quarterFiscalReceiptTotals = GetArchivedInvoiceFinancialTotals(annualFiscalReceipts.Where(receipt => receipt.CreatedAt.Month >= startMonth && receipt.CreatedAt.Month <= endMonth));
+                    var quarterFiscalReceiptStockCostTotals = GetInvoiceStockCostTotals(annualFiscalReceiptStockCostMovements.Where(movement => movement.OccurredAt.Month >= startMonth && movement.OccurredAt.Month <= endMonth));
 
                     return new
                     {
                         Quarter = quarter,
                         StartMonth = startMonth,
                         EndMonth = endMonth,
-                        Expenses = quarterExpenses + quarterInvoiceStockCostTotals.Cost,
-                        Incomes = quarterIncomes + quarterWorkSaleTotals.Profit + quarterArchivedInvoiceTotals.Total,
+                        Expenses = quarterExpenses + quarterInvoiceStockCostTotals.Cost + quarterFiscalReceiptStockCostTotals.Cost,
+                        Incomes = quarterIncomes + quarterWorkSaleTotals.Profit + quarterArchivedInvoiceTotals.Total + quarterFiscalReceiptTotals.Total,
                         Purchases = quarterPurchases,
                         Rents = quarterRents,
                         ArchivedInvoices = quarterArchivedInvoiceTotals.Total,
+                        FiscalReceipts = quarterFiscalReceiptTotals.Total,
                         WorkSalesRevenue = quarterWorkSaleTotals.Revenue,
                         WorkSalesCost = quarterWorkSaleTotals.Cost,
                         WorkSalesProfit = quarterWorkSaleTotals.Profit,
                         InvoiceStockCost = quarterInvoiceStockCostTotals.Cost,
-                        NetIncome = (quarterIncomes + quarterWorkSaleTotals.Profit + quarterArchivedInvoiceTotals.Total) -
-                                    (quarterExpenses + quarterInvoiceStockCostTotals.Cost) -
+                        FiscalReceiptStockCost = quarterFiscalReceiptStockCostTotals.Cost,
+                        NetIncome = (quarterIncomes + quarterWorkSaleTotals.Profit + quarterArchivedInvoiceTotals.Total + quarterFiscalReceiptTotals.Total) -
+                                    (quarterExpenses + quarterInvoiceStockCostTotals.Cost + quarterFiscalReceiptStockCostTotals.Cost) -
                                     quarterPurchases -
                                     quarterRents
                     };
@@ -914,11 +1070,15 @@ namespace backend.Services
                     TotalEmployeePayments = salaryTotals.TotalSalaries,
                     TotalArchivedInvoices = archivedInvoiceTotals.Total,
                     ArchivedInvoicesCount = archivedInvoiceTotals.Count,
+                    TotalFiscalReceipts = fiscalReceiptTotals.Total,
+                    FiscalReceiptsCount = fiscalReceiptTotals.Count,
                     TotalWorkSalesRevenue = workSaleTotals.Revenue,
                     TotalWorkSalesCost = workSaleTotals.Cost,
                     TotalWorkSalesProfit = workSaleTotals.Profit,
                     TotalInvoiceStockCost = invoiceStockCostTotals.Cost,
                     InvoiceStockCostCount = invoiceStockCostTotals.Count,
+                    TotalFiscalReceiptStockCost = fiscalReceiptStockCostTotals.Cost,
+                    FiscalReceiptStockCostCount = fiscalReceiptStockCostTotals.Count,
                     TotalOutflow = totalOutflow,
                     NetIncome = netIncome,
                     ProfitMargin = totalIncome > 0 ? (netIncome / totalIncome) * 100 : 0,
@@ -935,12 +1095,15 @@ namespace backend.Services
                     Purchases = annualPurchases.Count,
                     Rents = annualRents.Count,
                     ArchivedInvoices = annualArchivedInvoices.Count,
+                    FiscalReceipts = fiscalReceiptTotals.Count,
                     WorkSales = annualWorkSales.Count,
                     InvoiceStockCostMovements = invoiceStockCostTotals.Count,
+                    FiscalReceiptStockCostMovements = fiscalReceiptStockCostTotals.Count,
                     StockMovements = stockSplitTotals.TotalMovementCount,
                     WorkerTasks = workerTaskCounts.Total
                 },
                 ArchivedInvoices = BuildArchivedInvoiceReport(archivedInvoiceTotals),
+                FiscalReceipts = BuildArchivedInvoiceReport(fiscalReceiptTotals),
                 StockSplit = BuildStockSplitReport(stockSplitTotals),
                 WorkerTaskCounts = new
                 {
@@ -949,7 +1112,12 @@ namespace backend.Services
                     InProcess = workerTaskCounts.InProcess,
                     Completed = workerTaskCounts.Completed
                 },
-                ExpenseBreakdown = BuildExpenseBreakdown(annualExpenses, totalOutflow, invoiceStockCostTotals, salaryTotals)
+                ExpenseBreakdown = BuildExpenseBreakdown(
+                    annualExpenses,
+                    totalOutflow,
+                    invoiceStockCostTotals,
+                    salaryTotals,
+                    fiscalReceiptStockCostTotals)
             };
         }
 
@@ -1026,6 +1194,8 @@ namespace backend.Services
             var workSaleTotals = await GetMonthlyWorkSaleTotalsAsync(yearStart, yearEnd);
             var archivedInvoiceTotals = await GetMonthlyArchivedInvoiceTotalsAsync(yearStart, yearEnd);
             var invoiceStockCostTotals = await GetMonthlyInvoiceStockCostTotalsAsync(yearStart, yearEnd);
+            var fiscalReceiptTotals = await GetMonthlyFiscalReceiptTotalsAsync(yearStart, yearEnd);
+            var fiscalReceiptStockCostTotals = await GetMonthlyFiscalReceiptStockCostTotalsAsync(yearStart, yearEnd);
             var workerTaskCounts = await GetMonthlyWorkerTaskCountsAsync(yearStart, yearEnd);
             var stockTotals = await GetCurrentStockSplitTotalsAsync();
             var reports = new List<MonthlyReportDto>(12);
@@ -1040,10 +1210,12 @@ namespace backend.Services
                 var workSaleTotal = GetMonthlyValue(workSaleTotals, month, WorkSaleFinancialTotals.Empty);
                 var archivedInvoiceTotal = GetMonthlyValue(archivedInvoiceTotals, month, ArchivedInvoiceFinancialTotals.Empty);
                 var invoiceStockCostTotal = GetMonthlyValue(invoiceStockCostTotals, month, InvoiceStockCostTotals.Empty);
+                var fiscalReceiptTotal = GetMonthlyValue(fiscalReceiptTotals, month, ArchivedInvoiceFinancialTotals.Empty);
+                var fiscalReceiptStockCostTotal = GetMonthlyValue(fiscalReceiptStockCostTotals, month, InvoiceStockCostTotals.Empty);
                 var workerTaskCount = GetMonthlyValue(workerTaskCounts, month, WorkerTaskCounts.Empty);
 
-                var totalExpenses = expenseTotal + invoiceStockCostTotal.Cost;
-                var totalIncome = incomeTotal + workSaleTotal.Profit + archivedInvoiceTotal.Total;
+                var totalExpenses = expenseTotal + invoiceStockCostTotal.Cost + fiscalReceiptStockCostTotal.Cost;
+                var totalIncome = incomeTotal + workSaleTotal.Profit + archivedInvoiceTotal.Total + fiscalReceiptTotal.Total;
                 var netProfit = totalIncome - (totalExpenses + rentTotal + purchaseTotal + salaryTotal.TotalSalaries);
 
                 reports.Add(new MonthlyReportDto
@@ -1059,12 +1231,16 @@ namespace backend.Services
                     EmployeeCount = salaryTotal.EmployeeCount,
                     TotalArchivedInvoices = archivedInvoiceTotal.Total,
                     ArchivedInvoicesCount = archivedInvoiceTotal.Count,
+                    TotalFiscalReceipts = fiscalReceiptTotal.Total,
+                    FiscalReceiptsCount = fiscalReceiptTotal.Count,
                     TotalWorkSalesRevenue = workSaleTotal.Revenue,
                     TotalWorkSalesCost = workSaleTotal.Cost,
                     TotalWorkSalesProfit = workSaleTotal.Profit,
                     WorkSalesCount = workSaleTotal.Count,
                     TotalInvoiceStockCost = invoiceStockCostTotal.Cost,
                     InvoiceStockCostCount = invoiceStockCostTotal.Count,
+                    TotalFiscalReceiptStockCost = fiscalReceiptStockCostTotal.Cost,
+                    FiscalReceiptStockCostCount = fiscalReceiptStockCostTotal.Count,
                     MaterialStockItemCount = stockTotals.Material.ItemCount,
                     MaterialStockQuantity = stockTotals.Material.CurrentQuantity,
                     ProductStockItemCount = stockTotals.Product.ItemCount,
@@ -1242,6 +1418,74 @@ namespace backend.Services
             DateTime todayExclusive)
         {
             var movements = await GetInvoiceStockCostMovementSnapshotsAsync(null, null);
+            var currentMonth = new InvoiceStockCostAccumulator();
+            var yearToDate = new InvoiceStockCostAccumulator();
+            var allTime = new InvoiceStockCostAccumulator();
+
+            foreach (var movement in movements)
+            {
+                allTime.Add(movement);
+
+                if (movement.OccurredAt >= yearStart && movement.OccurredAt < todayExclusive)
+                {
+                    yearToDate.Add(movement);
+                }
+
+                if (movement.OccurredAt >= currentMonthStart && movement.OccurredAt < currentMonthEnd)
+                {
+                    currentMonth.Add(movement);
+                }
+            }
+
+            return new DashboardInvoiceStockCostBuckets
+            {
+                CurrentMonth = currentMonth.ToTotals(),
+                YearToDate = yearToDate.ToTotals(),
+                AllTime = allTime.ToTotals()
+            };
+        }
+
+        private async Task<DashboardArchivedInvoiceBuckets> GetDashboardFiscalReceiptBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive)
+        {
+            var receipts = await GetFiscalReceiptFinancialSnapshots().ToListAsync();
+            var currentMonth = new ArchivedInvoiceFinancialAccumulator();
+            var yearToDate = new ArchivedInvoiceFinancialAccumulator();
+            var allTime = new ArchivedInvoiceFinancialAccumulator();
+
+            foreach (var receipt in receipts)
+            {
+                allTime.Add(receipt);
+
+                if (receipt.CreatedAt >= yearStart && receipt.CreatedAt < todayExclusive)
+                {
+                    yearToDate.Add(receipt);
+                }
+
+                if (receipt.CreatedAt >= currentMonthStart && receipt.CreatedAt < currentMonthEnd)
+                {
+                    currentMonth.Add(receipt);
+                }
+            }
+
+            return new DashboardArchivedInvoiceBuckets
+            {
+                CurrentMonth = currentMonth.ToTotals(),
+                YearToDate = yearToDate.ToTotals(),
+                AllTime = allTime.ToTotals()
+            };
+        }
+
+        private async Task<DashboardInvoiceStockCostBuckets> GetDashboardFiscalReceiptStockCostBucketsAsync(
+            DateTime currentMonthStart,
+            DateTime currentMonthEnd,
+            DateTime yearStart,
+            DateTime todayExclusive)
+        {
+            var movements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(null, null);
             var currentMonth = new InvoiceStockCostAccumulator();
             var yearToDate = new InvoiceStockCostAccumulator();
             var allTime = new InvoiceStockCostAccumulator();
@@ -1623,6 +1867,56 @@ namespace backend.Services
             DateTime yearEnd)
         {
             var movements = await GetInvoiceStockCostMovementSnapshotsAsync(yearStart, yearEnd);
+            var accumulators = new Dictionary<int, InvoiceStockCostAccumulator>();
+
+            foreach (var movement in movements)
+            {
+                var month = movement.OccurredAt.Month;
+                if (!accumulators.TryGetValue(month, out var accumulator))
+                {
+                    accumulator = new InvoiceStockCostAccumulator();
+                    accumulators[month] = accumulator;
+                }
+
+                accumulator.Add(movement);
+            }
+
+            return accumulators.ToDictionary(
+                item => item.Key,
+                item => item.Value.ToTotals());
+        }
+
+        private async Task<Dictionary<int, ArchivedInvoiceFinancialTotals>> GetMonthlyFiscalReceiptTotalsAsync(
+            DateTime yearStart,
+            DateTime yearEnd)
+        {
+            var receipts = await GetFiscalReceiptFinancialSnapshots()
+                .Where(receipt => receipt.CreatedAt >= yearStart && receipt.CreatedAt < yearEnd)
+                .ToListAsync();
+            var accumulators = new Dictionary<int, ArchivedInvoiceFinancialAccumulator>();
+
+            foreach (var receipt in receipts)
+            {
+                var month = receipt.CreatedAt.Month;
+                if (!accumulators.TryGetValue(month, out var accumulator))
+                {
+                    accumulator = new ArchivedInvoiceFinancialAccumulator();
+                    accumulators[month] = accumulator;
+                }
+
+                accumulator.Add(receipt);
+            }
+
+            return accumulators.ToDictionary(
+                item => item.Key,
+                item => item.Value.ToTotals());
+        }
+
+        private async Task<Dictionary<int, InvoiceStockCostTotals>> GetMonthlyFiscalReceiptStockCostTotalsAsync(
+            DateTime yearStart,
+            DateTime yearEnd)
+        {
+            var movements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(yearStart, yearEnd);
             var accumulators = new Dictionary<int, InvoiceStockCostAccumulator>();
 
             foreach (var movement in movements)
@@ -2448,14 +2742,77 @@ namespace backend.Services
             };
         }
 
+        private IQueryable<FiscalReceiptArchive> GetFiscalReceiptsForPeriod(DateTime? startDate, DateTime? endExclusive)
+        {
+            var fiscalReceipts = _context.FiscalReceiptArchives.AsNoTracking().AsQueryable();
+
+            if (startDate.HasValue)
+            {
+                fiscalReceipts = fiscalReceipts.Where(receipt => receipt.ArchivedAt >= startDate.Value);
+            }
+
+            if (endExclusive.HasValue)
+            {
+                fiscalReceipts = fiscalReceipts.Where(receipt => receipt.ArchivedAt < endExclusive.Value);
+            }
+
+            return fiscalReceipts;
+        }
+
+        private async Task<ArchivedInvoiceFinancialTotals> GetFiscalReceiptFinancialTotalsAsync(
+            DateTime? startDate,
+            DateTime? endExclusive)
+        {
+            var fiscalReceipts = await GetFiscalReceiptFinancialSnapshots(startDate, endExclusive)
+                .ToListAsync();
+
+            return GetArchivedInvoiceFinancialTotals(fiscalReceipts);
+        }
+
+        private IQueryable<ArchivedInvoiceFinancialSnapshot> GetFiscalReceiptFinancialSnapshots(
+            DateTime? startDate = null,
+            DateTime? endExclusive = null)
+        {
+            var receipts = GetFiscalReceiptsForPeriod(startDate, endExclusive);
+
+            return receipts.Select(receipt => new ArchivedInvoiceFinancialSnapshot
+            {
+                CreatedAt = receipt.ArchivedAt,
+                Subtotal = receipt.Subtotal,
+                Total = receipt.Total,
+                ItemsJson = receipt.ItemsJson
+            });
+        }
+
         private async Task<List<InvoiceStockCostMovementSnapshot>> GetInvoiceStockCostMovementSnapshotsAsync(
+            DateTime? startDate,
+            DateTime? endExclusive)
+        {
+            return await GetStockCostMovementSnapshotsAsync(
+                InvoiceStockMovementKind,
+                startDate,
+                endExclusive);
+        }
+
+        private async Task<List<InvoiceStockCostMovementSnapshot>> GetFiscalReceiptStockCostMovementSnapshotsAsync(
+            DateTime? startDate,
+            DateTime? endExclusive)
+        {
+            return await GetStockCostMovementSnapshotsAsync(
+                FiscalReceiptStockMovementKind,
+                startDate,
+                endExclusive);
+        }
+
+        private async Task<List<InvoiceStockCostMovementSnapshot>> GetStockCostMovementSnapshotsAsync(
+            string movementKind,
             DateTime? startDate,
             DateTime? endExclusive)
         {
             var movements = _context.StockMovements
                 .AsNoTracking()
                 .Where(movement =>
-                    movement.MovementKind == InvoiceStockMovementKind &&
+                    movement.MovementKind == movementKind &&
                     movement.QuantityChange < 0);
 
             if (startDate.HasValue)
@@ -2485,6 +2842,14 @@ namespace backend.Services
             DateTime? endExclusive)
         {
             var movements = await GetInvoiceStockCostMovementSnapshotsAsync(startDate, endExclusive);
+            return GetInvoiceStockCostTotals(movements);
+        }
+
+        private async Task<InvoiceStockCostTotals> GetFiscalReceiptStockCostTotalsAsync(
+            DateTime? startDate,
+            DateTime? endExclusive)
+        {
+            var movements = await GetFiscalReceiptStockCostMovementSnapshotsAsync(startDate, endExclusive);
             return GetInvoiceStockCostTotals(movements);
         }
 
@@ -2660,7 +3025,8 @@ namespace backend.Services
             IEnumerable<Expense> expenses,
             decimal totalOutflow,
             InvoiceStockCostTotals invoiceStockCostTotals,
-            SalaryFinancialTotals? salaryTotals = null)
+            SalaryFinancialTotals? salaryTotals = null,
+            InvoiceStockCostTotals? fiscalReceiptStockCostTotals = null)
         {
             var breakdown = expenses
                 .GroupBy(e => e.ExpenseType)
@@ -2681,6 +3047,18 @@ namespace backend.Services
                     Total = invoiceStockCostTotals.Cost,
                     Count = invoiceStockCostTotals.Count,
                     Percentage = totalOutflow > 0 ? (invoiceStockCostTotals.Cost / totalOutflow) * 100 : 0
+                });
+            }
+
+            var fiscalReceiptStockCost = fiscalReceiptStockCostTotals ?? InvoiceStockCostTotals.Empty;
+            if (fiscalReceiptStockCost.Count > 0 || fiscalReceiptStockCost.Cost > 0)
+            {
+                breakdown.Add(new ExpenseBreakdownItem
+                {
+                    Type = "Fiscal Receipt Stock Cost",
+                    Total = fiscalReceiptStockCost.Cost,
+                    Count = fiscalReceiptStockCost.Count,
+                    Percentage = totalOutflow > 0 ? (fiscalReceiptStockCost.Cost / totalOutflow) * 100 : 0
                 });
             }
 

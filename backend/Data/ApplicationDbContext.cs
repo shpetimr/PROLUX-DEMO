@@ -21,6 +21,9 @@ namespace backend.Data
         public DbSet<Debt> Debts { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Project> Projects { get; set; }
+        public DbSet<FiscalReceipt> FiscalReceipts { get; set; }
+        public DbSet<FiscalReceiptArchive> FiscalReceiptArchives { get; set; }
+        public DbSet<FiscalReceiptStockDeduction> FiscalReceiptStockDeductions { get; set; }
         public DbSet<InvoiceArchive> InvoiceArchives { get; set; }
         public DbSet<InvoiceStockDeduction> InvoiceStockDeductions { get; set; }
         public DbSet<StockItem> StockItems { get; set; }
@@ -236,6 +239,69 @@ namespace backend.Data
                 entity.HasIndex(e => e.ClientRequestId).IsUnique();
                 entity.HasIndex(e => e.CreatedAt);
                 entity.HasIndex(e => e.CreatedById);
+            });
+
+            modelBuilder.Entity<FiscalReceipt>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ReceiptNumber).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.ClientRequestId).HasMaxLength(100);
+                entity.Property(e => e.CustomerName).HasMaxLength(200);
+                entity.Property(e => e.CustomerPhone).HasMaxLength(50);
+                entity.Property(e => e.ItemsJson).IsRequired();
+                entity.Property(e => e.Subtotal).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Total).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.Property(e => e.Status).IsRequired().HasConversion<string>();
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.ReceiptNumber).IsUnique();
+                entity.HasIndex(e => e.ClientRequestId).IsUnique();
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.PrintedAt);
+                entity.HasIndex(e => e.CreatedById);
+            });
+
+            modelBuilder.Entity<FiscalReceiptArchive>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ReceiptNumber).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.ClientRequestId).HasMaxLength(100);
+                entity.Property(e => e.CustomerName).HasMaxLength(200);
+                entity.Property(e => e.CustomerPhone).HasMaxLength(50);
+                entity.Property(e => e.ItemsJson).IsRequired();
+                entity.Property(e => e.Subtotal).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Total).HasColumnType("decimal(18,2)");
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.HasOne(e => e.FiscalReceipt)
+                    .WithOne(e => e.Archive)
+                    .HasForeignKey<FiscalReceiptArchive>(e => e.FiscalReceiptId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(e => e.FiscalReceiptId).IsUnique();
+                entity.HasIndex(e => e.ReceiptNumber).IsUnique();
+                entity.HasIndex(e => e.ClientRequestId).IsUnique();
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.PrintedAt);
+                entity.HasIndex(e => e.ArchivedAt);
+                entity.HasIndex(e => e.CreatedById);
+            });
+
+            modelBuilder.Entity<FiscalReceiptStockDeduction>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.DeductionKey).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.ReceiptNumber).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.CustomerName).HasMaxLength(200);
+                entity.HasIndex(e => e.DeductionKey).IsUnique();
+                entity.HasIndex(e => e.ReceiptNumber);
+                entity.HasIndex(e => e.AppliedAt);
             });
 
             modelBuilder.Entity<StockItem>(entity =>
