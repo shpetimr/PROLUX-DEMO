@@ -13,6 +13,9 @@ namespace backend.Controllers
     [Authorize]
     public class FiscalReceiptArchiveController : ControllerBase
     {
+        private const string ReprintMessage =
+            "Reprint uses archived fiscal receipt data; stock deduction was not repeated.";
+
         private readonly ApplicationDbContext _context;
 
         public FiscalReceiptArchiveController(ApplicationDbContext context)
@@ -57,20 +60,28 @@ namespace backend.Controllers
             return Ok(ToDto(receipt));
         }
 
-        [HttpDelete("{id:int}")]
+        [HttpPost("{id:int}/reprint")]
         [Authorize(Policy = AppPermissions.FiscalReceiptArchiveManage)]
-        public async Task<IActionResult> DeleteArchivedFiscalReceipt(int id)
+        public async Task<ActionResult<FiscalReceiptArchiveResponseDto>> ReprintArchivedFiscalReceipt(int id)
         {
-            var receipt = await _context.FiscalReceiptArchives.FindAsync(id);
+            var receipt = await _context.FiscalReceiptArchives
+                .AsNoTracking()
+                .Include(entity => entity.CreatedBy)
+                .FirstOrDefaultAsync(entity => entity.Id == id);
+
             if (receipt == null)
             {
                 return NotFound();
             }
 
-            _context.FiscalReceiptArchives.Remove(receipt);
-            await _context.SaveChangesAsync();
+            var response = ToDto(receipt);
+            response.StockDeduction = new InvoiceStockDeductionResultDto
+            {
+                AlreadyApplied = true,
+                Message = ReprintMessage
+            };
 
-            return NoContent();
+            return Ok(response);
         }
 
         private static FiscalReceiptArchiveResponseDto ToDto(FiscalReceiptArchive receipt)

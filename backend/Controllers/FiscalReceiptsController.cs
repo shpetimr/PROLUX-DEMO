@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -74,7 +75,7 @@ namespace backend.Controllers
         }
 
         [HttpPost("print")]
-        [Authorize(Policy = AppPermissions.FiscalReceiptsManage)]
+        [Authorize(Policy = AppPermissions.TemplatesPrint)]
         public async Task<ActionResult<FiscalReceiptArchiveResponseDto>> PrintFiscalReceipt(
             [FromBody] CreateFiscalReceiptDto dto)
         {
@@ -84,14 +85,24 @@ namespace backend.Controllers
                 return Unauthorized();
             }
 
-            if (!IsValidItemsJson(dto.ItemsJson))
+            var itemValidationError = ValidateReceiptItemsJson(dto.ItemsJson);
+            if (!string.IsNullOrWhiteSpace(itemValidationError))
             {
-                return BadRequest(new { message = "ItemsJson must be valid JSON." });
+                return BadRequest(new { message = itemValidationError });
             }
 
             var requestedReceiptNumber = dto.ReceiptNumber?.Trim() ?? "";
             var clientRequestId = NormalizeOptional(dto.ClientRequestId);
             var customerName = NormalizeOptional(dto.CustomerName);
+
+            if (string.IsNullOrWhiteSpace(requestedReceiptNumber) &&
+                string.IsNullOrWhiteSpace(clientRequestId))
+            {
+                return BadRequest(new
+                {
+                    message = "ClientRequestId is required when the fiscal receipt number is generated automatically."
+                });
+            }
 
             if (!string.IsNullOrWhiteSpace(clientRequestId))
             {
@@ -445,23 +456,71 @@ namespace backend.Controllers
                     entity.ReceiptNumber.ToUpper() == normalizedReceiptNumber);
         }
 
-        private static bool IsValidItemsJson(string? itemsJson)
+        private static string? ValidateReceiptItemsJson(string? itemsJson)
         {
             if (string.IsNullOrWhiteSpace(itemsJson))
             {
-                return false;
+                return "ItemsJson is required.";
             }
 
             try
             {
                 using var document = JsonDocument.Parse(itemsJson);
-                return document.RootElement.ValueKind == JsonValueKind.Array
-                    || document.RootElement.ValueKind == JsonValueKind.Object;
+                var root = document.RootElement;
+                var items = root.ValueKind == JsonValueKind.Array
+                    ? root
+                    : TryReadProperty(root, "items", "rows", "lines");
+
+                if (items.ValueKind != JsonValueKind.Array)
+                {
+                    return "ItemsJson must contain an items array.";
+                }
+
+                var hasReceiptLine = false;
+                foreach (var item in items.EnumerateArray())
+                {
+                    if (item.ValueKind != JsonValueKind.Object)
+                    {
+                        return "Fiscal receipt items must be JSON objects.";
+                    }
+
+                    if (!IsFilledReceiptLine(item))
+                    {
+                        continue;
+                    }
+
+                    hasReceiptLine = true;
+                    var name = ReadString(item, "name", "itemName", "description").Trim();
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        return "Each fiscal receipt item must include a name.";
+                    }
+
+                    var quantity = ParseReceiptQuantity(
+                        ReadString(item, "m2pcs", "m2Pcs", "quantity", "qty"));
+                    if (quantity <= 0)
+                    {
+                        return $"Fiscal receipt line '{name}' must have a quantity greater than 0.";
+                    }
+                }
+
+                return hasReceiptLine
+                    ? null
+                    : "Fiscal receipt must include at least one item.";
             }
             catch (JsonException)
             {
-                return false;
+                return "ItemsJson must be valid JSON.";
             }
+        }
+
+        private static bool IsFilledReceiptLine(JsonElement item)
+        {
+            return !string.IsNullOrWhiteSpace(ReadString(item, "name", "itemName", "description")) ||
+                !string.IsNullOrWhiteSpace(ReadString(item, "materials", "material")) ||
+                !string.IsNullOrWhiteSpace(ReadString(item, "m2pcs", "m2Pcs", "quantity", "qty")) ||
+                !string.IsNullOrWhiteSpace(ReadString(item, "price", "unitPrice")) ||
+                !string.IsNullOrWhiteSpace(ReadString(item, "total", "lineTotal"));
         }
 
         private static string? NormalizeOptional(string? value)
@@ -472,6 +531,67 @@ namespace backend.Controllers
         private static string BuildPendingReceiptNumber()
         {
             return $"PENDING-LF-{Guid.NewGuid():N}";
+        }
+
+        private static decimal ParseReceiptQuantity(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return 0m;
+            }
+
+            var normalized = raw.Trim().Replace('\u00A0', ' ').Replace(',', '.');
+            var matches = Regex.Matches(normalized, @"[-+]?(?:\d+\.?\d*|\.\d+)");
+            var quantityText = matches
+                .Cast<Match>()
+                .FirstOrDefault(match =>
+                    match.Index == 0 ||
+                    !char.IsLetter(normalized[match.Index - 1]))
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(quantityText))
+            {
+                return 0m;
+            }
+
+            return decimal.TryParse(
+                quantityText,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var parsed)
+                    ? parsed
+                    : 0m;
+        }
+
+        private static JsonElement TryReadProperty(JsonElement source, params string[] names)
+        {
+            if (source.ValueKind != JsonValueKind.Object)
+            {
+                return default;
+            }
+
+            foreach (var property in source.EnumerateObject())
+            {
+                if (names.Any(name => property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return property.Value;
+                }
+            }
+
+            return default;
+        }
+
+        private static string ReadString(JsonElement source, params string[] names)
+        {
+            var value = TryReadProperty(source, names);
+            return value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString() ?? "",
+                JsonValueKind.Number => value.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => ""
+            };
         }
 
         private async Task<string> GenerateReceiptNumberForArchiveAsync(int archiveId, DateTime createdAt)
