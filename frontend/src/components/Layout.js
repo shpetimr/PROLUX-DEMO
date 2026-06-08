@@ -23,6 +23,7 @@ import {
   CrownOutlined,
   MenuOutlined,
   PrinterOutlined,
+  FolderOpenOutlined,
   ProjectOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
@@ -70,6 +71,12 @@ function Layout() {
         requiredPermission: PERMISSIONS.TEMPLATES_PRINT,
       },
       {
+        key: "/fiscal-receipt",
+        icon: <PrinterOutlined />,
+        label: "Let\u00EBr Fiskale",
+        requiredPermission: PERMISSIONS.TEMPLATES_PRINT,
+      },
+      {
         key: "/offer-print",
         icon: <FileTextOutlined />,
         label: "Ofertë",
@@ -80,6 +87,12 @@ function Layout() {
         icon: <FileTextOutlined />,
         label: "Faturat e Arkivuara",
         requiredPermission: PERMISSIONS.INVOICE_ARCHIVE_MANAGE,
+      },
+      {
+        key: "/fiscal-receipt-archive",
+        icon: <FolderOpenOutlined />,
+        label: "Arkiva e Letrave Fiskale",
+        requiredPermission: PERMISSIONS.FISCAL_RECEIPT_ARCHIVE_MANAGE,
       },
       {
         key: "/employees",

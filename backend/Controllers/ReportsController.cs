@@ -1046,6 +1046,16 @@ namespace backend.Controllers
                         total = (decimal)obj.FinancialSummary.TotalArchivedInvoices,
                         count = obj.TransactionCounts.ArchivedInvoices
                     },
+                    fiscalReceipts = new
+                    {
+                        total = (decimal)obj.FinancialSummary.TotalFiscalReceipts,
+                        count = obj.TransactionCounts.FiscalReceipts
+                    },
+                    fiscalReceiptStockCost = new
+                    {
+                        total = (decimal)obj.FinancialSummary.TotalFiscalReceiptStockCost,
+                        count = obj.TransactionCounts.FiscalReceiptStockCostMovements
+                    },
                     workSales = new
                     {
                         revenue = (decimal)obj.FinancialSummary.TotalWorkSalesRevenue,

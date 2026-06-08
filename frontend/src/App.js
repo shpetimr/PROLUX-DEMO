@@ -29,6 +29,8 @@ import { DataChangeProvider } from "./contexts/DataChangeContext";
 import TemplatePrint from "./pages/TemplatePrint";
 import OfferPrint from "./pages/OfferPrint";
 import InvoiceArchive from "./pages/InvoiceArchive";
+import FiscalReceipt from "./pages/FiscalReceipt";
+import FiscalReceiptArchive from "./pages/FiscalReceiptArchive";
 import Stock from "./pages/Stock";
 import { PERMISSIONS, ROLES } from "./config/permissions";
 
@@ -191,12 +193,32 @@ function App() {
                 }
               />
               <Route
+                path="fiscal-receipt"
+                element={
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.TEMPLATES_PRINT}
+                  >
+                    <FiscalReceipt />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="invoice-archive"
                 element={
                   <ProtectedRoute
                     requiredPermission={PERMISSIONS.INVOICE_ARCHIVE_MANAGE}
                   >
                     <InvoiceArchive />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="fiscal-receipt-archive"
+                element={
+                  <ProtectedRoute
+                    requiredPermission={PERMISSIONS.FISCAL_RECEIPT_ARCHIVE_MANAGE}
+                  >
+                    <FiscalReceiptArchive />
                   </ProtectedRoute>
                 }
               />

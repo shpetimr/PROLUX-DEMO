@@ -266,6 +266,12 @@ export const API_ENDPOINTS = {
   INVOICE_ARCHIVE: "/invoice-archive",
   INVOICE_ARCHIVE_BY_ID: (id) => `/invoice-archive/${id}`,
   INVOICE_ARCHIVE_PDF: (id) => `/invoice-archive/${id}/pdf`,
+
+  FISCAL_RECEIPTS_PRINT: "/fiscal-receipts/print",
+  FISCAL_RECEIPT_ARCHIVE: "/fiscal-receipt-archive",
+  FISCAL_RECEIPT_ARCHIVE_BY_ID: (id) => `/fiscal-receipt-archive/${id}`,
+  FISCAL_RECEIPT_ARCHIVE_REPRINT: (id) =>
+    `/fiscal-receipt-archive/${id}/reprint`,
 };
 
 export default apiClient;
